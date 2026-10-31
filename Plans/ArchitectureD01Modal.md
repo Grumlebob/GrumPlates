@@ -1,6 +1,6 @@
 # D01: Book modal operation lifecycle
 
-Status: inventory and primary design reviewed; implementation and validation remain in progress. Production deployment is outside this package.
+Status: verified integrated through [PR 402](https://github.com/Grumlebob/GrumPlates/pull/402) as `fe0339c25fe34f2920324bd7a335823817d67426`. The owning PR retains the accepted lifecycle map, complete local/profile/package evidence, exact-head/main CI and accepted final payload receipt. Windows source and branches are closed; the previously rejected Linux cleanup remains an overall-goal dependency. Production deployment is outside this package.
 
 ## Baseline and ownership
 

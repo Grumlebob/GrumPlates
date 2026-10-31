@@ -1,6 +1,6 @@
 # A05: React transport ownership
 
-Status: implementation in progress. This package follows verified Accounts integration and preserves existing transport behavior.
+Status: verified integrated through [PR 400](https://github.com/Grumlebob/GrumPlates/pull/400) as `9a7177dec56abaa1a665c4bb481d5dd35b377c6a`. The owning PR retains compatibility, local/profile/package and exact-head/main CI evidence. Windows source and branches are closed. The Linux clone later served D01/D02 and remains an overall-goal cleanup dependency after automatic approval review rejected its scoped removal; its diagnostics and synthetic keyring are preserved with verified hashes.
 
 ## Baseline and prerequisite
 
