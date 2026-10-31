@@ -1,6 +1,6 @@
 # D02: Final architecture reconciliation
 
-Status: architecture guard and documentation reconciliation in progress; local validation and integration remain. Production deployment is outside this package.
+Status: verified integrated through [PR 403](https://github.com/Grumlebob/GrumPlates/pull/403) as `cbe751cd607932f5be731c1100735a244ce67bd6`. The owning PR retains complete local/profile/static/package evidence, exact-head/main CI, equal reviewed/integrated content and the accepted final immutable receipt. Windows source and branches are closed; the previously rejected Linux cleanup remains an explicit overall-goal dependency. All 124 retained diagnostics are covered by verified archives, including the one supplementary 70-byte success record. Production deployment is outside this package.
 
 ## Verified prerequisites and scope
 

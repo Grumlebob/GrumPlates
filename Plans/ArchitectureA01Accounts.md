@@ -1,6 +1,6 @@
 # A01: GrumPlates Accounts boundary
 
-Status: In progress. Source and move map reviewed before implementation on 2026-10-28.
+Status: verified integrated through [PR 398](https://github.com/Grumlebob/GrumPlates/pull/398) as `0988e75c35c62138d88ab762a5fcbca8589147e6`. The owning PR retains compatibility, local/profile/package and exact-head/main CI evidence. Accounts source resources are closed. The implementation notes below retain the original execution sequence.
 
 This task implements GP:A01 from Portfolio's CrossProjectArchitectureUpgrade plan. Production deployment is outside scope. A05, D01 and D02 follow only after their prerequisites integrate.
 
