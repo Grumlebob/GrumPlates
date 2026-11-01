@@ -12,7 +12,6 @@ using GrumPlates.Core.Features.Books.UseCases.UpdateBook;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace GrumPlates.Test.Features.Books.Client;
