@@ -1,6 +1,6 @@
 # D01 follow-up: changed authentication on the same modal route
 
-Status: a final requirement review reopened D01.4. The focused host characterization is prepared against unchanged product source; it must execute before the bridge changes. No local, CI or integration acceptance is claimed. Production deployment is outside this package.
+Status: a final requirement review reopened D01.4. Test-only characterization reproduced both same-route authentication-change failures against unchanged product source; the minimal host bridge is now implemented and awaits focused feedback. Full local/package, CI and integration acceptance remain required. Production deployment is outside this package.
 
 ## Requirement and baseline
 
@@ -24,6 +24,10 @@ The component remains the bridge; `BookModalLifecycle` remains unregistered and 
 The test project already references `Microsoft.AspNetCore.App`; no new test package is needed. [HtmlRenderer.BeginRenderingComponent](https://learn.microsoft.com/en-us/dotnet/api/microsoft.aspnetcore.components.web.htmlrenderer.beginrenderingcomponent?view=aspnetcore-10.0) permits observing initial asynchronous render output and awaiting `QuiescenceTask` after controlled completion. Static rendering does not replace the required real-browser focus/hydration checks. All fake API responses and accounts are synthetic.
 
 ## Verification and closeout
+
+Test-only source `f636e2665a8dd1e33f526ff1715272698842bc6d` passed native restore, complete solution formatting and fresh Release compilation with zero warnings/errors. The broad BookModal filter selected nineteen results: sixteen passed, both new account-change/sign-out cases failed, and one existing opt-in browser case was NotExecuted. Initial static prerender and every pre-existing selected modal unit case passed. Both new failures occur at the barrier waiting for a second read after authentication notification: the unchanged host never starts that read. The bounded finally block releases the old load and awaits renderer completion, leaving no hung test or unowned process. All seven raw diagnostic payloads and their source hashes are preserved. This deliberate failing characterization is evidence of the uncovered requirement, not a successful application gate.
+
+The primary accepts a seven-line bridge: remember the authentication task used by each route load, and reload through the existing lifecycle only when parameter processing receives a different task. Initialization records that task before its asynchronous load, so the initial parameter phase does not issue a second request. URI changes keep their existing path. A replacement task now clears stale content and cancels active load/operation state through the already tested lifecycle owner. No lifecycle, API, identity, rendering, CSS or storage policy changes.
 
 First execute the focused BookModal family on test-only source, retaining the old-route/disposal results and the new same-route failure. Correct only the host bridge after confirming that behavior. Then repeat focused feedback, review the exact lifecycle/source delta and run the complete prescribed local gate for both frontend profiles and all static checks before push. CSS classes do not change. Verify actual final-image modal/account/browser behavior with zero required skips.
 

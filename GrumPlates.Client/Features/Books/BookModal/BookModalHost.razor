@@ -75,6 +75,7 @@
 @code {
     private ElementReference _dialog;
     private BookModalLifecycle _lifecycle = default!;
+    private Task<AuthenticationState>? _loadedAuthenticationStateTask;
     private bool _focusPending;
 
     [CascadingParameter]
@@ -96,6 +97,11 @@
         await LoadFromUriAsync();
     }
 
+    protected override Task OnParametersSetAsync() =>
+        ReferenceEquals(_loadedAuthenticationStateTask, AuthenticationStateTask)
+            ? Task.CompletedTask
+            : LoadFromUriAsync();
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_focusPending && _lifecycle.Request is not null)
@@ -112,6 +118,7 @@
 
     private Task LoadFromUriAsync()
     {
+        _loadedAuthenticationStateTask = AuthenticationStateTask;
         var uri = Nav.Uri;
         var request = BookModalRouteState.Parse(uri);
         if (request is not null) _focusPending = true;
