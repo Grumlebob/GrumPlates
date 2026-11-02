@@ -1,6 +1,6 @@
 # D01 follow-up: changed authentication on the same modal route
 
-Status: a final requirement review reopened D01.4. Test-only characterization reproduced both same-route authentication-change failures against unchanged product source; the minimal host bridge is now implemented and awaits focused feedback. Full local/package, CI and integration acceptance remain required. Production deployment is outside this package.
+Status: characterization, bridge, focused feedback, full local gate and isolated final-image browser acceptance passed at `f3c7a4d1121aed6eff84bf32ed09264ba1ff02cc`, and again after rebasing onto the minimatch audit fix at `28e49c224990f53078af7b35ebeaf5f6592e03d8`. Exact-head/main CI, reviewed integration and closeout remain. Production deployment is outside this package.
 
 ## Requirement and baseline
 
@@ -32,3 +32,22 @@ The primary accepts a seven-line bridge: remember the authentication task used b
 First execute the focused BookModal family on test-only source, retaining the old-route/disposal results and the new same-route failure. Correct only the host bridge after confirming that behavior. Then repeat focused feedback, review the exact lifecycle/source delta and run the complete prescribed local gate for both frontend profiles and all static checks before push. CSS classes do not change. Verify actual final-image modal/account/browser behavior with zero required skips.
 
 Require exact-head `build-test-push`, reviewed guarded squash with an explicit non-skip message, fetched integrated content and required exact-main CI/final payload receipt. Retain failed characterization and successful raw evidence with exact identities and hashes. Update the owning PR and Portfolio index, archive compact unique evidence and close only this task's worktree, branches, source/build/smoke resources and claims. The previously rejected historical Linux cleanup remains an explicit manual overall-goal dependency; no alternate deletion is attempted.
+
+## Results at the bridge head
+
+All runs used commit `f3c7a4d1121aed6eff84bf32ed09264ba1ff02cc` in an owned, clean native checkout, one sequence at a time. The SDK was 10.0.303, owned by this task.
+
+- Focused BookModal family: 18 of 18 passed, with no skips. Both same-route account-change and sign-out cases now pass, and so do the initial prerender case and every earlier lifecycle and route case.
+- Full local gate (`docs/Test.md#local-gate`): every listed command passed, including `git diff --check`, restore, all CI Python suites, workflow policy, `dotnet format --verify-no-changes`, release/cloud/observability validation, the deployment audit, the doc-slice loader, rendered templates, yamllint, shellcheck and actionlint. `validate-frontend-profiles.sh` produced:
+
+  | Profile | Non-account tests | Account tests |
+  | --- | --- | --- |
+  | BlazorAuto | 188 passed, 16 expected opt-in skips, 204 total | 171 of 171 |
+  | React | 180 passed, 16 expected opt-in skips, 196 total | 157 of 157 |
+
+- Isolated final image: the `final-blazor` target was built from this commit and started with the CI smoke harness. A scratch copy of that harness, kept outside Git, enabled the Development-style seeded local user and added the Books journeys to its browser filter. Six of six browser cases passed with no skips: rapid modal navigation and focus, create/view/edit/cancel/back, the seeded-user bookcase CRUD across refresh and navigation, mobile author books, pre-hydration save state and render mode. Run-labelled containers were removed by the harness's own cleanup, and the image was deleted afterwards.
+- The bridge adds no CSS class, so Tailwind output is unchanged.
+
+## Rebase onto the audit fix
+
+Exact-head CI 41365398917 at the first push failed only `npm audit`. The cause was the new minimatch advisory GHSA-g3hv-75wg-m249, which this change does not touch. [PR 409](https://github.com/Grumlebob/GrumPlates/pull/409) fixed the audit and was integrated as `b75344e0`. This branch was then rebased onto it without conflicts. At the rebased code head `28e49c224990f53078af7b35ebeaf5f6592e03d8`, the same full local gate passed with identical profile results. The same isolated final-image run passed 6 of 6 Books/app-shell browser cases with no skips, and its image was removed.
