@@ -1,6 +1,6 @@
 # Lean template cleanup
 
-Status: **not started**. Research and inventory were completed on 2026-11-02 against `origin/main` `d28a6c7b3afb0a406a217a5508e103de6227e2f8`. The owner answered every open question on 2026-11-02 (OD-6 to OD-9). A review on the same day added recommendations OD-10 to OD-15 and verified the live state again. No question blocks execution. The live-target work (P01-B and P14) needs operator authorisation. [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md) grants it when the owner starts that goal.
+Status: **not started**. Research and inventory were completed on 2026-11-02 against `origin/main` `d28a6c7b3afb0a406a217a5508e103de6227e2f8`. The owner answered every open question on 2026-11-02 (OD-6 to OD-9). A review on the same day added recommendations OD-10 to OD-15 and verified the live state again. A downstream review added OD-16 to OD-18 and packets D01-D10 (section 7), which port small proven fixes to CarbonCalculator, ImprovedDb, Portfolio and JobHunt. No question blocks execution. The live-target work (P01-B and P14) needs operator authorisation. [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md) grants it when the owner starts that goal.
 
 This is an execution runbook for an agent that has no memory of the conversation that produced it. Do one packet at a time, in the order in section 5. Record evidence as section 3 describes. If a packet's checks fail, stop that packet and fix it or report. Do not skip ahead.
 
@@ -12,6 +12,7 @@ Make GrumPlates a lean template:
 2. **One account model.** Accounts are always on and always use the hardened account code. Remove the `Accounts:Enabled` switch, the original-scaffold Blazor Identity behaviour it kept alive, and the separate `LocalAccounts` demo seed.
 3. **Fewer brittle parts.** Remove settings and checks that duplicate each other, pinned values that must be edited in many places, and checks that read prose documentation.
 4. **Total repository hygiene.** Remove stale branches, resolve open PRs, delete finished plans, and remove local build leftovers.
+5. **Cheap downstream wins.** Unblock the failing Dependabot PRs in CarbonCalculator, ImprovedDb and Portfolio, and port the small template fixes that apply there, without major refactoring (section 7).
 
 Keep everything that represents the intended style for new code: vertical feature slices, caching and cache invalidation, rate limiting, observability, health checks, the three deployment targets, digest-pinned releases, migrations provenance, scoped maintenance and backups.
 
@@ -39,6 +40,9 @@ Recommendations from the 2026-11-02 review. They are accepted when the owner run
 | OD-13 | Bring the LocalCluster database up to date (deploy current `main` with migrations) **before** the squash (packet P01-B). | LocalCluster lacks migration `20261015183858_AccountOutboxAndDataProtectionKeys` (section 4.2). It must have all four old migrations before its history can be rewritten in P14. |
 | OD-14 | P07 is one PR: rename the `ApplicationUser` namespace and squash. | The regenerated snapshot carries the new namespace, so the old migration files never need editing. |
 | OD-15 | P05 deletes `select-ci-runner.yml`. Jobs use `runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]`. | The reusable workflow only passes a variable through once routing is gone. |
+| OD-16 | Downstream work is limited to packets D01-D10: Dependabot unblocks, the Lighthouse override, one test fix, single Node source, settings tidy, and removal of the unused legacy key import and legacy release path. No downstream deploys or host changes. | The owner asked for benefits without major refactoring. Each item is small, already proven in the template, or unblocks red PRs. |
+| OD-17 | Portfolio stays on Node 24 LTS. Close #197 and ignore Node major updates in its Dependabot config; adopt the single Node source so patch updates are one edit. | Its `docs/Frontend.md` documents Node 24 as a deliberate choice; a major runtime move is a refactor decision for the owner. |
+| OD-18 | Not ported: runner-routing removal, migration squash, `refresh_rating_ranks`, the accounts-switch removal and `LocalAccounts` replacement, ImprovedDb's release path, Markdown audit rules (section 7.3). | They are in use downstream, risk live data, or are major refactors. |
 
 Earlier decisions that still hold: Identity (with MFA, passkeys, external login) stays; Cloud, LocalCluster and LocalSingleNode stay as supported template targets; do not add "absence" tests that prove a removed thing is gone (an earlier owner rule, recorded in `Plans/TemplateCleanupAndFeatureRetirement.md` section 10, which packet P12 deletes).
 
@@ -47,7 +51,7 @@ Earlier decisions that still hold: Identity (with MFA, passkeys, external login)
 Read [AGENTS.md](../AGENTS.md) and [docs/Test.md](../docs/Test.md) completely before starting. They override anything here that conflicts. The most important rules:
 
 - **One PR per packet** (P03 has five sub-PRs). Branch from fresh `origin/main`. Name branches `cleanup/lean-<packet>-<yyyymmdd>`, for example `cleanup/lean-p02-20261103`.
-- **Evidence and ledger.** Put the packet's evidence (template at the end of section 12) in its PR description before merge. Do not push a separate PR just to update the ledger. Instead, the **next** packet's PR also changes that packet's ledger row to `Complete`, with its PR URL, merge SHA and exact-main CI run. P15 records the last ones. GitHub-only and host-only packets (P00, P01-A, P01-B, P13, P14) record their evidence in the next PR the same way.
+- **Evidence and ledger.** Put the packet's evidence (template at the end of section 12) in its PR description before merge. Do not push a separate PR just to update the ledger. Instead, the **next** packet's PR also changes that packet's ledger row to `Complete`, with its PR URL, merge SHA and exact-main CI run. P15 records the last ones. GitHub-only and host-only packets (P00, P01-A, P01-B, P13, P14) and the downstream packets (D01-D10, whose evidence also goes in their own downstream PR descriptions) get their ledger rows updated in the next GrumPlates PR the same way.
 - **Merge command:** `gh pr merge <n> -R Grumlebob/GrumPlates --squash --delete-branch`. Then `git fetch --prune` and delete the local branch.
 - **Code/config PRs:** run the full local gate in [docs/Test.md](../docs/Test.md#local-gate) before pushing. Merge only when `build-test-push` is green on the **exact PR head**. After merge, wait for green CI on the exact merge commit on `main` before marking the packet complete.
 - **Docs-only PRs** (every changed file is `.md`/`.mdx`): follow the AGENTS.md exception: `[skip ci]` in commit and squash title, `git diff --check`. Anything under `Deployment/` or `docs/` still requires `bash Deployment/LocalCluster/Scripts/audit-deployment.sh` before merge, because the deployment audit reads Markdown (until packet P11 changes that).
@@ -251,9 +255,14 @@ Keep: `Plans/README.md`, this file, `Plans/LeanTemplateCleanupGoal.md`, `Plans/C
 | P12 | Plans and docs cleanup | all code packets merged | docs (+ one HTML delete → not docs-only) |
 | P13 | Local junk cleanup on the owner's PC | anytime | local only |
 | P14 | Rewrite migration history, deploy and verify live targets | P02–P12 merged | deployment (authorised by the goal) |
+| D01-D05, D10 | Downstream quick wins and branch hygiene | P01-A | downstream code / GitHub |
+| D06 | CarbonCalculator Node single source | P08 | downstream code |
+| D07 | Downstream settings tidy | P09 | downstream code |
+| D08 | CarbonCalculator legacy key-import removal | P02 | downstream code |
+| D09 | CarbonCalculator and Portfolio legacy release-path removal | P04 | downstream code |
 | P15 | Closeout | everything | GitHub/local |
 
-Execute in this exact order: P00, P01-A, P01-B, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, P13, P14, P15. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
+Execute in this exact order: P00, P01-A, P01-B, D01, D02, D03, D04, D05, D10, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, D06, D07, D08, D09, P13, P14, P15. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
 
 **Main is never deployable between P07 and P14 without the history rewrite.** Do not dispatch any CD run with `run_migrations=true` after P07 merges until P14 step 3 has rewritten that target's history.
 
@@ -638,11 +647,117 @@ Expected effects, which are not failures: accounts are now on everywhere. Data P
    Every remaining hit must have a recorded "keep" reason from P06 step 6.
 6. Mark this plan **complete** in its status line, fill the last ledger rows, and merge that as a docs-only PR (`[skip ci]`, `git diff --check`). Verify the squash commit is on `origin/main`, then delete its branch.
 7. Agent memory. If you run as Claude Code with this project's memory folder (`~/.claude/projects/C--Users-jgrum-Documents-Programming-Csharp-GrumPlates/memory/`): delete `docs-skip-ci-can-break-audit.md` (P11 made it obsolete) and its `MEMORY.md` line, and change `grumplates-rename-plan.md` so it no longer points to the deleted `Plans/GrumPlatesRename.md` (the rename is recorded in git history, PR list and `docs/`). Keep `no-exact-test-count-pins.md`. Otherwise, list these changes for the owner.
-8. Give the owner the downstream list from section 7 and the final evidence summary.
+8. Downstream closeout: `gh pr list -R Grumlebob/<Repo> --state open` for CarbonCalculator, ImprovedDb, Portfolio and JobHunt shows no PR that D01-D05 should have unblocked (only newer Dependabot PRs, handled the normal way). Every D-packet worktree is removed. Report the kept downstream branches from D10 with their one-line summaries.
+9. Final report to the owner: what changed in each repository, PR numbers, deploy run IDs, backup paths, kept branches, and that D09's CD changes get their first live use on the owner's next normal deploy of CarbonCalculator and Portfolio.
 
-## 7. Downstream repositories
+## 7. Downstream repositories (packets D01-D10)
 
-CarbonCalculator and Portfolio were created from this template and are ported by hand. This plan does **not** change them. After P15, give the owner a short list of the template PRs that downstream repos may want to port: accounts always on, legacy DP import removal, legacy release path removal, Node single-source, configuration tidy. Do not open downstream PRs without the owner asking.
+These repositories were created from this template (except JobHunt) and have since diverged. Port only the small, proven fixes below (OD-16). Do not refactor them otherwise.
+
+| Repo | GitHub | Local checkout | Notes |
+| --- | --- | --- | --- |
+| CarbonCalculator | `Grumlebob/CarbonCalculator` | `C:\Users\jgrum\Documents\Programming\Csharp\CarbonCalculator` | Live on `node-demo`. Accounts on. Runner routing **enabled** (desktop runner). |
+| ImprovedDb | `Grumlebob/ImprovedDb` | `C:\Users\jgrum\Documents\Programming\Csharp\ImprovedDb` | Keeps `BlazorAutoApp` names. Its own runner routing and release design. **The primary checkout has uncommitted work: never touch it.** |
+| Portfolio | `Grumlebob/Portfolio` | `C:\Users\jgrum\Documents\Programming\Csharp\Portfolio` | Live on `node-portfolio`. Node 24 LTS on purpose (its `docs/Frontend.md`). |
+| JobHunt | `Grumlebob/JobHunt` | `C:\Users\jgrum\Documents\Programming\JobHunt` | Documents only, not from the template. Branch hygiene only. |
+
+### 7.1 Rules for downstream packets
+
+- That repository's `AGENTS.md` and `docs/Test.md` override this plan. Read them before its first packet. Their gates:
+  - CarbonCalculator: `pwsh -File Scripts/Testing/Validate.ps1 -Mode affected -Base origin/main` before pushing. Use `-Mode full` in its prepared Linux environment when its `AGENTS.md` asks for it.
+  - Portfolio: the local gate in its `docs/Test.md` (short form in its `AGENTS.md`, including `bash Deployment/Common/Scripts/audit-deployment.sh`). On Windows some Python suites assume Linux; compare with a clean `origin/main` worktree before treating a failure as yours.
+  - ImprovedDb: its `docs/Test.md` gate. Merge code PRs with a reviewed message and no skip-CI marker: `gh pr merge <n> -R Grumlebob/ImprovedDb --squash --subject '<subject>' --body-file <file>`.
+  - `repo-gate` from Git Bash works in any of these repositories.
+- Work in a new worktree: `git -C <checkout> fetch origin --prune`, then `git -C <checkout> worktree add ../<Repo>-lean origin/main --detach`, then `git switch -c chore/template-port-<packet>-<yyyymmdd>` inside it. Remove the worktree after merge.
+- Port by reading, not by copying blindly: `gh pr diff <n> -R Grumlebob/GrumPlates` (or the merged template commit), then apply the same change with that repository's names and paths.
+- One PR per packet per repository. Merge only when `build-test-push` is green on the exact PR head. Pass `-R Grumlebob/<Repo>` to every `gh` command.
+- **No downstream CD dispatch and no host changes.** Read-only `ssh` listing is allowed only where a packet says so.
+- A Dependabot PR is unblocked by merging the fix, then commenting `@dependabot rebase`. Merge it when green on its exact head, unless the repository's Dependabot auto-merge workflow does it first. If Dependabot closes or replaces it, handle the replacement and record the new number.
+
+### 7.2 Facts (2026-11-02, read-only)
+
+| Repo | `origin/main` | Open PRs | Why they fail |
+| --- | --- | --- | --- |
+| CarbonCalculator | `e0db25e2` | #341 (GitHub Actions bump in `codeql.yml`) | Green and `CLEAN`; not merged. |
+| ImprovedDb | `853f7c9a` | #426 (Lighthouse 13.6.0 in `BlazorAutoApp.Client`), #329 (Actions bump) | #426: npm audit, `minimatch` 10.2.6 via `@sentry/bundler-plugins` → `glob`. #329: `Scripts/CI/tests/test_ci_workflow_routing.py:601` asserts the exact SHA `actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1`, so every bump of that action fails. |
+| Portfolio | `8cced2c` | #197 (Node 24 → 26), #198, #199 (.NET image digests), #200 (Actions), #201 (Lighthouse in `Scripts/Testing/BrowserTools`), #202 (NuGet) | #198-#202: "Audit React frontend dependencies". `npm audit --package-lock-only` in `Portfolio.React` shows 14 moderate, all through `minimatch` (eslint, `@typescript-eslint/typescript-estree`, `@eslint/config-array`, `openapi-typescript` → `@redocly/openapi-core`), the same tree GrumPlates #409 fixed. #201 also has the Lighthouse `glob` path. #197: the deployment audit pins the literal `FROM node:24.22.1-bookworm-slim`. |
+| JobHunt | `a7cb015` | none | — |
+
+- CarbonCalculator already ported #409 (its #426, `4c7ac0b0`); its React audit is clean. Its `Scripts/Testing` still uses Lighthouse 13.5.0 (no `glob` yet).
+- Node pins. CarbonCalculator: `26.12.1` in `CarbonCalculator/Dockerfile:3`, `CarbonCalculator.React/package.json:8`, `.github/workflows/ci.yml:420,494` (re-find others with `git grep -n '26\.12\.1'`). Portfolio: `24.22.1` in `Portfolio/Dockerfile:3`, `Portfolio.React/package.json:8`, `Scripts/Testing/BrowserTools/package.json:6`, `.github/workflows/ci.yml:260,285`, `Deployment/Common/Scripts/Component/lib/audit_deployment.py:410,498`, `Scripts/Testing/RunReactPublicE2E.ps1:84-101`, `docs/Frontend.md:62`. `Scripts/Quality/tool-versions.json` pins Node for the optional Sonar tooling; leave it.
+- Template leftovers (hits outside `Plans/`): `settings.defaults.json` and `AppConfigurationExtensions` exist in all three apps. CarbonCalculator: legacy Data Protection import (61 hits, 16 files; inventory `data_protection_legacy_key_store: None`, `accounts_enabled: true`) and legacy release path (92 hits, 22 files, including `pin-localsinglenode-legacy-release.yml`). Portfolio: legacy release path (44 hits, 14 files). The latest successful CD runs used `RELEASE_PAYLOAD_TRANSPORT: ghcr-container` (CarbonCalculator run 41322421370 on 2026-11-01; Portfolio run 41092492054 on 2026-10-30).
+- Extra branches. JobHunt: `codex/portfolio-aware-applications` (PR #1 merged; one commit not on `main` by ancestry). CarbonCalculator: `backup/codex/p18-ac26-upload-constraints` (5 commits), `backup/codex/template-trx-run-summary` (6), `backup/codex/third-consumption-conflict-review-20261022` (1), `backup/codex/third-five-consumption-boundaries-20261022` (1), `task/test-feedback-review-20261027` (2; PR #388 closed). None has an open PR.
+
+### D01 — Portfolio: port the React minimatch fix (#409) and the Lighthouse override
+
+1. Read `gh pr diff 409 -R Grumlebob/GrumPlates` and CarbonCalculator's port `git -C <CarbonCalculator checkout> show 4c7ac0b0`.
+2. Copy `GrumPlates.React/scripts/patch-redocly-minimatch.mjs` and `patch-redocly-minimatch.test.mjs` into `Portfolio.React/scripts/`. Change only names and paths.
+3. `Portfolio.React/package.json`: add the same `postinstall` script and `overrides` block as `GrumPlates.React/package.json` on `main`. First run `npm ls @redocly/openapi-core` in `Portfolio.React`. If its version is not 1.34.x, keep Portfolio's version and override only `minimatch`.
+4. `Portfolio/Dockerfile` `react-dependencies` stage: `COPY` the patch script before `npm ci`, as `GrumPlates/Dockerfile` does. Update the Portfolio audit rule that asserts that stage (~498) in the same PR.
+5. The patch test runs under Vitest. GrumPlates' `vitest.config.ts` includes `"scripts/**/*.test.mjs"`; Portfolio's includes only `app/**/*.test.{ts,tsx}`. Add `"scripts/**/*.test.mjs"` to Portfolio's `include`. The test also checks the Dockerfile `COPY` line, so adjust its expected path to `Portfolio.React/scripts/...`.
+6. `Scripts/Testing/BrowserTools/package.json`: add `"overrides": { "glob": { "minimatch": "11.0.1" } }` (merge into any existing `overrides`).
+7. In both folders: `npm install --package-lock-only`, `npm ci`, `npm audit --audit-level=moderate` (no findings). In `Portfolio.React` also `npm run lint`, `npm test`, `npm run build`, `npm run api:check`. In BrowserTools, `npx lighthouse --version` must work.
+8. Portfolio local gate, PR, merge. Then `@dependabot rebase` on #198, #199, #200, #201 and #202 and merge each when green.
+
+### D02 — Lighthouse `glob` override in ImprovedDb and CarbonCalculator
+
+Same fix as template step P01-A 3a.
+1. ImprovedDb `BlazorAutoApp.Client/package.json` and CarbonCalculator `Scripts/Testing/package.json`: add `"glob": { "minimatch": "11.0.1" }` to `overrides` (create the object if missing; keep existing entries). In CarbonCalculator it is inert until Lighthouse 13.6.0 arrives, so its next Dependabot PR does not fail.
+2. In each folder: `npm install --package-lock-only`, `npm ci`, `npm audit --audit-level=moderate`, and the folder's build script (ImprovedDb: the Tailwind CSS build named in its `package.json`).
+3. One PR per repository, each with its own gate. After the ImprovedDb merge, `@dependabot rebase` on ImprovedDb #426.
+
+### D03 — ImprovedDb: stop pinning an action SHA in a test
+
+1. In `Scripts/CI/tests/test_ci_workflow_routing.py` (~601) replace the literal assertion with `self.assertRegex(SELECT_RUNNER_JOB, r"actions/create-github-app-token@[0-9a-f]{40}\b")`. The regex keeps the test's meaning (the job uses that action, pinned to a full SHA) without breaking on every Dependabot bump.
+2. `git grep -n -E '@[0-9a-f]{40}' -- Scripts/CI/tests` and convert every other literal SHA that only repeats a workflow pin in the same way.
+3. Run that test module, then ImprovedDb's gate. PR, merge with a reviewed message (7.1). Then `@dependabot rebase` on #329.
+
+### D04 — CarbonCalculator: merge #341
+
+`gh pr checks 341 -R Grumlebob/CarbonCalculator`. If `build-test-push` is green on the current head, `gh pr merge 341 -R Grumlebob/CarbonCalculator --squash --delete-branch`. Otherwise comment `@dependabot rebase` and merge when green.
+
+### D05 — Portfolio: stay on Node 24 and use one Node version source (OD-17)
+
+1. Close #197: `gh pr close 197 -R Grumlebob/Portfolio --comment "Portfolio stays on Node 24 LTS (docs/Frontend.md). Node major updates are ignored by Dependabot; patch updates still arrive."`
+2. `.github/dependabot.yml`, the `docker` block for `directory: "/Portfolio"`: add
+   ```yaml
+       ignore:
+         - dependency-name: "node"
+           update-types: ["version-update:semver-major"]
+   ```
+3. Apply template packet P08's design with Portfolio's files (7.2 lists them). The source of truth is the `FROM node:` line in `Portfolio/Dockerfile`. Both `engines.node` become `">=24.22.1 <25"`. `ci.yml` derives the version; the two audit literals become one rule that `ci.yml` derives it from the Dockerfile and that the Dockerfile stage is named `react-dependencies`. `RunReactPublicE2E.ps1` reads the Dockerfile. `docs/Frontend.md` says "the version in `Portfolio/Dockerfile`". Leave `Scripts/Quality/tool-versions.json`.
+4. Verify: `git grep -n '24\.22\.1' -- ':!Plans' ':!*package-lock.json' ':!Scripts/Quality'` shows only the Dockerfile and the two engine ranges. Portfolio local gate, PR, merge.
+
+### D06 — CarbonCalculator: one Node version source (after template P08)
+
+Port template P08's merged diff to CarbonCalculator (7.2 lists its pins). `engines.node` becomes `">=26.12.1 <27"`. Verify with `git grep -n '26\.12\.1' -- ':!Plans' ':!*package-lock.json'`, then its gate, PR, merge.
+
+### D07 — Settings tidy (after template P09), CarbonCalculator, ImprovedDb and Portfolio
+
+Port only template P09 steps 1 and 2: delete `settings.defaults.json` (moving any unique keys into `appsettings.json`) and the configuration-source re-adding code (`AppConfigurationExtensions` or its equivalent), with the same checks as P09. One PR per repository. If a repository's version differs enough that the port is no longer a small change, skip it there and record why.
+
+### D08 — CarbonCalculator: remove the legacy Data Protection import (after template P02)
+
+Port template P02's merged diff. CarbonCalculator already has accounts on, so its keys are already in PostgreSQL with a certificate; only the import and re-wrap code, settings, Ansible tasks, templates, tests and docs go. Verify with P02 step 8's grep. Gate, PR, merge.
+
+### D09 — Remove the legacy release path (after template P04), CarbonCalculator and Portfolio
+
+1. Re-check read-only, per repository: the newest successful CD run's log shows `RELEASE_PAYLOAD_TRANSPORT: ghcr-container`. List the host pin store read-only: find its path from the repository's LocalSingleNode settings (`deploy_root` + `release-payloads/`, as in template section 4.2), then `ssh node-demo 'sudo -n ls <path>'` (CarbonCalculator) or `ssh node-portfolio 'sudo -n ls <path>'` (Portfolio). If any `legacy-` pin or `actions-artifact` use shows up, skip that repository and report.
+2. Port template P04's merged diff, including the `pin-localsinglenode-legacy-release.yml` workflow in CarbonCalculator. Verify with P04 step 13's grep. Gate, PR, merge.
+3. Do not deploy. The owner's next normal deploy is the first live use; say so in the final report.
+
+### D10 — Downstream branch hygiene
+
+For each branch in 7.2:
+1. `git -C <checkout> fetch origin --prune`. Changed files: `files=$(git diff --name-only origin/main...origin/<branch>)`.
+2. It is integrated when `git cherry origin/main origin/<branch>` prints only `-` lines, **or** `git diff origin/main origin/<branch> -- $files` is empty, **or** every hunk of `git diff origin/main...origin/<branch>` is already present on `main`. Check that last one by reading.
+3. Integrated: `git push origin --delete <branch>`, delete any local copy, and record the full SHA. JobHunt's branch is expected to be integrated (PR #1 merged).
+4. Not integrated: keep it. Record a one-line summary of what it holds for the owner. Never delete it.
+5. Never touch any other branch, worktree or checkout.
+
+### 7.3 Not ported (OD-18)
+
+Runner-routing removal (CarbonCalculator uses routing; ImprovedDb has its own). Migration squash (live data on shared hosts, no runtime gain). `refresh_rating_ranks` (a real ImprovedDb feature). Removing the accounts switch and replacing `LocalAccounts` in CarbonCalculator or ImprovedDb (major refactors). ImprovedDb's release path (a different design). Markdown-reading audit rules downstream. The owner can ask for any of these later.
 
 ## 8. Out of scope
 
@@ -651,6 +766,7 @@ CarbonCalculator and Portfolio were created from this template and are ported by
 - The owner's live infrastructure files that the template uses to deploy its own demo (`Deployment/LocalCluster/inventory/prod/vault.yml`, `hosts.yml`, the tracked `group_vars`). Forks replace them per `docs/HowToForkThisRepo.md`.
 - `Plans/CloudflaredConnectorFollowUps.md` work (connector pin bump etc.). It is a separate open plan.
 - Q-002 (Caddy MD5 check), Q-003, Q-004 in `Plans/CodeQualityImprovements.md`.
+- Downstream work beyond packets D01-D10 (OD-18, section 7.3).
 
 ## 9. Risks and how to handle them
 
@@ -664,13 +780,14 @@ CarbonCalculator and Portfolio were created from this template and are ported by
 | The audit loses a check that mattered | P11 deletes only Markdown-reading rules. Every code, template and workflow rule stays. |
 | The squashed migration differs from the live schema | P01-B brings LocalCluster to all four migrations. P07 step 4 requires identical schema dumps from old and new migrations. P14 step 3 diffs each live schema against the new one, takes a verified backup first, and the rewrite SQL aborts unless exactly the four old IDs are present. |
 | A CD run with migrations between P07 and P14 | Section 5 forbids it. If it happens anyway, the bundle fails on existing tables before changing anything; fix by running P14 step 3 for that database. |
+| A downstream port breaks a live product | Only small, template-proven changes (OD-16); each repository's own gate and `build-test-push`; no downstream deploys. D09 checks pin stores read-only first and skips a repository on any doubt. |
 | Seeded passwords leak | They are generated into the ignored `.env`, never printed, never logged, and never stored in tracked files. Deployments do not get a User seed. |
 | Developers and CI without a key-encryption certificate | Docker local setup creates `docker/https/aspnetapp.pfx`; Windows Development uses DPAPI; Linux/macOS Development falls back to unencrypted keys with a warning (OD-10); `ci-docker-smoke.sh` generates a certificate (P03-B step 10); deployments mount one from the vault. |
 | Existing developer `.env` files lack seeded accounts | `setup-local.ps1` fills unconfigured seeds in place (OD-12). |
 
 ## 10. Manual blockers (owner)
 
-None block execution. Starting [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md) is the authorisation for P01-B and P14 (backups, history rewrites, CD dispatches, release status), for deleting the stale branch and the unused repository variable. Remove that paragraph from the goal before starting it if you want to do those steps yourself.
+None block execution. Starting [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md) is the authorisation for P01-B and P14 (backups, history rewrites, CD dispatches, release status), for deleting the stale branch and the unused repository variable, and for the downstream packets: opening and merging their PRs, merging the unblocked Dependabot PRs, closing Portfolio #197, read-only pin-store listing in D09, and deleting downstream branches that D10 proves integrated. Remove that paragraph from the goal before starting it if you want to do those steps yourself.
 
 Optional, owner only: `agent.md` in the repo root is your private, ignored notes file with outdated SSH details and Codex instructions. Agents leave it alone.
 
@@ -691,6 +808,7 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | --- | --- | --- |
 | Research and inventory | Complete | 2026-11-02 at `origin/main` `d28a6c7b3afb0a406a217a5508e103de6227e2f8`; sections 4.1–4.11. |
 | Owner answers Q1–Q4 | Complete | 2026-11-02: seeded accounts; squash; remove routing; remove Markdown audit rules (OD-6 to OD-9). |
+| Downstream review | Complete | 2026-11-02: OD-16 to OD-18, packets D01-D10; facts in section 7.2. |
 | Plan review | Complete | 2026-11-02: OD-10 to OD-15; live databases, pins, images and deploy inputs verified read-only (section 4.2). |
 | P00 | Pending | |
 | P01-A | Pending | |
@@ -712,6 +830,16 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P12 | Pending | |
 | P13 | Pending | |
 | P14 | Pending (authorised by the goal) | |
+| D01 Portfolio minimatch + Lighthouse | Pending | |
+| D02 Lighthouse override (ImprovedDb, CarbonCalculator) | Pending | |
+| D03 ImprovedDb SHA test | Pending | |
+| D04 CarbonCalculator #341 | Pending | |
+| D05 Portfolio Node 24 single source | Pending | |
+| D06 CarbonCalculator Node single source | Pending | |
+| D07 Settings tidy downstream | Pending | |
+| D08 CarbonCalculator key import | Pending | |
+| D09 Legacy release path downstream | Pending | |
+| D10 Downstream branches | Pending | |
 | P15 | Pending | |
 
 Packet entry template:
