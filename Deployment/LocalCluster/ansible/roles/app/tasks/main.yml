@@ -21,9 +21,6 @@
       - (vault_accounts_email_username | default('') | length == 0) == (vault_accounts_email_password | default('') | length == 0)
       - (accounts_email_host | default('') | length > 0) or ((accounts_email_from | default('') | length == 0) and (vault_accounts_email_username | default('') | length == 0) and (vault_accounts_email_password | default('') | length == 0))
       - (accounts_email_host | default('') | length == 0) or ((accounts_enabled | default(false) | bool) and (accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
-      - (data_protection_legacy_key_store | default('None')) in ['None', 'Redis', 'FileSystem']
-      - (data_protection_legacy_redis_key | default('') | regex_search('[\r\n\0]')) is none
-      - ((data_protection_legacy_key_store | default('None')) == 'Redis') == ((data_protection_legacy_redis_key | default('') | length) > 0)
     fail_msg: "Account deployment settings are incomplete or contain unsupported line breaks."
   no_log: true
 - name: Validate encrypted Data Protection certificate inputs
@@ -48,13 +45,6 @@
     group: deploy
     mode: "0440"
   no_log: true
-- name: Ensure legacy Data Protection import source directory
-  ansible.builtin.file:
-    path: "/etc/{{ app_name }}/data-protection/legacy"
-    state: directory
-    owner: root
-    group: deploy
-    mode: "0750"
 - name: Read deploy group ID for the read-only certificate mount
   ansible.builtin.getent:
     database: group

@@ -43,11 +43,9 @@
   ansible.builtin.assert:
     that:
       - >-
-        (accounts_public_origin | default('') ~ accounts_admin_seed_email | default('') ~ accounts_email_host | default('') ~ accounts_email_from | default('') ~ vault_accounts_admin_seed_password | default('') ~ vault_accounts_email_username | default('') ~ vault_accounts_email_password | default('') ~ vault_data_protection_certificate_password | default('') ~ data_protection_legacy_redis_key | default(''))
+        (accounts_public_origin | default('') ~ accounts_admin_seed_email | default('') ~ accounts_email_host | default('') ~ accounts_email_from | default('') ~ vault_accounts_admin_seed_password | default('') ~ vault_accounts_email_username | default('') ~ vault_accounts_email_password | default('') ~ vault_data_protection_certificate_password | default(''))
         | regex_search('[\r\n\0]') is none
       - vault_data_protection_certificate_password is match('^[A-Fa-f0-9]{64}$')
-      - (data_protection_legacy_key_store | default('None')) in ['None', 'Redis', 'FileSystem']
-      - ((data_protection_legacy_key_store | default('None')) == 'Redis') == ((data_protection_legacy_redis_key | default('') | length) > 0)
       - not (accounts_admin_seed_enabled | default(false) | bool) or ((accounts_enabled | default(false) | bool) and (accounts_admin_seed_email | default('') | length > 0) and (vault_accounts_admin_seed_password | default('') | length > 0))
       - not (accounts_registration_enabled | default(false) | bool) or ((accounts_enabled | default(false) | bool) and (accounts_email_host | default('') | length > 0) and (accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
       - (accounts_admin_seed_email | default('') | length == 0) == (vault_accounts_admin_seed_password | default('') | length == 0)
@@ -63,13 +61,6 @@
     owner: root
     group: root
     mode: "0755"
-- name: Ensure legacy Data Protection import source directory
-  ansible.builtin.file:
-    path: "/etc/{{ app_name }}/data-protection/legacy"
-    state: directory
-    owner: root
-    group: deploy
-    mode: "0750"
 - name: Check whether the app Data Protection certificate already exists
   ansible.builtin.stat:
     path: "/etc/{{ app_name }}/data-protection/certificate.pem"

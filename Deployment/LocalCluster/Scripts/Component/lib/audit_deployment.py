@@ -1918,9 +1918,6 @@ for path, checks in {
         ("Accounts__Email__Password={{ vault_accounts_email_password | default('') }}", "SMTP password from the protected vault"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
         ("DataProtection__KeyEncryptionCertificatePassword={{ vault_data_protection_certificate_password }}", "app Data Protection certificate passphrase from vault"),
-        ("DataProtection__LegacyKeyStore={{ data_protection_legacy_key_store | default('None') }}", "legacy Data Protection source selection"),
-        ("DataProtection__LegacyRedisKey={{ data_protection_legacy_redis_key | default('') }}", "legacy Redis repository key"),
-        ("/run/legacy-data-protection", "legacy Data Protection source mount path"),
     ],
     "Deployment/LocalCluster/ansible/roles/app/templates/compose.env.j2": [
         ("APP_IMAGE_REF=", "Compose image interpolation input"),
@@ -1928,7 +1925,6 @@ for path, checks in {
         ("REDIS_PASSWORD={{ vault_redis_password }}", "validated Redis Compose input"),
         ("DATA_PROTECTION_CERT_HOST_PATH=/etc/{{ app_name }}/data-protection/certificate.pem", "app Data Protection certificate bind source"),
         ("DATA_PROTECTION_CERT_GID={{ data_protection_certificate_gid }}", "restricted certificate reader group"),
-        ("DATA_PROTECTION_LEGACY_HOST_PATH=/etc/{{ app_name }}/data-protection/legacy", "legacy Data Protection bind source"),
     ],
     "Deployment/LocalCluster/ansible/roles/postgres/templates/node-db.env.j2": [
         ("COMPOSE_PROJECT_NAME={{ app_name }}", "explicit Compose project name"),
@@ -1964,8 +1960,6 @@ for path, checks in {
         ("mode: \"0440\"", "restrict certificate file to root and app group"),
         ("http://127.0.0.1:{{ app_port }}/health/ready", "local readiness wait"),
         ("version('2.30.0', '>=', version_type='loose')", "raw env-file Compose minimum version"),
-        ("data_protection_legacy_key_store", "validated legacy Data Protection source selection"),
-        ("/data-protection/legacy", "protected legacy Data Protection source directory"),
         ("no_log: true", "account secret validation output redaction"),
     ],
     "Deployment/LocalCluster/ansible/roles/postgres/tasks/main.yml": [
@@ -2002,8 +1996,6 @@ for path in [
         fail(f"{path}: account credentials must not be duplicated in Compose interpolation")
     if "target: /run/secrets/data-protection.pem" not in compose_text or "read_only: true" not in compose_text:
         fail(f"{path}: app Data Protection certificate must be mounted read-only")
-    if "target: /run/legacy-data-protection" not in compose_text or "read_only: true" not in compose_text:
-        fail(f"{path}: legacy Data Protection source must be mounted read-only")
     if "DATA_PROTECTION_CERT_GID" not in compose_text:
         fail(f"{path}: app Data Protection certificate group must be explicit")
 
@@ -2014,9 +2006,6 @@ for path, needles in {
         ("Accounts__Email__Password={{ cloud_accounts_email_password | default('') }}", "SMTP password from an optional workflow secret"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
         ("DataProtection__KeyEncryptionCertificatePassword={{ cloud_data_protection_certificate_password }}", "app Data Protection certificate passphrase from workflow secret"),
-        ("DataProtection__LegacyKeyStore={{ data_protection_legacy_key_store | default('None') }}", "legacy Data Protection source selection"),
-        ("DataProtection__LegacyRedisKey={{ data_protection_legacy_redis_key | default('') }}", "legacy Redis repository key"),
-        ("/run/legacy-data-protection", "legacy Data Protection source mount path"),
     ],
     "Deployment/Cloud/ansible/roles/app/templates/compose.env.j2": [
         ("APP_IMAGE={{ app_image }}", "Compose image interpolation input"),
@@ -2024,12 +2013,9 @@ for path, needles in {
         ("REDIS_PASSWORD={{ cloud_redis_password }}", "Redis Compose input"),
         ("DATA_PROTECTION_CERT_HOST_PATH=/etc/{{ app_name }}/data-protection/certificate.pem", "app Data Protection certificate bind source"),
         ("DATA_PROTECTION_CERT_GID={{ data_protection_certificate_gid }}", "restricted certificate reader group"),
-        ("DATA_PROTECTION_LEGACY_HOST_PATH=/etc/{{ app_name }}/data-protection/legacy", "legacy Data Protection bind source"),
     ],
     "Deployment/Cloud/ansible/roles/app/tasks/main.yml": [
         ("version('2.30.0', '>=', version_type='loose')", "raw env-file Compose minimum version"),
-        ("data_protection_legacy_key_store", "validated legacy Data Protection source selection"),
-        ("/data-protection/legacy", "protected legacy Data Protection source directory"),
         ("cloud_postgres_password is match('^[A-Za-z0-9._@%+/=-]{16,128}$')", "Compose-safe Cloud database password"),
         ("cloud_redis_password is match('^[A-Za-z0-9._@%+/=-]{16,128}$')", "Compose-safe Cloud Redis password"),
         ("cloud_data_protection_certificate_base64 | b64decode", "install encrypted app Data Protection certificate"),
@@ -2045,17 +2031,6 @@ for path, needles in {
     "Deployment/Cloud/Scripts/Component/lib/cloud_settings.py": [
         ("ACCOUNT_SETTING_KEYS", "explicit account settings allowlist"),
         ("validate_account_deploy_settings(values)", "shared account settings validation"),
-        ("LEGACY_DATA_PROTECTION_SETTING_KEYS", "explicit legacy Data Protection settings allowlist"),
-        ("validate_legacy_data_protection_settings(values)", "legacy Data Protection source validation"),
-    ],
-    "Deployment/LocalCluster/Scripts/Component/lib/deploy_settings.py": [
-        ("LEGACY_DATA_PROTECTION_SETTING_KEYS", "explicit legacy Data Protection settings allowlist"),
-        ("validate_legacy_data_protection_settings(values)", "legacy Data Protection source validation"),
-    ],
-    "Deployment/Common/Scripts/Component/lib/data_protection_deploy_settings.py": [
-        ("FileSystem", "FileSystem source support"),
-        ("Redis", "Redis source support"),
-        ("single-line value", "single-line Redis key validation"),
     ],
     "Deployment/Cloud/Scripts/deploy.sh": [
         ("cloud_accounts_admin_seed_password", "optional Admin seed credential forwarding"),
@@ -2696,16 +2671,11 @@ if single_compose.count('"127.0.0.1:') != 3:
 require_contains(single + "/compose/docker-compose.yml", 'LocalAccounts__Enabled: "false"', "deployment account seeding disabled")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "single-node app certificate path")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePassword={{ vault_data_protection_certificate_password }}", "single-node protected certificate passphrase")
-require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__LegacyKeyStore={{ data_protection_legacy_key_store | default('None') }}", "single-node legacy Data Protection source selection")
 require_contains(single + "/ansible/templates/backup.service.j2", "SupplementaryGroups=deploy", "backup service can read the root:deploy Data Protection certificate")
-require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__LegacyRedisKey={{ data_protection_legacy_redis_key | default('') }}", "single-node legacy Redis key")
 require_contains(single + "/ansible/templates/compose.env.j2", "DATA_PROTECTION_CERT_GID={{ data_protection_certificate_gid }}", "single-node certificate reader group")
-require_contains(single + "/ansible/templates/compose.env.j2", "DATA_PROTECTION_LEGACY_HOST_PATH=/etc/{{ app_name }}/data-protection/legacy", "single-node legacy source bind path")
 require_contains(single + "/compose/docker-compose.yml", "target: /run/secrets/data-protection.pem", "single-node read-only certificate mount")
-require_contains(single + "/compose/docker-compose.yml", "target: /run/legacy-data-protection", "single-node legacy source mount")
 require_contains(single + "/compose/docker-compose.yml", "read_only: true", "single-node read-only certificate mount")
 require_contains(single + "/Scripts/lib/backup.py", "data-protection.pem", "single-node backup preserves app certificate recovery key")
-require_contains(single + "/ansible/roles/single_node_stack/tasks/main.yml", "/data-protection/legacy", "single-node legacy source directory")
 for needle in ("find-successful-ci-run.py", "--target-sha \"$TARGET_SHA\"", "--read-final-payload-receipt", "validate_release_manifest.py", "release_image_digest", "with-deploy-lock.sh", "git merge-base --is-ancestor", "git show \"${TARGET_SHA}:frontend-profile.txt\"", "--legacy-blazor-default", "TARGET_PROFILE_FILE_PRESENT=${profile_file_present}", 'if [[ "$RELEASE_MANIFEST_SCHEMA_VERSION" == 2 && "$TARGET_PROFILE_FILE_PRESENT" != true ]]', "--expected-frontend-profile \"$FRONTEND_PROFILE\"", "--expected-acceptance-profile \"$ACCEPTANCE_PROFILE\"", "--image-labels-json \"$IMAGE_LABELS_PATH\"", "--expected-ci-run-attempt", "verify-release-identity.sh \"$APP_IMAGE\" \"$RELEASE_IMAGE_DIGEST\" \"$FRONTEND_PROFILE\" \"$ACCEPTANCE_PROFILE\" \"$TARGET_SHA\" \"$RELEASE_MANIFEST_SCHEMA_VERSION\" \"$CI_RUN_ID\" \"$CI_RUN_ATTEMPT\" \"$SOURCE_REPO_URL\"", "LOCALSINGLENODE_HOST", "TARGET: localsinglenode", "release_frontend_profile=$FRONTEND_PROFILE", "release_acceptance_profile=$ACCEPTANCE_PROFILE"):
     require_contains(".github/workflows/cd-localsinglenode.yml", needle, "strict single-node release contract")
 

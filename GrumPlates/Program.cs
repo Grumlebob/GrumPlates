@@ -94,7 +94,6 @@ app.Use(async (ctx, next) =>
 FrontendComposition.UseFrontendStaticFiles(app);
 
 await app.ApplyAppMigrationsAsync();
-await app.ImportAndValidateDataProtectionKeysAsync();
 await app.SeedConfiguredAdminAsync();
 await app.SeedAuthorBooksAsync();
 await FrontendComposition.SeedFrontendDataAsync(app);

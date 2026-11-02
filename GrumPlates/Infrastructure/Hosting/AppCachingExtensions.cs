@@ -21,7 +21,6 @@ internal static class AppCachingExtensions
         services.AddOptions<DataProtectionKeyStorageOptions>()
             .Bind(configuration.GetSection(DataProtectionKeyStorageOptions.SectionName))
             .Validate(options => accountsEnabled || !string.IsNullOrWhiteSpace(options.KeyStoragePath), "DataProtection:KeyStoragePath must be configured.")
-            .Validate(options => options.HasValidLegacySource(), "DataProtection legacy key source settings are incomplete or ambiguous.")
             .ValidateOnStart();
 
         if (!hasRedis && !allowMissingRedis)
@@ -202,22 +201,6 @@ internal sealed class DataProtectionKeyStorageOptions
     public const string SectionName = "DataProtection";
 
     public string KeyStoragePath { get; init; } = Path.Combine("..", "data", "storage", "DataProtection-Keys");
-    public string LegacyKeyStore { get; init; } = "None";
-    public string LegacyRedisKey { get; init; } = string.Empty;
-    public string LegacyKeyStoragePath { get; init; } = string.Empty;
     public string KeyEncryptionCertificatePath { get; init; } = string.Empty;
     public string KeyEncryptionCertificatePassword { get; init; } = string.Empty;
-
-    public bool HasValidLegacySource()
-    {
-        var hasRedisKey = !string.IsNullOrWhiteSpace(LegacyRedisKey);
-        var hasFilePath = !string.IsNullOrWhiteSpace(LegacyKeyStoragePath);
-        return LegacyKeyStore switch
-        {
-            "None" => !hasRedisKey && !hasFilePath,
-            "Redis" => hasRedisKey && !hasFilePath,
-            "FileSystem" => hasFilePath && !hasRedisKey,
-            _ => false
-        };
-    }
 }

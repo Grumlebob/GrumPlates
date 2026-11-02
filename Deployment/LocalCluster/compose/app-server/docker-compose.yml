@@ -39,10 +39,6 @@ services:
         source: ${DATA_PROTECTION_CERT_HOST_PATH:?DATA_PROTECTION_CERT_HOST_PATH is required}
         target: /run/secrets/data-protection.pem
         read_only: true
-      - type: bind
-        source: ${DATA_PROTECTION_LEGACY_HOST_PATH:?DATA_PROTECTION_LEGACY_HOST_PATH is required}
-        target: /run/legacy-data-protection
-        read_only: true
     networks:
       - default
       - observability
