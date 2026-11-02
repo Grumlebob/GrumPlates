@@ -19,8 +19,7 @@ public sealed class AccountFixtureTests
         {
             UseRealIdentityCookies = true,
             InitializeDatabaseRespawner = false,
-            AppName = $"accounts-fixture-{Guid.NewGuid():N}",
-            ConfigurationOverrides = new() { ["Accounts:Enabled"] = "false" }
+            AppName = $"accounts-fixture-{Guid.NewGuid():N}"
         });
         await factory.InitializeAsync();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions

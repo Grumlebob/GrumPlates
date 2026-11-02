@@ -60,18 +60,6 @@ public sealed class AccountPasswordTests
         Assert.False(ValidateFormPassword("a sufficiently long value\uD800"));
     }
 
-    [Fact]
-    public void BlazorFormPasswordAttribute_PreservesLegacyDisabledPolicy()
-    {
-        var disabled = new PolicyFormPasswordModel("legacy");
-        disabled.SetAccountPasswordPolicy(enabled: false);
-        var enabled = new PolicyFormPasswordModel("legacy");
-        enabled.SetAccountPasswordPolicy(enabled: true);
-
-        Assert.True(ValidateModelPassword(disabled));
-        Assert.False(ValidateModelPassword(enabled));
-    }
-
     [Theory]
     [InlineData("films+pic+galeries")]
     [InlineData("FILMS+PIC+GALERIES")]
@@ -100,7 +88,7 @@ public sealed class AccountPasswordTests
     }
 
     [Fact]
-    public void DtoTransport_Allows128NonBmpCodePointsAndLegacyShortProof()
+    public void DtoTransport_Allows128NonBmpCodePointsAndShortCurrentPasswordProof()
     {
         var newPassword = new AccountChangePasswordRequest { Password = "old", NewPassword = string.Concat(Enumerable.Repeat("😀", 128)) };
         Assert.True(Validator.TryValidateObject(newPassword, new ValidationContext(newPassword), [], validateAllProperties: true));

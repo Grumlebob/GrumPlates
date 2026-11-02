@@ -12,16 +12,16 @@ public sealed class AccountOptionsTests
     [Fact]
     public void StartupSnapshot_DoesNotFollowPartialConfigurationReloads()
     {
-        var configuration = Configuration(new() { ["Accounts:Enabled"] = "true" });
+        var configuration = Configuration(new() { ["Accounts:WriteLimit:PermitLimit"] = "5" });
         var services = new ServiceCollection();
         services.AddAccountFeature(configuration, new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing"));
         using var provider = services.BuildServiceProvider();
         var snapshot = provider.GetRequiredService<AccountOptions>();
-        configuration["Accounts:Enabled"] = "false";
+        configuration["Accounts:WriteLimit:PermitLimit"] = "6";
         configuration.Reload();
-        Assert.True(snapshot.Enabled);
+        Assert.Equal(5, snapshot.WriteLimit.PermitLimit);
         Assert.Same(snapshot, provider.GetRequiredService<IOptions<AccountOptions>>().Value);
-        Assert.True(provider.GetRequiredService<AccountOptions>().Enabled);
+        Assert.Equal(5, provider.GetRequiredService<AccountOptions>().WriteLimit.PermitLimit);
     }
 
     [Theory]
