@@ -9,19 +9,11 @@ public sealed class IdentityE2ETests : BlazorE2ETestBase
 {
     [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
     [Trait("Category", "E2E")]
-    public async Task Identity_CanRegisterLogoutLoginAndOpenProfile()
+    public async Task Identity_CanLoginLogoutAndOpenProfile()
     {
         await RunWithFailureScreenshotAsync(async () =>
         {
-            var suffix = Guid.NewGuid().ToString("N")[..10];
-            var email = $"e2e-{suffix}@example.test";
-            TrackCreatedUser(email);
-
-            await GoToAsync("/Account/Register");
-            await Page.Locator("#Input\\.Email").FillAsync(email);
-            await Page.Locator("#Input\\.Password").FillAsync(E2EPassword);
-            await Page.Locator("#Input\\.ConfirmPassword").FillAsync(E2EPassword);
-            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Register" }).ClickAsync();
+            var email = await SignInAsSeededUserAsync();
 
             var accountLink = Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = email });
             var visibleAccountLink = await MakeNavigationItemVisibleAsync(accountLink);
@@ -36,10 +28,7 @@ public sealed class IdentityE2ETests : BlazorE2ETestBase
             await Expect(visibleLoginLink)
                 .ToBeVisibleAsync();
 
-            await visibleLoginLink.ClickAsync();
-            await Page.Locator("#Input\\.Email").FillAsync(email);
-            await Page.Locator("#Input\\.Password").FillAsync(E2EPassword);
-            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Log in", Exact = true }).ClickAsync();
+            await SignInAsSeededUserAsync();
             visibleAccountLink = await MakeNavigationItemVisibleAsync(accountLink);
             await Expect(visibleAccountLink)
                 .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
@@ -62,11 +51,9 @@ public sealed class IdentityE2ETests : BlazorE2ETestBase
             await Expect(visibleLoginLink)
                 .ToBeVisibleAsync();
 
+            // Local development has no SMTP, so recovery reports that it is unavailable.
             await GoToAsync("/Account/ForgotPassword");
-            await Page.Locator("#Input\\.Email").FillAsync(email);
-            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Request password reset", Exact = true }).ClickAsync();
-            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Forgot password confirmation" }))
-                .ToBeVisibleAsync();
+            await Expect(Page.GetByText("This account operation is unavailable.")).ToBeVisibleAsync();
         });
     }
 

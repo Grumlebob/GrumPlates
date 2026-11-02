@@ -18,7 +18,7 @@ public sealed class PreHydrationControlsE2ETests : BlazorE2ETestBase
     {
         await RunWithFailureScreenshotAsync(async () =>
         {
-            await RegisterUniqueUserAsync("prehydration");
+            await SignInAsSeededUserAsync();
 
             const string frameworkScriptPattern = "**/_framework/blazor.web*.js";
             var frameworkScriptIntercepted = false;

@@ -6,12 +6,10 @@ namespace GrumPlates.Test.E2E.Support;
 
 internal sealed class E2ETestDataCleanup(Func<IPage> page, Func<string, Task<IResponse?>> goTo)
 {
-    internal const string DefaultPassword = E2ETestCredentials.Password;
-
     private readonly List<TrackedBook> _trackedBooks = [];
     private readonly List<TrackedUser> _trackedUsers = [];
 
-    public void TrackCreatedUser(string email, string password = DefaultPassword)
+    public void TrackCreatedUser(string email, string password)
     {
         if (string.IsNullOrWhiteSpace(email))
         {

@@ -4,7 +4,7 @@ Browser checks are separate from the ordinary test run. Blazor Playwright E2E is
 
 ## Blazor Playwright E2E
 
-For the Docker app, start the stack without opening a second browser. Clear `RUN_E2E` after the run so later test commands do not start browsers unexpectedly.
+For the Docker app, start the stack without opening a second browser. Blazor E2E signs in as the local seeded User; it does not register accounts. It reads `Accounts__UserSeed__Email` and `Accounts__UserSeed__Password` from the repository `.env` that `docker/setup-local.ps1` writes, or `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` when both are set. Tests must not change that account. Clear `RUN_E2E` after the run so later test commands do not start browsers unexpectedly.
 
 ```powershell
 .\Scripts\RunLocal.ps1 -NoBrowser
@@ -20,7 +20,7 @@ The browser is visible by default. Set `E2E_HEADLESS=1` only for a CI-style run.
 
 Important settings: `E2E_SLOW_MO_MS` controls visible delay; `E2E_NAVIGATION_TIMEOUT_MS` and `E2E_ACTION_TIMEOUT_MS` set timeouts; `E2E_VIEWPORT_WIDTH` and `E2E_VIEWPORT_HEIGHT` set the viewport. `E2E_CLEANUP_CONNECTION_STRING` is an optional PostgreSQL connection for cleanup; without it, cleanup uses the app connection or local Docker values. For a direct run with several visible desktop and mobile flows, raise `RateLimiting__Global__PermitLimit` to `10000`, `RateLimiting__Api__PermitLimit` to `1000`, and `Accounts__WriteLimit__PermitLimit` to `1000` for that app process only.
 
-Current examples: [Books flows](../../GrumPlates.Test/E2E/Features/Books/BooksE2ETests.cs), [Identity flows](../../GrumPlates.Test/E2E/Features/Accounts/IdentityE2ETests.cs), and [pre-hydration controls](../../GrumPlates.Test/E2E/AppShell/PreHydrationControlsE2ETests.cs). Test files are the coverage inventory. Use shared cleanup for created users and data; tests must clean up after failures. Failure screenshots and traces are under `TestResults/Playwright`; videos are under `TestResults/Playwright/Videos`. Paths are defined in [E2EArtifactPaths](../../GrumPlates.Test/E2E/Support/E2EArtifactPaths.cs). `TestResults` is generated output and can be deleted.
+Current examples: [Books flows](../../GrumPlates.Test/E2E/Features/Books/BooksE2ETests.cs), [Identity flows](../../GrumPlates.Test/E2E/Features/Accounts/IdentityE2ETests.cs), and [pre-hydration controls](../../GrumPlates.Test/E2E/AppShell/PreHydrationControlsE2ETests.cs). Test files are the coverage inventory. Use shared cleanup for created data; tests must clean up after failures. Failure screenshots and traces are under `TestResults/Playwright`; videos are under `TestResults/Playwright/Videos`. Paths are defined in [E2EArtifactPaths](../../GrumPlates.Test/E2E/Support/E2EArtifactPaths.cs). `TestResults` is generated output and can be deleted.
 
 ## React public browser checks
 

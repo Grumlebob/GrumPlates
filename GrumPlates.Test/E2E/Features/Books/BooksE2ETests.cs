@@ -50,7 +50,7 @@ public sealed class BooksE2ETests : BlazorE2ETestBase
             TrackCreatedBook(title, url);
             TrackCreatedBook(updatedTitle, url);
 
-            await RegisterUniqueUserAsync("e2e-books");
+            await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
             await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
             await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
@@ -265,7 +265,7 @@ public sealed class BooksE2ETests : BlazorE2ETestBase
             TrackCreatedBook(title, url);
             TrackCreatedBook(updatedTitle, url);
 
-            await LoginAsync("user@user.com", "User123");
+            await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
             await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
             await Expect(Page.GetByTestId("add-book")).ToBeVisibleAsync();
@@ -349,16 +349,5 @@ public sealed class BooksE2ETests : BlazorE2ETestBase
     {
         await Page.ReloadAsync(new PageReloadOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
         await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-    }
-
-    private async Task LoginAsync(string email, string password)
-    {
-        await GoToAsync("/Account/Login");
-        await Page.Locator("#Input\\.Email").FillAsync(email);
-        await Page.Locator("#Input\\.Password").FillAsync(password);
-        await Page
-            .GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Log in", Exact = true })
-            .ClickAsync();
-        await Page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
     }
 }
