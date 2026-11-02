@@ -791,13 +791,17 @@ for path, checks in {
             fail(f"{path}: missing {why}")
 
 
-# Deployments use Docker, but published demo logins must never be seeded there.
+# Deployments provision only the configured Admin; the local User seed must never reach them.
 for seeded_path in [
     "Deployment/LocalCluster/compose/app-server/docker-compose.yml",
     "Deployment/Cloud/compose/app-server/docker-compose.yml",
+    "Deployment/LocalSingleNode/compose/docker-compose.yml",
+    "Deployment/LocalCluster/ansible/roles/app/templates/app.env.j2",
+    "Deployment/Cloud/ansible/roles/app/templates/app.env.j2",
+    "Deployment/LocalSingleNode/ansible/templates/app.env.j2",
 ]:
-    if 'LocalAccounts__Enabled: "false"' not in read(seeded_path):
-        fail(f'{seeded_path}: missing LocalAccounts__Enabled: "false" (no seeded demo logins in deployments)')
+    if "UserSeed" in read(seeded_path):
+        fail(f"{seeded_path}: deployments must not seed the local User account")
 
 ci_provenance = read("Deployment/Common/Scripts/Component/lib/find-successful-ci-run.py")
 for needle in ['ALLOWED_EVENTS = {"push", "workflow_dispatch"}', "verify_publishing_job", "/attempts/{attempt}/jobs", 'job.get("run_attempt")', 'job.get("head_sha")']:
@@ -2669,7 +2673,6 @@ for binding in re.findall(r'(?m)^      - "([^"\n]+:[0-9${}A-Z_]+)"$', single_com
         fail("localsinglenode: published ports must bind loopback")
 if single_compose.count('"127.0.0.1:') != 3:
     fail("localsinglenode: all three service publications must bind loopback")
-require_contains(single + "/compose/docker-compose.yml", 'LocalAccounts__Enabled: "false"', "deployment account seeding disabled")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "single-node app certificate path")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePassword={{ vault_data_protection_certificate_password }}", "single-node protected certificate passphrase")
 require_contains(single + "/ansible/templates/backup.service.j2", "SupplementaryGroups=deploy", "backup service can read the root:deploy Data Protection certificate")

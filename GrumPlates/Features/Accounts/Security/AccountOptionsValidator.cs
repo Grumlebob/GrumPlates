@@ -7,12 +7,13 @@ internal sealed class AccountOptionsValidator(string appName) : IValidateOptions
 {
     public ValidateOptionsResult Validate(string? name, AccountOptions options)
     {
-        if (options.Email is null || options.AdminSeed is null || options.WriteLimit is null)
+        if (options.Email is null || options.AdminSeed is null || options.UserSeed is null || options.WriteLimit is null)
         {
-            return ValidateOptionsResult.Fail("Accounts:Email, Accounts:AdminSeed and Accounts:WriteLimit must be configuration objects.");
+            return ValidateOptionsResult.Fail("Accounts:Email, Accounts:AdminSeed, Accounts:UserSeed and Accounts:WriteLimit must be configuration objects.");
         }
         List<string> errors = [];
-        ValidateSeed(options, errors);
+        ValidateSeed(options.AdminSeed, "Accounts:AdminSeed", errors);
+        ValidateSeed(options.UserSeed, "Accounts:UserSeed", errors);
         ValidateEmail(options, errors);
         if (options.RegistrationEnabled && !options.EmailEnabled)
         {
@@ -33,24 +34,23 @@ internal sealed class AccountOptionsValidator(string appName) : IValidateOptions
         return errors.Count == 0 ? ValidateOptionsResult.Success : ValidateOptionsResult.Fail(errors);
     }
 
-    private void ValidateSeed(AccountOptions options, List<string> errors)
+    private void ValidateSeed(AccountSeedOptions seed, string section, List<string> errors)
     {
-        var seed = options.AdminSeed;
         if (string.IsNullOrEmpty(seed.Email) != string.IsNullOrEmpty(seed.Password))
         {
-            errors.Add("Accounts:AdminSeed:Email and Accounts:AdminSeed:Password must be supplied together.");
+            errors.Add($"{section}:Email and {section}:Password must be supplied together.");
         }
         if ((!string.IsNullOrEmpty(seed.Email) || seed.Enabled) && !IsEmail(seed.Email))
         {
-            errors.Add("Accounts:AdminSeed:Email must be a valid mailbox.");
+            errors.Add($"{section}:Email must be a valid mailbox.");
         }
         if (seed.Enabled && string.IsNullOrEmpty(seed.Password))
         {
-            errors.Add("Accounts:AdminSeed:Password is required.");
+            errors.Add($"{section}:Password is required.");
         }
         if (seed.Enabled && !AccountPasswordValidator.ValidateCandidate(seed.Password, seed.Email, appName).Succeeded)
         {
-            errors.Add("Accounts:AdminSeed:Password must satisfy the account password policy.");
+            errors.Add($"{section}:Password must satisfy the account password policy.");
         }
     }
 

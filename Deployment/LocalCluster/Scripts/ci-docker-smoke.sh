@@ -218,7 +218,6 @@ docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -e Database__RunMigrationsAtStartup=true \
   -e RateLimiting__Global__PermitLimit=10000 \
   -e RateLimiting__Api__PermitLimit=1000 \
-  -e LocalAccounts__Enabled=false \
   -e Observability__OpenTelemetry__Enabled=false \
   "$IMAGE_REF"
 
@@ -440,7 +439,6 @@ EOF
     -e RateLimiting__Global__PermitLimit=10000 \
     -e RateLimiting__Api__PermitLimit=1000 \
     -e Accounts__WriteLimit__PermitLimit=1000 \
-    -e LocalAccounts__Enabled=false \
     -e Observability__OpenTelemetry__Enabled=false \
     "$IMAGE_REF"
 

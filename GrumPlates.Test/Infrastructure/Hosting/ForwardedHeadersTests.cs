@@ -73,7 +73,6 @@ public sealed class ForwardedHeadersTests
             ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Port=5432;Database=app;Username=postgres;Password=postgres;GSS Encryption Mode=Disable",
             ["Database:RunMigrationsAtStartup"] = "false",
             ["AuthorBooks:SeedAtStartup"] = "false",
-            ["LocalAccounts:Enabled"] = "false",
             ["Redis:Configuration"] = "CHANGE_ME",
             ["Redis:AllowMissing"] = "true"
         };

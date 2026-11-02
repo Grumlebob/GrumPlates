@@ -258,7 +258,6 @@ for args in calls:
             assert any(value.startswith("ConnectionStrings__DefaultConnection=Host=ci-postgres;") for value in args)
             assert "Redis__Configuration=ci-redis:6379,abortConnect=false" in args
             assert "RateLimiting__Api__PermitLimit=1000" in args
-            assert "LocalAccounts__Enabled=false" in args
             if "web-enabled" in name:
                 assert "Accounts__Enabled=true" in args
                 assert "Accounts__RegistrationEnabled=true" in args

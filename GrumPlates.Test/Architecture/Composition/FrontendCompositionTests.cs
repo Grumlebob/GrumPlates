@@ -2,11 +2,9 @@ using GrumPlates.Features.Accounts.Blazor;
 using GrumPlates.Features.Accounts.Identity;
 using GrumPlates.Frontend;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 
 namespace GrumPlates.Test.Architecture.Composition;
 
@@ -52,13 +50,6 @@ public sealed class FrontendCompositionTests
             Assert.DoesNotContain(services, descriptor =>
                 descriptor.ServiceType.Namespace?.StartsWith("Microsoft.AspNetCore.Components", StringComparison.Ordinal) == true);
             Assert.DoesNotContain(schemes, scheme => scheme.Name == "Google");
-
-            var builder = WebApplication.CreateBuilder(new WebApplicationOptions
-            {
-                EnvironmentName = Environments.Production
-            });
-            await using var app = builder.Build();
-            await FrontendComposition.SeedFrontendDataAsync(app);
         }
     }
 }

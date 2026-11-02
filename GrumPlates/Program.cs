@@ -94,9 +94,8 @@ app.Use(async (ctx, next) =>
 FrontendComposition.UseFrontendStaticFiles(app);
 
 await app.ApplyAppMigrationsAsync();
-await app.SeedConfiguredAdminAsync();
+await app.SeedConfiguredAccountsAsync();
 await app.SeedAuthorBooksAsync();
-await FrontendComposition.SeedFrontendDataAsync(app);
 
 FrontendComposition.MapFrontendEndpoints(app);
 app.MapAppHealthChecks();

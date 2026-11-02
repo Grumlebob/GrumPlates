@@ -54,7 +54,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
         for port in service.get('ports', []):
             assert port['host_ip'] == '127.0.0.1', 'Compose published a non-loopback port'
     assert config['services']['web']['image'] == context['app_image'] + '@' + context['release_image_digest']
-    assert config['services']['web']['environment']['LocalAccounts__Enabled'] == 'false'
     assert config['services']['web']['environment']['Accounts__Enabled'] == 'false'
     assert config['services']['web']['environment']['Accounts__RegistrationEnabled'] == 'false'
     assert config['services']['web']['environment']['DataProtection__KeyEncryptionCertificatePath'] == '/run/secrets/data-protection.pem'

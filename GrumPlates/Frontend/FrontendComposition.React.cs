@@ -32,8 +32,6 @@ internal static class FrontendComposition
             app.Services.GetRequiredService<ReactFrontendStaticRoot>().FileProvider);
     }
 
-    public static Task SeedFrontendDataAsync(WebApplication app) => Task.CompletedTask;
-
     public static void MapFrontendEndpoints(WebApplication app)
     {
         ReactFrontendHosting.MapNavigationFallback(

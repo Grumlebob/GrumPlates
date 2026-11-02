@@ -17,7 +17,6 @@ services:
         format: raw
     environment:
       ASPNETCORE_ENVIRONMENT: Docker
-      LocalAccounts__Enabled: "false"
       ASPNETCORE_HTTP_PORTS: ${APP_PORT}
       APP_VERSION: ${APP_VERSION}
       App__Name: ${APP_NAME}

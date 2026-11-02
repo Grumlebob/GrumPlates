@@ -1,4 +1,5 @@
 using GrumPlates.Features.Accounts;
+using GrumPlates.Features.Accounts.Security;
 using GrumPlates.Infrastructure.Persistence;
 using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
@@ -10,15 +11,15 @@ using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
 namespace GrumPlates.Test.Features.Accounts;
 
 [Collection(TestCollectionNames.StartupIntegration)]
-public sealed class AdminAccountSeedTests
+public sealed class AccountSeedTests
 {
     [Fact]
     public async Task DisabledSeed_ReturnsWithoutResolvingDatabaseServices()
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var options = new AccountOptions { AdminSeed = new AdminSeedOptions { Enabled = false } };
+        var options = new AccountOptions { AdminSeed = new AccountSeedOptions { Enabled = false }, UserSeed = new AccountSeedOptions { Enabled = false } };
 
-        await AdminAccountSeed.SeedConfiguredAdminAsync(options, services, NullLogger.Instance);
+        await AccountSeed.SeedConfiguredAccountsAsync(options, services, NullLogger.Instance);
     }
 
     [Fact]
@@ -189,11 +190,91 @@ public sealed class AdminAccountSeedTests
         Assert.Equal(1, await users.Users.CountAsync(user => user.NormalizedEmail == users.NormalizeEmail(email)));
     }
 
+    [Fact]
+    public async Task UserSeed_CreatesConfirmedUserOnceWithoutResettingPassword()
+    {
+        await using var fixture = new RealCookieAccountFixture();
+        await fixture.InitializeAsync();
+        var adminEmail = $"admin-{Guid.NewGuid():N}@example.test";
+        var userEmail = $"user-{Guid.NewGuid():N}@example.test";
+        var password = NewPassword();
+        await SeedAsync(fixture, adminEmail, NewPassword(), userEmail, password);
+
+        string hash;
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync(userEmail);
+            Assert.NotNull(user);
+            Assert.True(user.EmailConfirmed);
+            Assert.True(await users.CheckPasswordAsync(user, password));
+            Assert.True(await users.IsInRoleAsync(user, "User"));
+            Assert.False(await users.IsInRoleAsync(user, "Admin"));
+            Assert.NotNull(await users.FindByEmailAsync(adminEmail));
+            hash = user.PasswordHash!;
+        }
+
+        await SeedAsync(fixture, adminEmail, NewPassword(), userEmail, NewPassword());
+
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = await users.FindByEmailAsync(userEmail);
+            Assert.NotNull(user);
+            Assert.Equal(hash, user.PasswordHash);
+            Assert.True(await users.CheckPasswordAsync(user, password));
+        }
+    }
+
+    [Fact]
+    public async Task UserSeed_RefusesAnExistingAccountWithoutTheUserRole()
+    {
+        await using var fixture = new RealCookieAccountFixture();
+        await fixture.InitializeAsync();
+        var email = $"plain-{Guid.NewGuid():N}@example.test";
+        var password = NewPassword();
+        using (var scope = fixture.Factory.Services.CreateScope())
+        {
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            Assert.True((await users.CreateAsync(new ApplicationUser { Email = email, UserName = email }, password)).Succeeded);
+        }
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => AccountSeed.SeedConfiguredAccountsAsync(
+            new AccountOptions { UserSeed = new AccountSeedOptions { Enabled = true, Email = email, Password = NewPassword() } },
+            fixture.Factory.Services,
+            NullLogger.Instance));
+
+        Assert.Contains("User seed refused", error.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(password, error.Message);
+    }
+
+    [Fact]
+    public void UserSeed_WeakPasswordFailsValidation()
+    {
+        var result = new AccountOptionsValidator("GrumPlates").Validate(null, new AccountOptions
+        {
+            UserSeed = new AccountSeedOptions { Enabled = true, Email = "user@example.test", Password = "too-short" }
+        });
+
+        Assert.True(result.Failed);
+        Assert.Contains("Accounts:UserSeed:Password must satisfy the account password policy.", result.Failures!);
+    }
+
     private static Task SeedAsync(RealCookieAccountFixture fixture, string email, string password) =>
-        AdminAccountSeed.SeedConfiguredAdminAsync(
+        AccountSeed.SeedConfiguredAccountsAsync(
             new AccountOptions
             {
-                AdminSeed = new AdminSeedOptions { Enabled = true, Email = email, Password = password }
+                AdminSeed = new AccountSeedOptions { Enabled = true, Email = email, Password = password }
+            },
+            fixture.Factory.Services,
+            NullLogger.Instance);
+
+    private static Task SeedAsync(RealCookieAccountFixture fixture, string adminEmail, string adminPassword, string userEmail, string userPassword) =>
+        AccountSeed.SeedConfiguredAccountsAsync(
+            new AccountOptions
+            {
+                AdminSeed = new AccountSeedOptions { Enabled = true, Email = adminEmail, Password = adminPassword },
+                UserSeed = new AccountSeedOptions { Enabled = true, Email = userEmail, Password = userPassword }
             },
             fixture.Factory.Services,
             NullLogger.Instance);

@@ -6,7 +6,8 @@ internal sealed class AccountOptions
     public bool RegistrationEnabled { get; init; }
     public string PublicOrigin { get; init; } = "";
     public AccountEmailOptions Email { get; init; } = new();
-    public AdminSeedOptions AdminSeed { get; init; } = new();
+    public AccountSeedOptions AdminSeed { get; init; } = new();
+    public AccountSeedOptions UserSeed { get; init; } = new();
     public AccountWriteLimitOptions WriteLimit { get; init; } = new();
     public bool EmailEnabled => !string.IsNullOrWhiteSpace(Email.Host);
 }
@@ -22,7 +23,7 @@ internal sealed class AccountEmailOptions
     public int MaxAttempts { get; init; } = 3;
 }
 
-internal sealed class AdminSeedOptions
+internal sealed class AccountSeedOptions
 {
     public bool Enabled { get; init; }
     public string Email { get; init; } = "";

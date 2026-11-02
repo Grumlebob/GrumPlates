@@ -20,40 +20,28 @@ Blazor retains its existing MFA, passkey and configured external-login capabilit
 
 React hides private data while rechecking the session and clears private query caches when the account changes. Unsaved book drafts remain bound to their original application and user; another user must explicitly discard the previous draft before adding or editing a book. Deletion confirmation and account-management credentials do not carry across application or user changes. These boundaries follow [React's guidance on preserving and resetting state](https://react.dev/learn/preserving-and-resetting-state).
 
-## Create a local React Admin
+## Local seeded accounts
 
-Use the Docker development setup from [How to run locally](HowToRunLocally.md). It generates the local HTTPS certificate used to protect the local PostgreSQL Data Protection key ring. Select `React` in `frontend-profile.txt` for this run; the file is the persisted profile selection.
-
-Run setup if `.env` or the local certificate is missing:
+Local setup seeds one Admin and one User for both frontends. Run it once, or again if `.env` or the local certificate is missing:
 
 ```powershell
 pwsh -File ./docker/setup-local.ps1
 ```
 
-In the ignored `.env`, set the account values below. Keep values unquoted and edit the file directly; do not put the password in shell history. Replace the example address and placeholder password with local values.
+Setup fills `Accounts__AdminSeed__*` with `admin@localhost.test` and `Accounts__UserSeed__*` with `user@localhost.test` in the ignored `.env`, each with a generated 24-character password. It prints the emails, never the passwords. It leaves a seed alone when its email or password is already set, so your own values are kept. Startup creates each account once, confirmed, with the `Admin` or `User` role. It never changes an existing password or email, and it refuses an email that belongs to an account without that role. Local self-registration stays off because there is no local mail server.
 
-```dotenv
-Accounts__Enabled=true
-Accounts__RegistrationEnabled=false
-Accounts__AdminSeed__Enabled=true
-Accounts__AdminSeed__Email=operator@example.test
-Accounts__AdminSeed__Password=<private 15–128 character passphrase>
-Accounts__PublicOrigin=
-Accounts__Email__Host=
-Accounts__Email__From=
-Accounts__Email__Username=
-Accounts__Email__Password=
-```
-
-Start the app and open the local HTTPS URL, normally `https://localhost:7186/auth/login`:
+Start the app and sign in at `https://localhost:7186/Account/Login` (Blazor) or `https://localhost:7186/auth/login` (React):
 
 ```powershell
 .\Scripts\RunLocal.ps1 -NoBrowser
 ```
 
-Startup creates the confirmed Admin account and `Admin` role if the address is new. It refuses to assign the role if that address already belongs to a non-admin account. The seed never changes an existing password. After the first successful startup, set `Accounts__AdminSeed__Enabled=false`, clear the seed email and password, save `.env`, and restart the app. Keep `Accounts__Enabled=true` to retain account access. The seeded role does not add an admin dashboard to the template.
+| Setting | Meaning |
+| --- | --- |
+| `Accounts:AdminSeed` | `Enabled`, `Email`, `Password`. Creates the Admin once. Deployments use it too. |
+| `Accounts:UserSeed` | Same shape. Creates an ordinary User once. Local development only; deployments do not set it. |
 
-The password must satisfy the account password policy and must not be common or match the email or application name. Do not use the legacy Blazor demo credentials or carry local seed values into a deployed environment. Keep `.env`, local databases and generated certificates out of commits and images.
+Seed passwords must satisfy the account password policy and must not be common or match the email or application name. Do not carry local seed values into a deployed environment. Keep `.env`, local databases and generated certificates out of commits and images. The seeded Admin role does not add an admin dashboard to the template.
 
 ## Email, quotas and delivery
 

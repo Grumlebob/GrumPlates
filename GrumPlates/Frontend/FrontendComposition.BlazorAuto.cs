@@ -2,7 +2,6 @@ using GrumPlates.Client.Features.Books.AuthorBookcase;
 using GrumPlates.Client.Features.Books.UserBookcase;
 using GrumPlates.Components;
 using GrumPlates.Features.Accounts.Blazor;
-using GrumPlates.Features.Accounts.Blazor.Seed;
 using GrumPlates.Features.Accounts.Email;
 using GrumPlates.Infrastructure.Hosting;
 using ClientImports = GrumPlates.Client._Imports;
@@ -42,8 +41,6 @@ internal static class FrontendComposition
             branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
         });
     }
-
-    public static Task SeedFrontendDataAsync(WebApplication app) => app.SeedLocalLoginAccountsAsync();
 
     public static void UseFrontendStaticFiles(WebApplication app)
     {

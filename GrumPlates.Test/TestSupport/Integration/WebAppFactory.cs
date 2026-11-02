@@ -36,7 +36,6 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private const string ForwardedHeaderKnownNetworkV6EnvironmentVariable = "ForwardedHeaders__KnownNetworks__1";
     private const string GlobalRateLimitEnvironmentVariable = "RateLimiting__Global__PermitLimit";
     private const string ApiRateLimitEnvironmentVariable = "RateLimiting__Api__PermitLimit";
-    private const string LocalAccountsEnabledEnvironmentVariable = "LocalAccounts__Enabled";
     private const string AuthorBooksSeedAtStartupEnvironmentVariable = "AuthorBooks__SeedAtStartup";
     private const string OpenTelemetryEnabledEnvironmentVariable = "Observability__OpenTelemetry__Enabled";
     private const string OpenTelemetryEndpointEnvironmentVariable = "Observability__OpenTelemetry__Endpoint";
@@ -98,7 +97,6 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Redis:AllowMissing"] = redisAllowMissing.ToString(),
                 ["Database:RunMigrationsAtStartup"] = _options.RunMigrationsAtStartup.ToString(),
                 ["AuthorBooks:SeedAtStartup"] = _options.AuthorBooksSeedAtStartup.ToString(),
-                ["LocalAccounts:Enabled"] = "false",
                 ["DataProtection:KeyEncryptionCertificatePath"] = _keyCertificate.Path,
                 ["DataProtection:KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 ["ForwardedHeaders:KnownNetworks:0"] = "0.0.0.0/0",
@@ -231,7 +229,6 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 [CacheBooksDisableLocalEnvironmentVariable] = _options.DisableLocalCache?.ToString(),
                 [StartupMigrationsEnvironmentVariable] = _options.RunMigrationsAtStartup.ToString(),
                 [AuthorBooksSeedAtStartupEnvironmentVariable] = _options.AuthorBooksSeedAtStartup.ToString(),
-                [LocalAccountsEnabledEnvironmentVariable] = "false",
                 ["DataProtection__KeyEncryptionCertificatePath"] = _keyCertificate.Path,
                 ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 [ForwardedHeaderKnownNetworkV4EnvironmentVariable] = "0.0.0.0/0",

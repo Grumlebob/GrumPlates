@@ -7,6 +7,7 @@ using GrumPlates.Features.Accounts.Identity;
 using GrumPlates.Features.Accounts.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Options;
 using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
 
@@ -118,7 +119,7 @@ public sealed class AccountPasswordTests
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         var services = new ServiceCollection();
         services.AddIdentityBackend();
-        services.AddAccountFeature(configuration, new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing"));
+        services.AddAccountFeature(configuration, new HostingEnvironment { EnvironmentName = "Testing" });
         Assert.Single(services, service => service.ServiceType == typeof(IPasswordValidator<ApplicationUser>));
         Assert.Equal(typeof(AccountPasswordValidator), services.Single(service => service.ServiceType == typeof(IPasswordValidator<ApplicationUser>)).ImplementationType);
         using var provider = services.BuildServiceProvider();
@@ -138,7 +139,7 @@ public sealed class AccountPasswordTests
             ["Accounts:AdminSeed:Password"] = "short"
         }).Build();
         var error = Assert.Throws<OptionsValidationException>(() => new ServiceCollection().AddAccountFeature(configuration,
-            new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing")));
+            new HostingEnvironment { EnvironmentName = "Testing" }));
         Assert.Contains("Accounts:AdminSeed:Password", error.Message);
         Assert.DoesNotContain("short", error.Message);
     }

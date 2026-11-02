@@ -27,7 +27,7 @@ Use `-NoBrowser` to keep the browser closed, `-Observability` to start the optio
 
 The app is normally at `https://localhost:7186`. Docker exposes ports on loopback only. Postgres uses host port `5432`, Redis `6379`, and Redis Insight `5540` by default. Change a busy host port in `.env`, then rerun the wrapper. For one run, set the variable in the shell instead (for example `$env:APP_HTTPS_HOST_PORT = '7187'`); a variable already set in the environment wins over `.env`, and the wrapper checks health on the published port. This also applies to `POSTGRES_USER`, `POSTGRES_PASSWORD` and `Database__*`, so remove machine-wide values for those before the first run creates the database volume. Keep container-to-container ports (Postgres `5432` and Redis `6379`) unchanged. The optional observability URLs and ports are defined in `.env.example`; usage is in [Observability](ObservabilityGuide.md).
 
-Development can seed a local User account. Values are in [appsettings.Development.json](../GrumPlates/appsettings.Development.json); use them only for local development. Startup migrations run in the Docker profile.
+Local setup seeds a local Admin and a local User; their emails are printed by setup and their passwords are in `.env`. Startup migrations run in the Docker profile.
 
 ## Reset local data
 
@@ -48,7 +48,7 @@ $env:Database__RunMigrationsAtStartup = "true"
 dotnet run --project .\GrumPlates\GrumPlates.csproj -- --urls https://localhost:7186
 ```
 
-If the HTTPS port is busy, choose another URL with `--urls` and set `E2E_BASE_URL` to the same URL for browser tests. React's Vite proxy and API setup are described in [Frontend/React](Frontend/React.md).
+To seed the local accounts without Docker, set the six `Accounts__AdminSeed__*` and `Accounts__UserSeed__*` keys from `.env` as environment variables in the same shell. If the HTTPS port is busy, choose another URL with `--urls` and set `E2E_BASE_URL` to the same URL for browser tests. React's Vite proxy and API setup are described in [Frontend/React](Frontend/React.md).
 
 ## Tailwind
 
