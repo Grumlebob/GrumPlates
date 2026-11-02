@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parents[4]
 TARGET = ROOT / "Deployment/LocalSingleNode"
 ETC = Path(os.environ.get("LOCALSINGLENODE_ETC", "/etc"))
 ACCOUNT_SETTING_DEFAULTS = {
-    "accounts_enabled": False,
     "accounts_registration_enabled": False,
     "accounts_admin_seed_enabled": False,
     "accounts_admin_seed_email": "",
@@ -105,7 +104,7 @@ def settings(path: Path | None = None) -> dict:
         raise ValueError("backup_keep_days must be a positive integer")
     if values["observability_enabled"] is not False:
         raise ValueError("single-node observability must be disabled")
-    account_bool_keys = ("accounts_enabled", "accounts_registration_enabled", "accounts_admin_seed_enabled")
+    account_bool_keys = ("accounts_registration_enabled", "accounts_admin_seed_enabled")
     if any(type(values[key]) is not bool for key in account_bool_keys):
         raise ValueError("account feature settings must be true or false")
     if type(values["accounts_email_port"]) is not int or not 1 <= values["accounts_email_port"] <= 65535:
@@ -115,10 +114,6 @@ def settings(path: Path | None = None) -> dict:
     account_string_keys = ("accounts_admin_seed_email", "accounts_public_origin", "accounts_email_host", "accounts_email_from")
     if any(type(values[key]) is not str or any(char in values[key] for char in "\r\n\0") for key in account_string_keys):
         raise ValueError("account settings must be single-line strings")
-    if values["accounts_admin_seed_enabled"] and not values["accounts_enabled"]:
-        raise ValueError("accounts_admin_seed_enabled requires accounts_enabled")
-    if values["accounts_registration_enabled"] and not values["accounts_enabled"]:
-        raise ValueError("accounts_registration_enabled requires accounts_enabled")
     return values
 
 

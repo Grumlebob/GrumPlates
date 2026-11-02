@@ -15,7 +15,6 @@ POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
 
 class AcceptanceHandler(BaseHTTPRequestHandler):
     requests: list[tuple[str, str, str]] = []
-    accounts_enabled = False
     capability_status = 200
     capability_malformed = False
     shell = (
@@ -47,10 +46,10 @@ class AcceptanceHandler(BaseHTTPRequestHandler):
         if path == "/api/client-config":
             payload = json.dumps({
                 "schemaVersion": 1,
-                "accountsEnabled": (
-                    "true" if AcceptanceHandler.capability_malformed else AcceptanceHandler.accounts_enabled
+                "applicationId": (
+                    "not-an-application-id" if AcceptanceHandler.capability_malformed
+                    else "1234567890abcdef1234567890abcdef"
                 ),
-                "applicationId": "1234567890abcdef1234567890abcdef",
             }).encode()
             self.respond(
                 AcceptanceHandler.capability_status,
@@ -58,7 +57,7 @@ class AcceptanceHandler(BaseHTTPRequestHandler):
                 "application/json",
                 {"Cache-Control": "no-store"},
             )
-        elif path == "/api/auth/session" and AcceptanceHandler.accounts_enabled:
+        elif path == "/api/auth/session":
             payload = json.dumps({
                 "enabled": True,
                 "registrationEnabled": False,
@@ -75,7 +74,7 @@ class AcceptanceHandler(BaseHTTPRequestHandler):
                     "Set-Cookie": "__Host-CSRF-1234567890abcdef1234567890abcdef=fixture; Path=/; HttpOnly; SameSite=Strict",
                 },
             )
-        elif path == "/api/auth/login" and AcceptanceHandler.accounts_enabled:
+        elif path == "/api/auth/login":
             self.respond(405, b'{"code":"MethodNotAllowed"}', "application/problem+json", {"Allow": "POST"})
         elif path == "/health/ready":
             self.respond(200, b"Healthy")
@@ -113,12 +112,10 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
 
     def run_fixture(
         self,
-        accounts_enabled: bool,
         capability_status: int = 200,
         capability_malformed: bool = False,
     ):
         AcceptanceHandler.requests = []
-        AcceptanceHandler.accounts_enabled = accounts_enabled
         AcceptanceHandler.capability_status = capability_status
         AcceptanceHandler.capability_malformed = capability_malformed
         server = ThreadingHTTPServer(("127.0.0.1", 0), AcceptanceHandler)
@@ -147,26 +144,8 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
         self.assertIn("FrontendProfile and AcceptanceProfile do not match", result.stdout + result.stderr)
         self.assertNotIn("PASS DNS", result.stdout)
 
-    def test_react_disabled_acceptance_uses_explicit_capability_and_real_404s(self):
-        result, requests = self.run_fixture(accounts_enabled=False)
-        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-        self.assertIn("PASS React-client-config", result.stdout)
-        self.assertIn("PASS React-public-data", result.stdout)
-        self.assertIn("PASS React-no-cookie", result.stdout)
-        self.assertIn("RESULT: PASS", result.stdout)
-        self.assertTrue(requests)
-        self.assertEqual(("GET", "/api/client-config"), requests[0][:2])
-        methods = {method for method, _path, _cookie in requests}
-        self.assertLessEqual(methods, {"GET", "HEAD"})
-        paths = {path.split("?", 1)[0] for _method, path, _cookie in requests}
-        self.assertIn("/api/author-books", paths)
-        self.assertIn("/api/auth/login", paths)
-        self.assertIn("/api/auth/session", paths)
-        self.assertIn("PASS React-inactive-route-/api/auth/session", result.stdout)
-        self.assertTrue(all(not cookie for _method, _path, cookie in requests))
-
     def test_react_enabled_acceptance_checks_session_post_only_and_unknown_routes(self):
-        result, requests = self.run_fixture(accounts_enabled=True)
+        result, requests = self.run_fixture()
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertIn("PASS React-client-config", result.stdout)
         self.assertIn("PASS React-enabled-session", result.stdout)
@@ -192,7 +171,7 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
             {"capability_malformed": True},
         ):
             with self.subTest(options=options):
-                result, requests = self.run_fixture(accounts_enabled=False, **options)
+                result, requests = self.run_fixture(**options)
                 self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
                 self.assertIn("React client capability document is missing or invalid", result.stdout + result.stderr)
                 self.assertNotIn("PASS health", result.stdout)

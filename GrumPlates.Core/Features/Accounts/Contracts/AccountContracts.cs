@@ -1,6 +1,6 @@
 namespace GrumPlates.Core.Features.Accounts.Contracts;
 
-public sealed record ClientConfiguration(int SchemaVersion, bool AccountsEnabled, string ApplicationId);
+public sealed record ClientConfiguration(int SchemaVersion, string ApplicationId);
 public sealed record AccountProfile(string Id, string Email, IReadOnlyList<string> Roles);
 public sealed record AccountSession(bool Enabled, bool RegistrationEnabled, bool EmailEnabled, string CsrfToken, AccountProfile? User);
 public sealed record AccountMessage(string Message);

@@ -54,7 +54,7 @@ network="${APP_NAME}-ci-${session}"
 postgres="${APP_NAME}-ci-postgres-${session}"
 redis="${APP_NAME}-ci-redis-${session}"
 web="${APP_NAME}-ci-web-${session}"
-web_enabled="${APP_NAME}-ci-web-enabled-${session}"
+web_mail="${APP_NAME}-ci-web-mail-${session}"
 smtp="${APP_NAME}-ci-smtp-${session}"
 fixture_dir=""
 dp_cert_dir=""
@@ -83,16 +83,16 @@ cleanup() {
   trap - EXIT INT TERM
   if [[ "$status" -ne 0 ]]; then
     owned_container "$web" && docker logs --tail 200 --since 10m "$web" || true
-    owned_container "$web_enabled" && docker logs --tail 200 --since 10m "$web_enabled" || true
+    owned_container "$web_mail" && docker logs --tail 200 --since 10m "$web_mail" || true
     owned_container "$smtp" && docker logs --tail 200 --since 10m "$smtp" || true
     owned_container "$postgres" && docker logs --tail 200 --since 10m "$postgres" || true
     owned_container "$redis" && docker logs --tail 200 --since 10m "$redis" || true
   fi
-  for container in "$web" "$web_enabled" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$smtp" "$postgres" "$redis"; do
     owned_container "$container" && docker rm -f "$container" >/dev/null 2>&1 || true
   done
   owned_network "$network" && docker network rm "$network" >/dev/null 2>&1 || true
-  for container in "$web" "$web_enabled" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$smtp" "$postgres" "$redis"; do
     if owned_container "$container"; then echo "Owned smoke container remains: $container" >&2; status=1; fi
   done
   if owned_network "$network"; then echo "Owned smoke network remains: $network" >&2; status=1; fi
@@ -246,7 +246,7 @@ forwarded_proto=(--header "X-Forwarded-Proto: https")
 
 if [[ "$FRONTEND_PROFILE" == "React" ]]; then
   client_config_response="$(curl --silent --show-error --max-time 30 --dump-header - --output - "${forwarded_proto[@]}" "$base_url/api/client-config")"
-  accounts_enabled="$(python3 -c 'import json,re,sys
+  python3 -c 'import json,re,sys
 raw=sys.stdin.buffer.read()
 headers,body=raw.split(b"\r\n\r\n",1)
 lines=headers.decode("latin1").splitlines()
@@ -256,9 +256,7 @@ assert any(line.startswith("cache-control:") and "no-store" in line for line in 
 assert not any(line.startswith("set-cookie:") for line in header_lines), "client config must not set cookies"
 payload=json.loads(body)
 assert type(payload.get("schemaVersion")) is int and payload["schemaVersion"] == 1, "client config schema version is invalid"
-assert type(payload.get("accountsEnabled")) is bool, "client config capability is invalid"
-assert re.fullmatch(r"[0-9a-fA-F]{32}", payload.get("applicationId", "")), "client config application ID is invalid"
-print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
+assert re.fullmatch(r"[0-9a-fA-F]{32}", payload.get("applicationId", "")), "client config application ID is invalid"' <<< "$client_config_response"
 
   home_html="$(curl --fail --silent --show-error --max-time 30 --header 'Accept: text/html' "${forwarded_proto[@]}" "$base_url/")"
   grep -Fqi '<!DOCTYPE html>' <<< "$home_html" || { echo "React home page did not return HTML" >&2; exit 1; }
@@ -307,14 +305,10 @@ print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
     exit 1
   fi
 
-  if [[ "$accounts_enabled" == "true" ]]; then
-    login_headers="$(curl --silent --show-error --max-time 30 --dump-header - --output /dev/null "${forwarded_proto[@]}" "$base_url/api/auth/login")"
-    grep -Eiq '^HTTP/[^ ]+[[:space:]]+405([[:space:]]|$)' <<< "$login_headers" || { echo "enabled GET /api/auth/login did not return 405" >&2; exit 1; }
-    grep -Eiq '^Allow:[[:space:]]*POST[[:space:]]*$' <<< "$login_headers" || { echo "enabled GET /api/auth/login did not advertise Allow: POST" >&2; exit 1; }
-    inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)
-  else
-    inactive_paths=(/Account /api/auth /api/auth/session /api/auth/login /assets/missing.js)
-  fi
+  login_headers="$(curl --silent --show-error --max-time 30 --dump-header - --output /dev/null "${forwarded_proto[@]}" "$base_url/api/auth/login")"
+  grep -Eiq '^HTTP/[^ ]+[[:space:]]+405([[:space:]]|$)' <<< "$login_headers" || { echo "GET /api/auth/login did not return 405" >&2; exit 1; }
+  grep -Eiq '^Allow:[[:space:]]*POST[[:space:]]*$' <<< "$login_headers" || { echo "GET /api/auth/login did not advertise Allow: POST" >&2; exit 1; }
+  inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)
 
   for path in "${inactive_paths[@]}"; do
     response="$(curl --silent --show-error --max-time 30 --write-out $'\n%{http_code}' --header 'Accept: text/html' "${forwarded_proto[@]}" "$base_url$path")"
@@ -345,7 +339,7 @@ print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
   pwsh "$REPO_ROOT/GrumPlates.Test/bin/Release/net10.0/playwright.ps1" install chromium
 
   docker rm -f "$web" >/dev/null
-  web="${APP_NAME}-ci-web-disabled-removed-${session}"
+  web="${APP_NAME}-ci-web-removed-${session}"
 
   runner_temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
   mkdir -p "$runner_temp"
@@ -405,7 +399,7 @@ EOF
   account_password="E2E-$(openssl rand -hex 24)-A9!"
   changed_password="E2E-$(openssl rand -hex 24)-B7!"
   admin_password="E2E-$(openssl rand -hex 24)-C5!"
-  docker run -d --name "$web_enabled" --network "$network" "${owned_label_args[@]}" \
+  docker run -d --name "$web_mail" --network "$network" "${owned_label_args[@]}" \
     -p 127.0.0.1::8080 -p "127.0.0.1:${react_https_host_port}:8443" \
     -v "$app_tls_dir:/run/react-auth-fixture:ro" \
     -e ASPNETCORE_ENVIRONMENT=Docker \
@@ -415,7 +409,6 @@ EOF
     -e SSL_CERT_FILE=/run/react-auth-fixture/ca.pem \
     -e "APP_VERSION=${APP_VERSION}" \
     -e "App__Name=${APP_NAME}" \
-    -e "Accounts__Enabled=true" \
     -e "Accounts__RegistrationEnabled=true" \
     -e "Accounts__PublicOrigin=https://127.0.0.1:${react_https_host_port}" \
     -e Accounts__Email__Host=ci-smtp \
@@ -452,7 +445,7 @@ EOF
     sleep 2
   done
   echo "enabled React app ready at ${enabled_base_url}"
-  enabled_http_port="$(docker port "$web_enabled" 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
+  enabled_http_port="$(docker port "$web_mail" 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$enabled_http_port" ]] || { echo "enabled React app did not publish its loopback HTTP port" >&2; exit 1; }
   cd "$REPO_ROOT"
   pwsh -NoProfile -File "$REPO_ROOT/Scripts/Test-DeployedSite.ps1" \
@@ -480,7 +473,7 @@ EOF
   python3 "$REPO_ROOT/Scripts/CI/validate_dotnet_test_results.py" \
     "$react_enabled_results_dir/react-enabled-browser.trx" \
     --expected-skipped 0 --suite "Packaged React enabled account browser journey"
-  echo "React packaged disabled/enabled HTTP and browser journeys passed"
+  echo "React packaged HTTP and account browser journeys passed"
 else
   home_html="$(curl --fail --silent --show-error --max-time 30 "${forwarded_proto[@]}" "${base_url}/")"
   grep -Fqi '<!DOCTYPE html>' <<< "$home_html" || { echo "home page did not return HTML" >&2; exit 1; }

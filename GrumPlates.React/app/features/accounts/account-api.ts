@@ -4,7 +4,7 @@ import { ApiError } from "../../api/errors";
 export type Session = components["schemas"]["AccountSession"];
 export type ClientConfiguration = components["schemas"]["ClientConfiguration"];
 
-export const disabledSession: Session = {
+export const emptySession: Session = {
   enabled: false,
   registrationEnabled: false,
   emailEnabled: false,

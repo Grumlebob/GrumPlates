@@ -10,7 +10,6 @@ lan_hostnames: []
 backup_root: /opt/books-backups
 backup_keep_days: 7
 observability_enabled: false
-accounts_enabled: false
 accounts_registration_enabled: false
 accounts_admin_seed_enabled: false
 accounts_admin_seed_email: ""

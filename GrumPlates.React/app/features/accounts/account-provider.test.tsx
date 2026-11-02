@@ -20,7 +20,7 @@ describe("account provider lifecycle", () => {
     vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
     vi.stubGlobal("fetch", async (request: Request) => {
       if (new URL(request.url).pathname === "/api/client-config") {
-        return json({ schemaVersion: 1, accountsEnabled: true, applicationId: "e".repeat(32) });
+        return json({ schemaVersion: 1, applicationId: "e".repeat(32) });
       }
       sessionRequests += 1;
       return json({ enabled: true, registrationEnabled: false, emailEnabled: false, csrfToken: "csrf", user: { id: owner, email: `${owner}@example.test`, roles: [] } });
@@ -46,7 +46,7 @@ describe("account provider lifecycle", () => {
       constructor() { throw new DOMException("Channel use is blocked.", "SecurityError"); }
     });
     vi.stubGlobal("fetch", async (request: Request) => new URL(request.url).pathname === "/api/client-config"
-      ? json({ schemaVersion: 1, accountsEnabled: true, applicationId: "d".repeat(32) })
+      ? json({ schemaVersion: 1, applicationId: "d".repeat(32) })
       : json({ enabled: true, registrationEnabled: false, emailEnabled: false, csrfToken: "csrf", user: { id: owner, email: `${owner}@example.test`, roles: [] } }));
     Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
     const client = new QueryClient({ defaultOptions: { queries: { gcTime: 0 } } });
@@ -65,7 +65,7 @@ describe("account provider lifecycle", () => {
       requests.push(request);
       const path = new URL(request.url).pathname;
       return path === "/api/client-config"
-        ? json({ schemaVersion: 1, accountsEnabled: true, applicationId })
+        ? json({ schemaVersion: 1, applicationId })
         : json({ enabled: true, registrationEnabled: false, emailEnabled: false, csrfToken: "csrf", user: null });
     });
     vi.stubGlobal("fetch", fetcher);

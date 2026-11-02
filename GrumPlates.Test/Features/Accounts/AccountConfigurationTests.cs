@@ -142,10 +142,9 @@ public sealed class ClientConfigurationTests
         var config = await response.Content.ReadFromJsonAsync<ClientConfiguration>();
         Assert.NotNull(config);
         Assert.Equal(1, config.SchemaVersion);
-        Assert.True(config.AccountsEnabled);
         Assert.Matches("^[0-9a-f]{32}$", config.ApplicationId);
         using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal(3, json.RootElement.EnumerateObject().Count());
+        Assert.Equal(2, json.RootElement.EnumerateObject().Count());
         using var session = await client.GetAsync("/api/auth/session");
         Assert.Equal(HttpStatusCode.OK, session.StatusCode);
     }

@@ -2205,7 +2205,6 @@
       "ClientConfiguration": {
         "required": [
           "schemaVersion",
-          "accountsEnabled",
           "applicationId"
         ],
         "type": "object",
@@ -2213,9 +2212,6 @@
           "schemaVersion": {
             "type": "integer",
             "format": "int32"
-          },
-          "accountsEnabled": {
-            "type": "boolean"
           },
           "applicationId": {
             "type": "string"

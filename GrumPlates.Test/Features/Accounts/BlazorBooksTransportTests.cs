@@ -19,7 +19,7 @@ public sealed class BlazorBooksTransportTests
         {
             Content = request.RequestUri!.AbsolutePath switch
             {
-                "/api/client-config" => Json(new { schemaVersion = 1, accountsEnabled = true, applicationId = new string('a', 32) }),
+                "/api/client-config" => Json(new { schemaVersion = 1, applicationId = new string('a', 32) }),
                 "/api/auth/session" => Json(new { enabled = true, registrationEnabled = false, emailEnabled = false, csrfToken = "fresh-csrf", user = (object?)null }),
                 _ => Json(new { id = 7, title = "Fixture" })
             }
@@ -46,7 +46,7 @@ public sealed class BlazorBooksTransportTests
         var handler = new RecordingHandler((request, captured) =>
         {
             var path = request.RequestUri!.AbsolutePath;
-            if (path == "/api/client-config") return JsonResponse(new { schemaVersion = 1, accountsEnabled = true, applicationId = new string('b', 32) });
+            if (path == "/api/client-config") return JsonResponse(new { schemaVersion = 1, applicationId = new string('b', 32) });
             if (path == "/api/auth/session") return JsonResponse(new { enabled = true, registrationEnabled = false, emailEnabled = false, csrfToken = "csrf-b", user = new { id = "owner-b", email = "b@example.test", roles = Array.Empty<string>() } });
             return captured.ExpectedUser == "owner-a"
                 ? new HttpResponseMessage(HttpStatusCode.Conflict)

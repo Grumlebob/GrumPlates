@@ -19,7 +19,7 @@ internal static class ClientConfigurationEndpoints
         endpoints.MapGet("/api/client-config", (HttpContext context, AccountApplicationIdentity identity) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            return TypedResults.Ok(new ClientConfiguration(1, true, identity.Id));
+            return TypedResults.Ok(new ClientConfiguration(1, identity.Id));
         }).WithName("ClientConfiguration").WithTags("Accounts").AllowAnonymous();
         return endpoints;
     }

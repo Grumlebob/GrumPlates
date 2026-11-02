@@ -405,7 +405,6 @@ export interface components {
         ClientConfiguration: {
             /** Format: int32 */
             schemaVersion: number;
-            accountsEnabled: boolean;
             applicationId: string;
         };
         CreateBookRequest: {

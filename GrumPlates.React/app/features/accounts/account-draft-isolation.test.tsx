@@ -142,7 +142,7 @@ function renderApp(path: string, state: { owner: string | null; pendingSession?:
       return new Response(null, { status: 204 });
     }
     switch (new URL(request.url).pathname) {
-      case "/api/client-config": return json({ schemaVersion: 1, accountsEnabled: true, applicationId: state.applicationId ?? "a".repeat(32) });
+      case "/api/client-config": return json({ schemaVersion: 1, applicationId: state.applicationId ?? "a".repeat(32) });
       case "/api/auth/session": return state.pendingSession ?? json(session(state.owner));
       case "/api/books": {
         if (request.method === "GET") return json({ books: state.books ?? [] });

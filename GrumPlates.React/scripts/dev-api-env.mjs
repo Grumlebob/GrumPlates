@@ -1,5 +1,4 @@
 const API_ENVIRONMENT_KEYS = new Set([
-  "Accounts__Enabled",
   "Accounts__RegistrationEnabled",
   "Accounts__PublicOrigin",
   "Accounts__Email__Host",
@@ -11,6 +10,9 @@ const API_ENVIRONMENT_KEYS = new Set([
   "Accounts__AdminSeed__Enabled",
   "Accounts__AdminSeed__Email",
   "Accounts__AdminSeed__Password",
+  "Accounts__UserSeed__Enabled",
+  "Accounts__UserSeed__Email",
+  "Accounts__UserSeed__Password",
 ]);
 
 export function parseApiEnvironment(contents) {

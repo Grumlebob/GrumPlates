@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiResult } from "../../api/api-result";
-import { disabledSession } from "./account-api";
+import { emptySession } from "./account-api";
 import { AccountSessionController } from "./account-session-controller";
 
 const controllers: AccountSessionController[] = [];
@@ -16,21 +16,10 @@ afterEach(() => {
 });
 
 describe("account session controller", () => {
-  it("uses explicit capability and treats an enabled session 404 as unavailable", async () => {
-    const disabledRequests: Request[] = [];
-    const disabledFetcher = vi.fn(async (request: Request) => {
-      disabledRequests.push(request);
-      return json({ schemaVersion: 1, accountsEnabled: false, applicationId: applicationIdA });
-    });
-    const disabled = createController(disabledFetcher);
-    await expect(disabled.refresh()).resolves.toMatchObject({ enabled: false });
-    expect(disabled.getSnapshot().status).toBe("disabled");
-    expect(disabledFetcher).toHaveBeenCalledTimes(1);
-    expect(disabledRequests[0]?.credentials).toBe("omit");
-
+  it("treats a session 404 as unavailable", async () => {
     const unavailableFetcher = vi.fn(async (request: Request) => {
       if (new URL(request.url).pathname === "/api/client-config") {
-        return json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdB });
+        return json({ schemaVersion: 1, applicationId: applicationIdB });
       }
       return json({ title: "Not found" }, 404, "application/problem+json");
     });
@@ -71,7 +60,7 @@ describe("account session controller", () => {
     const sessionResponse = deferred<Response>();
     const fetcher = vi.fn(async (request: Request) => {
       if (new URL(request.url).pathname === "/api/client-config") {
-        return json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA });
+        return json({ schemaVersion: 1, applicationId: applicationIdA });
       }
       return sessionResponse.promise;
     });
@@ -95,7 +84,7 @@ describe("account session controller", () => {
         configurationCalls += 1;
         return configurationCalls === 1
           ? oldConfiguration.promise
-          : json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdB });
+          : json({ schemaVersion: 1, applicationId: applicationIdB });
       }
       return newSession.promise;
     });
@@ -104,7 +93,7 @@ describe("account session controller", () => {
     const stale = controller.refresh();
     const transition = controller.changed();
     await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
-    oldConfiguration.resolve(json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA }));
+    oldConfiguration.resolve(json({ schemaVersion: 1, applicationId: applicationIdA }));
     await expect(stale).rejects.toHaveProperty("name", "AbortError");
 
     const current = controller.refresh();
@@ -121,7 +110,7 @@ describe("account session controller", () => {
     const fetcher = vi.fn(async (request: Request) => {
       const path = new URL(request.url).pathname;
       if (path === "/api/client-config") {
-        return json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA });
+        return json({ schemaVersion: 1, applicationId: applicationIdA });
       }
       if (path === "/api/auth/session") {
         return json(session(userId, "csrf-token"));
@@ -153,7 +142,7 @@ describe("account session controller", () => {
     const fetcher = async (request: Request) => {
       const path = new URL(request.url).pathname;
       if (path === "/api/client-config") {
-        return json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA });
+        return json({ schemaVersion: 1, applicationId: applicationIdA });
       }
       if (path === "/api/auth/session") return json(session(userId, "csrf-token"));
       if (path === "/api/auth/login") {
@@ -233,9 +222,9 @@ describe("account session controller", () => {
     controller.dispose();
 
     expect(requestSignal?.aborted).toBe(true);
-    configuration.resolve(json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA }));
+    configuration.resolve(json({ schemaVersion: 1, applicationId: applicationIdA }));
     await expect(stale).rejects.toHaveProperty("name", "AbortError");
-    expect(controller.getSnapshot()).toMatchObject({ status: "loading", session: disabledSession });
+    expect(controller.getSnapshot()).toMatchObject({ status: "loading", session: emptySession });
   });
 
   it("discards an old owner's private response when an ordinary refresh discovers a new owner", async () => {
@@ -359,7 +348,7 @@ describe("account session controller", () => {
     const controller = createController(async request => {
       const path = new URL(request.url).pathname;
       if (path === "/api/books") return body.response;
-      if (path === "/api/client-config") return json({ schemaVersion: 1, accountsEnabled: true, applicationId });
+      if (path === "/api/client-config") return json({ schemaVersion: 1, applicationId });
       return accountResponse(request, "user-a", "csrf-a");
     });
     await controller.refresh();
@@ -427,7 +416,7 @@ function createController(fetcher: (request: Request) => Promise<Response>, quer
 function accountResponse(request: Request, userId: string, csrfToken: string): Response {
   const path = new URL(request.url).pathname;
   if (path === "/api/client-config") {
-    return json({ schemaVersion: 1, accountsEnabled: true, applicationId: applicationIdA });
+    return json({ schemaVersion: 1, applicationId: applicationIdA });
   }
   if (path === "/api/auth/session") return json(session(userId, csrfToken));
   if (path === "/api/books" && request.method === "GET") return json({ books: [] });

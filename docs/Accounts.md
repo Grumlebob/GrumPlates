@@ -1,6 +1,6 @@
 # Accounts
 
-Accounts are optional and disabled by default. React reads the server capability before starting account requests. The server remains authoritative: hiding a link or route never replaces API authentication, authorization, antiforgery or cache policy.
+Accounts are always on. Registration, the Admin seed and email are opt-in. React reads the client configuration before starting account requests. The server remains authoritative: hiding a link or route never replaces API authentication, authorization, antiforgery or cache policy.
 
 Server implementation and Blazor Identity UI live under `GrumPlates/Features/Accounts`; shared DTOs live in `GrumPlates.Core/Features/Accounts/Contracts`. `ApplicationUser` resides in the feature's `Identity` folder but retains the CLR namespace `GrumPlates.Features.Login.Account` for Identity/EF compatibility. The shared context, design-time factory and historical migrations stay under `Infrastructure/Persistence`. The outbox entity and operations belong to Accounts; its EF mapping remains inline in the shared `AppDbContext`. See [architecture](Architecture.md) for composition and the deliberate Books-to-Accounts integration.
 
@@ -8,15 +8,14 @@ Server implementation and Blazor Identity UI live under `GrumPlates/Features/Acc
 
 | Configuration | Behavior |
 | --- | --- |
-| `Accounts:Enabled=false` | Account API routes are absent. React stays public-only, offers no private Books and creates no account session cookie. Legacy Blazor Identity behavior is retained. |
-| `Accounts:Enabled=true`, email host empty | Login, logout, password change, export, deletion and private Books work. Registration, confirmation, recovery and email change stay unavailable. A configured Admin can be provisioned once with `Accounts:AdminSeed`. |
-| `Accounts:Enabled=true`, email host and sender configured | The mail worker can send confirmation and recovery links. Registration additionally requires `Accounts:RegistrationEnabled=true`. `Accounts:PublicOrigin` must be a bare HTTPS origin. |
+| Email host empty | Login, logout, password change, export, deletion and private Books work. Registration, confirmation, recovery and email change stay unavailable. A configured Admin can be provisioned once with `Accounts:AdminSeed`. |
+| Email host and sender configured | The mail worker can send confirmation and recovery links. Registration additionally requires `Accounts:RegistrationEnabled=true`. `Accounts:PublicOrigin` must be a bare HTTPS origin. |
 
-`GET /api/client-config` returns the account capability without user data or secrets. When enabled, React reads `GET /api/auth/session` for the current user, feature flags and an antiforgery token. The UI lives at `/auth/login`, `/auth/register` and related `/auth/*` routes; `/auth` redirects to login. `/my-books` is private. Account mutations use POST and the antiforgery header. API failures stay JSON responses rather than login redirects.
+`GET /api/client-config` returns the schema version and application ID without user data or secrets. React reads `GET /api/auth/session` for the current user, feature flags and an antiforgery token. The UI lives at `/auth/login`, `/auth/register` and related `/auth/*` routes; `/auth` redirects to login. `/my-books` is private. Account mutations use POST and the antiforgery header. API failures stay JSON responses rather than login redirects.
 
 The authentication cookie is `Secure`, `HttpOnly`, `SameSite=Lax`, host-only and fixed at eight hours, or fourteen days when “remember me” is selected. Account and private API responses use `Cache-Control: private, no-store`. Passwords must contain 15–128 Unicode characters, contain no control characters, and differ from the application name and email; common passwords are rejected. Password changes, resets and confirmed email changes rotate the security stamp; account deletion removes the user. Each action revokes existing sessions.
 
-Blazor retains its existing MFA, passkey and configured external-login capabilities in enabled mode. React's password-only sign-in does not bypass MFA. Blazor password recovery preserves MFA, and sensitive management still requires a valid session and current-password proof. New external users complete email-first registration, then sign in to link their provider; disabling registration also prevents external callbacks from creating accounts.
+Blazor retains its existing MFA, passkey and configured external-login capabilities. React's password-only sign-in does not bypass MFA. Blazor password recovery preserves MFA, and sensitive management still requires a valid session and current-password proof. New external users complete email-first registration, then sign in to link their provider; disabling registration also prevents external callbacks from creating accounts.
 
 React hides private data while rechecking the session and clears private query caches when the account changes. Unsaved book drafts remain bound to their original application and user; another user must explicitly discard the previous draft before adding or editing a book. Deletion confirmation and account-management credentials do not carry across application or user changes. These boundaries follow [React's guidance on preserving and resetting state](https://react.dev/learn/preserving-and-resetting-state).
 
@@ -53,7 +52,7 @@ A database restore may replay an active pending job and produce a duplicate emai
 
 ## Production key and backup recovery
 
-When accounts are enabled, Data Protection keys and account data share the PostgreSQL database. Production keys are wrapped with the app-owned certificate and private key stored outside that database. A database dump alone cannot restore sign-in cookies or decrypt outbox jobs. Preserve the same app identity, deployment environment, database, certificate/private key and certificate password. Replicas of one app share those inputs; unrelated apps must not.
+Data Protection keys and account data share the PostgreSQL database. Production keys are wrapped with the app-owned certificate and private key stored outside that database. A database dump alone cannot restore sign-in cookies or decrypt outbox jobs. Preserve the same app identity, deployment environment, database, certificate/private key and certificate password. Replicas of one app share those inputs; unrelated apps must not.
 
 Keep the wrapping key across ordinary redeploys. Store it with protected off-host backups and never bake it into an image. Follow the selected target's backup verification and recovery procedures: [LocalCluster](../Deployment/LocalCluster/Operations.md#backup-and-restore), [Cloud](../Deployment/Cloud/Operations.md#back-up-and-restore-postgresql), or [LocalSingleNode](../Deployment/LocalSingleNode/Operations.md#backups-and-recovery).
 

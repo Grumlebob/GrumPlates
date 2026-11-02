@@ -1918,7 +1918,6 @@ for path, checks in {
         ("release_image_digest", "digest-pinned image reference"),
         ("POSTGRES_PORT={{ postgres_port }}", "PostgreSQL port env rendering"),
         ("REDIS_PORT={{ redis_port }}", "Redis port env rendering"),
-        ("Accounts__Enabled={{ accounts_enabled | default(false) | string | lower }}", "accounts disabled when settings are absent"),
         ("Accounts__AdminSeed__Password={{ vault_accounts_admin_seed_password | default('') }}", "Admin seed password from the protected vault"),
         ("Accounts__Email__Password={{ vault_accounts_email_password | default('') }}", "SMTP password from the protected vault"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
@@ -2006,7 +2005,6 @@ for path in [
 
 for path, needles in {
     "Deployment/Cloud/ansible/roles/app/templates/app.env.j2": [
-        ("Accounts__Enabled={{ accounts_enabled | default(false) | string | lower }}", "accounts disabled when settings are absent"),
         ("Accounts__AdminSeed__Password={{ cloud_accounts_admin_seed_password | default('') }}", "Admin seed password from an optional workflow secret"),
         ("Accounts__Email__Password={{ cloud_accounts_email_password | default('') }}", "SMTP password from an optional workflow secret"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
@@ -2964,8 +2962,8 @@ for needle, why in [
     ('^Cache-Control:[[:space:]]*public, ?max-age=31536000, ?immutable', "React image smoke verifies immutable fingerprinted assets"),
     ('^Cache-Control:[[:space:]]*private, ?no-store', "React image smoke verifies private API cache denial"),
     ('/api/client-config', "React image smoke reads explicit capability before account-route expectations"),
-    ('payload["accountsEnabled"]', "React image smoke validates the account capability"),
-    ('if [[ "$accounts_enabled" == "true" ]]; then', "React image smoke selects enabled versus disabled route expectations"),
+    ("client config application ID is invalid", "React image smoke validates the client configuration"),
+    ("GET /api/auth/login did not return 405", "React image smoke checks that account routes are POST-only"),
     ("Allow:[[:space:]]*POST", "React image smoke verifies enabled POST-only reads return 405"),
     ('/api/auth/not-a-real-operation', "React image smoke verifies unknown enabled routes remain 404"),
     ('inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)', "React image smoke verifies unknown API, React-only and missing paths stay 404"),
@@ -3022,10 +3020,10 @@ for needle, why in [
 ]:
     if needle not in react_acceptance:
         fail(f"Scripts/Test-DeployedSite.ps1: React acceptance lacks {why}")
-capability_request = deployed_site_acceptance.index("$capability = Get-ReactCapability")
+capability_request = deployed_site_acceptance.index("Get-ReactCapability $capabilitySession $uri")
 common_request = deployed_site_acceptance.index("Invoke-CommonAcceptance $anonymous $FrontendProfile", capability_request)
 if capability_request > common_request:
-    fail("React acceptance must read explicit capability before common or profile checks")
+    fail("React acceptance must read the client configuration before common or profile checks")
 if "Form " in react_acceptance or "Login " in react_acceptance or "RequestMethod 'POST'" in react_acceptance:
     fail("React public HTTP acceptance must not submit forms or credentials")
 require_contains(single + "/Scripts/lib/platform_check.py", '"WSL_DISTRO_NAME"', "native deployment boundary")

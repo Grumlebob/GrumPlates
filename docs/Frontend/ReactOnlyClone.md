@@ -48,6 +48,6 @@ Expect matches in these areas:
 ## Deliberate boundaries
 
 - Narrowing the release resolver and verifiers touches deployment machinery. It may be a separate PR, but record it as a follow-up so no build can produce or accept a Blazor release.
-- React accounts are optional and disabled by default. A public-only clone should keep them disabled; removing the feature requires a separate change covering the React UI, server authorization, Identity storage, migrations, deployment settings and recovery documentation. Removing the Razor account pages alone does not make those decisions. Treat PostgreSQL, Redis and the Books sample as separate product boundaries.
+- Accounts are always on. A public-only clone can leave registration and email off; removing the feature requires a separate change covering the React UI, server authorization, Identity storage, migrations, deployment settings and recovery documentation. Removing the Razor account pages alone does not make those decisions. Treat PostgreSQL, Redis and the Books sample as separate product boundaries.
 
 Worked example: [Portfolio #11](https://github.com/Grumlebob/Portfolio/pull/11) removed Blazor from the first clone, and its description lists each decision.

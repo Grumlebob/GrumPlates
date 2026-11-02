@@ -124,7 +124,6 @@ class AccountDeploymentSettingsTests(unittest.TestCase):
 
     def test_seed_only_is_valid_without_smtp_and_registration_requires_complete_email(self):
         seed_only = {
-            "accounts_enabled": "true",
             "accounts_admin_seed_enabled": "true",
             "accounts_admin_seed_email": "admin@example.invalid",
         }
@@ -142,26 +141,26 @@ class AccountDeploymentSettingsTests(unittest.TestCase):
 
         incomplete = {**registration, "accounts_email_from": ""}
         self.assertIn(
-            "accounts_registration_enabled requires enabled accounts and complete email settings",
+            "accounts_registration_enabled requires complete email settings",
             validate_account_deploy_settings(incomplete),
         )
         for target, module in (("LocalCluster", LOCAL_CLUSTER), ("Cloud", CLOUD)):
             with self.subTest(target=target):
                 self.assertIn(
-                    "accounts_registration_enabled requires enabled accounts and complete email settings",
+                    "accounts_registration_enabled requires complete email settings",
                     module.validate({**valid_settings(target), **incomplete}),
                 )
 
     def test_account_settings_types_and_unknown_keys_are_rejected(self):
         self.assertEqual(
             [
-                "accounts_enabled must be true or false",
+                "accounts_registration_enabled must be true or false",
                 "accounts_email_port must be an integer from 1 through 65535",
                 "accounts_email_security must be StartTls or SslOnConnect",
             ],
             validate_account_deploy_settings(
                 {
-                    "accounts_enabled": "sometimes",
+                    "accounts_registration_enabled": "sometimes",
                     "accounts_email_port": "not-a-port",
                     "accounts_email_security": "Plaintext",
                 }

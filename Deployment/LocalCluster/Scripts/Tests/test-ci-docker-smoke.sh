@@ -66,7 +66,7 @@ elif args[:2] == ["network", "create"] or args[0] == "run":
                 elif len(mapping) == 4 and mapping[-1] in ("5432", "8080", "8443"):
                     metadata["ports"][mapping[-1] + "/tcp"] = mapping[2]
     state(name).write_text(json.dumps(metadata))
-    if "web-enabled" in name and os.environ.get("SMOKE_REMOVE_CALLER"):
+    if "web-mail" in name and os.environ.get("SMOKE_REMOVE_CALLER"):
         caller = Path(os.environ["SMOKE_REMOVE_CALLER"])
         assert caller.name == "caller" and caller.parent.resolve() == root.parent.resolve()
         caller.rmdir()
@@ -98,9 +98,7 @@ cat > "$TMP_ROOT/bin/curl" <<'SH'
 url="${*: -1}"
 if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
   if [[ "$url" == */api/client-config ]]; then
-    enabled="false"
-    [[ "$url" != https://* ]] || enabled="true"
-    printf 'HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/json\r\n\r\n{"schemaVersion":1,"accountsEnabled":%s,"applicationId":"1234567890abcdef1234567890abcdef"}' "$enabled"
+    printf 'HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/json\r\n\r\n{"schemaVersion":1,"applicationId":"1234567890abcdef1234567890abcdef"}'
     exit
   fi
   if [[ "$url" == */ && "$*" == *"--dump-header"* ]]; then
@@ -258,8 +256,7 @@ for args in calls:
             assert any(value.startswith("ConnectionStrings__DefaultConnection=Host=ci-postgres;") for value in args)
             assert "Redis__Configuration=ci-redis:6379,abortConnect=false" in args
             assert "RateLimiting__Api__PermitLimit=1000" in args
-            if "web-enabled" in name:
-                assert "Accounts__Enabled=true" in args
+            if "web-mail" in name:
                 assert "Accounts__RegistrationEnabled=true" in args
                 assert "Accounts__Email__Security=StartTls" in args
                 assert "ASPNETCORE_URLS=http://+:8080;https://+:8443" in args
@@ -294,7 +291,7 @@ import json, os
 from pathlib import Path
 root = Path(os.environ['SMOKE_STATE'])
 labels = {'localcluster.ci.repository': 'example/repo', 'localcluster.ci.owner': 'ci-smoke', 'localcluster.ci.run_id': '123', 'localcluster.ci.run_attempt': '2'}
-for name in ('sample-ci-postgres-123-2', 'sample-ci-redis-123-2', 'sample-ci-web-enabled-123-2', 'sample-ci-smtp-123-2', 'sample-ci-123-2'):
+for name in ('sample-ci-postgres-123-2', 'sample-ci-redis-123-2', 'sample-ci-web-mail-123-2', 'sample-ci-smtp-123-2', 'sample-ci-123-2'):
     (root / name).write_text(json.dumps(labels))
 (root / 'sample-ci-postgres-456-1').write_text(json.dumps({**labels, 'localcluster.ci.run_id': '456', 'localcluster.ci.run_attempt': '1'}))
 PY
