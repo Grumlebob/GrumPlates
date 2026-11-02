@@ -101,7 +101,7 @@ Use these as starting evidence. Re-verify any fact a packet depends on, because 
 | PR | Change | Failing step | Cause | Fix |
 | --- | --- | --- | --- | --- |
 | #405 | NuGet minor/patch (`Directory.Packages.props`) | Audit React frontend dependencies | Ran before the minimatch fix #409 landed | `@dependabot rebase` |
-| #407 | lighthouse 13.5.0 → 13.6.0 (`GrumPlates.Client`) | Audit frontend dependencies | Same | `@dependabot rebase` |
+| #407 | lighthouse 13.5.0 → 13.6.0 (`GrumPlates.Client`) | Audit frontend dependencies | Lighthouse 13.6.0 brings `@sentry/bundler-plugins` → `glob` 13.0.6 → `minimatch` 10.2.6 (GHSA-g3hv-75wg-m249, fixed in 11.0.1). #409 only patched `GrumPlates.React`, so a rebase alone **does not** fix it (verified with `npm audit --package-lock-only` on the PR lockfile, 2026-11-02). | P01-A step 3a, then `@dependabot rebase` |
 | #406 | Docker `node:26.12.1` → `26.13.0` (`GrumPlates/Dockerfile`) | Build and smoke both frontend image profiles | `npm ci` fails `EBADENGINE`: `GrumPlates.React/package.json` requires exactly `"node": "26.12.1"` | Packet P08, then rebase |
 
 ### 4.2 Live deployments
@@ -270,6 +270,7 @@ Execute in this exact order: P00, P01-A, P01-B, P02, P03-A … P03-E, P04, P05, 
 
 1. Re-check `coord/node-inventory-handoff`: `git log --oneline main..origin/coord/node-inventory-handoff` must show exactly the three commits ending at `c6a59ba3afe8afe4a041400cd088ae9c43dbf4ba`, and `git diff --stat main...origin/coord/node-inventory-handoff` must show only `debug.md`. If it changed, stop and ask.
 2. Delete it: `git push origin --delete coord/node-inventory-handoff`, then `git branch -D coord/node-inventory-handoff`. Record the full SHA in the ledger.
+3a. Before rebasing #407, open a small PR on `main` (branch `cleanup/lean-p01-client-minimatch-<date>`): in `GrumPlates.Client/package.json` add `"glob": { "minimatch": "11.0.1" }` inside the existing `overrides` object (keep the `@tailwindcss/cli` entry), the same version #409 used. Run `npm install --package-lock-only` in `GrumPlates.Client`; then `npm ci`, `npm audit --audit-level=moderate` and `npm run css:build` must pass. The override is inert until Lighthouse 13.6.0 arrives. Full local gate, merge when green.
 3. For PRs #405 and #407: comment `@dependabot rebase` on each (`gh pr comment <n> -R Grumlebob/GrumPlates --body "@dependabot rebase"`). Wait for the new CI run. `build-test-push` should now pass. When it is green on the exact head, the repository's Dependabot auto-merge workflow may merge it; if it does not, merge with `gh pr merge <n> -R Grumlebob/GrumPlates --squash --delete-branch`. If CI still fails, read the failing step's log (`gh run view <run> --log-failed`), record the cause in the ledger and fix it in a separate PR or leave it for the owner.
 4. Leave #406 open until P08 is merged.
 5. Do not touch the `improveddb` remote or its branches.
