@@ -16,7 +16,8 @@ internal static class FrontendComposition
         services.AddRazorComponents()
             .AddInteractiveServerComponents()
             .AddInteractiveWebAssemblyComponents()
-            .AddAuthenticationStateSerialization();
+            .AddAuthenticationStateSerialization(options =>
+                options.SerializationCallback = AccountAuthenticationStateSerialization.Serialize);
 
         services.AddBlazorIdentityUi(configuration);
         services.AddSingleton<IAccountMailFrontend>(AccountMailFrontend.BlazorAuto);
