@@ -3,6 +3,7 @@
 FROM node:26.12.1-bookworm-slim AS react-dependencies
 WORKDIR /src/GrumPlates.React
 COPY GrumPlates.React/package.json GrumPlates.React/package-lock.json GrumPlates.React/.npmrc ./
+COPY GrumPlates.React/scripts/patch-redocly-minimatch.mjs ./scripts/patch-redocly-minimatch.mjs
 RUN npm install --global npm@12.2.0 && npm ci
 
 FROM react-dependencies AS react-assets
