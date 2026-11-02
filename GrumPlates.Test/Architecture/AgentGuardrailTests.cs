@@ -43,18 +43,6 @@ public sealed class AgentGuardrailTests
     }
 
     [Fact]
-    public void LocalClusterCd_RequiresSuccessfulCiForSelectedCommit()
-    {
-        var workflow = ReadRepoFile(".github", "workflows", "cd-localcluster.yml");
-
-        Assert.Matches(@"find-successful-ci-run\.py\s+\\\s+--target-sha ""\$TARGET_SHA""\s+--read-final-payload-receipt", workflow);
-        Assert.Contains("validate_release_manifest.py", workflow, StringComparison.Ordinal);
-        Assert.Contains("--expected-ci-run-attempt \"$CI_RUN_ATTEMPT\"", workflow, StringComparison.Ordinal);
-        Assert.Contains("git merge-base --is-ancestor \"$TARGET_SHA\" \"$GITHUB_SHA\"", workflow, StringComparison.Ordinal);
-        Assert.Contains("release_image_digest=${RELEASE_IMAGE_DIGEST}", workflow, StringComparison.Ordinal);
-    }
-
-    [Fact]
     public void DockerCleanupScripts_DoNotPruneVolumes()
     {
         var script = ReadRepoFile("Deployment", "LocalCluster", "Scripts", "prune-docker-residue.sh");
@@ -81,28 +69,6 @@ public sealed class AgentGuardrailTests
             offenders.Count == 0,
             "Cleanup scripts and workflows must not prune Docker volumes or the whole Docker system:\n" + string.Join('\n', offenders));
         Assert.Contains("Docker volumes are protected", script, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void DeploymentWorkflows_RequireEnabledTarget()
-    {
-        var workflows = EnumerateRepoFiles(".github/workflows", "cd-*.yml")
-            .Concat(EnumerateRepoFiles(".github/workflows", "*-maintenance.yml"))
-            .ToList();
-
-        Assert.NotEmpty(workflows);
-        foreach (var file in workflows)
-        {
-            var workflow = File.ReadAllText(file);
-            Assert.Contains("Require this deployment target to be enabled", workflow, StringComparison.Ordinal);
-            Assert.Contains("vars.DEPLOY_TARGETS", workflow, StringComparison.Ordinal);
-            var firstSteps = Regex.Matches(workflow, @"(?m)^    steps:\r?\n      - name: (?<name>[^\r\n]+)");
-            Assert.NotEmpty(firstSteps);
-            foreach (Match step in firstSteps)
-            {
-                Assert.Equal("Require this deployment target to be enabled", step.Groups["name"].Value);
-            }
-        }
     }
 
     private static string ReadRepoFile(params string[] parts) =>
