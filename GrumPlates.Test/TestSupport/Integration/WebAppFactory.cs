@@ -21,7 +21,6 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     // from tripping limits. Rate-limit tests set low limits explicitly.
     private const int DefaultGlobalPermitLimit = 10_000;
     private const int DefaultApiPermitLimit = 1_000;
-    private const int DefaultAuthenticationPermitLimit = 1_000;
     private const string RyukImageEnvironmentVariable = "TESTCONTAINERS_RYUK_CONTAINER_IMAGE";
     private const string ConnectionStringEnvironmentVariable = "ConnectionStrings__DefaultConnection";
     private const string RedisConfigurationEnvironmentVariable = "Redis__Configuration";
@@ -37,7 +36,6 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private const string ForwardedHeaderKnownNetworkV6EnvironmentVariable = "ForwardedHeaders__KnownNetworks__1";
     private const string GlobalRateLimitEnvironmentVariable = "RateLimiting__Global__PermitLimit";
     private const string ApiRateLimitEnvironmentVariable = "RateLimiting__Api__PermitLimit";
-    private const string AuthenticationRateLimitEnvironmentVariable = "RateLimiting__Authentication__PermitLimit";
     private const string LocalAccountsEnabledEnvironmentVariable = "LocalAccounts__Enabled";
     private const string AuthorBooksSeedAtStartupEnvironmentVariable = "AuthorBooks__SeedAtStartup";
     private const string OpenTelemetryEnabledEnvironmentVariable = "Observability__OpenTelemetry__Enabled";
@@ -101,14 +99,12 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Database:RunMigrationsAtStartup"] = _options.RunMigrationsAtStartup.ToString(),
                 ["AuthorBooks:SeedAtStartup"] = _options.AuthorBooksSeedAtStartup.ToString(),
                 ["LocalAccounts:Enabled"] = "false",
-                ["Accounts:Enabled"] = "true",
                 ["DataProtection:KeyEncryptionCertificatePath"] = _keyCertificate.Path,
                 ["DataProtection:KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 ["ForwardedHeaders:KnownNetworks:0"] = "0.0.0.0/0",
                 ["ForwardedHeaders:KnownNetworks:1"] = "::/0",
                 ["RateLimiting:Global:PermitLimit"] = (_options.GlobalRateLimitPermitLimit ?? DefaultGlobalPermitLimit).ToString(),
                 ["RateLimiting:Api:PermitLimit"] = (_options.ApiRateLimitPermitLimit ?? DefaultApiPermitLimit).ToString(),
-                ["RateLimiting:Authentication:PermitLimit"] = (_options.AuthenticationRateLimitPermitLimit ?? DefaultAuthenticationPermitLimit).ToString(),
                 ["Observability:OpenTelemetry:Enabled"] = (_options.OpenTelemetryEnabled ?? false).ToString(),
                 ["Observability:OpenTelemetry:Endpoint"] = _options.OpenTelemetryEndpoint ?? "http://127.0.0.1:4317",
                 ["Cache:Invalidation:Enabled"] = (_options.CacheInvalidationEnabled ?? !string.Equals(_redisConnectionString, "CHANGE_ME", StringComparison.Ordinal)).ToString()
@@ -236,14 +232,12 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 [StartupMigrationsEnvironmentVariable] = _options.RunMigrationsAtStartup.ToString(),
                 [AuthorBooksSeedAtStartupEnvironmentVariable] = _options.AuthorBooksSeedAtStartup.ToString(),
                 [LocalAccountsEnabledEnvironmentVariable] = "false",
-                ["Accounts__Enabled"] = "true",
                 ["DataProtection__KeyEncryptionCertificatePath"] = _keyCertificate.Path,
                 ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 [ForwardedHeaderKnownNetworkV4EnvironmentVariable] = "0.0.0.0/0",
                 [ForwardedHeaderKnownNetworkV6EnvironmentVariable] = "::/0",
                 [GlobalRateLimitEnvironmentVariable] = (_options.GlobalRateLimitPermitLimit ?? DefaultGlobalPermitLimit).ToString(),
                 [ApiRateLimitEnvironmentVariable] = (_options.ApiRateLimitPermitLimit ?? DefaultApiPermitLimit).ToString(),
-                [AuthenticationRateLimitEnvironmentVariable] = (_options.AuthenticationRateLimitPermitLimit ?? DefaultAuthenticationPermitLimit).ToString(),
                 [OpenTelemetryEnabledEnvironmentVariable] = (_options.OpenTelemetryEnabled ?? false).ToString(),
                 [OpenTelemetryEndpointEnvironmentVariable] = _options.OpenTelemetryEndpoint ?? "http://127.0.0.1:4317"
             };

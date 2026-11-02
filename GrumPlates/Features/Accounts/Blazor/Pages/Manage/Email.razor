@@ -7,8 +7,6 @@
 @using Microsoft.AspNetCore.WebUtilities
 
 @inject UserManager<ApplicationUser> UserManager
-@inject IEmailSender<ApplicationUser> EmailSender
-@inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject AccountOptions AccountOptions
 @inject AccountOperations Accounts
@@ -17,7 +15,7 @@
 
 <h3>Manage email</h3>
 <StatusMessage Message="@message" />
-@if (AccountOptions.Enabled && !AccountOptions.EmailEnabled)
+@if (!AccountOptions.EmailEnabled)
 {
     <p role="status">Email account operations are unavailable.</p>
 }
@@ -48,14 +46,11 @@ else
                     <label for="Input.NewEmail" class="account-label">New email</label>
                     <ValidationMessage For="() => Input.NewEmail" class="account-text-danger" />
                 </div>
-                @if (AccountOptions.Enabled)
-                {
-                    <div class="account-field">
-                        <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="account-input" autocomplete="current-password" maxlength="256" aria-required="true" />
-                        <label for="Input.Password" class="account-label">Current password</label>
-                    </div>
-                    <label><InputCheckbox @bind-Value="showPassword" /> Show password</label>
-                }
+                <div class="account-field">
+                    <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="account-input" autocomplete="current-password" maxlength="256" aria-required="true" />
+                    <label for="Input.Password" class="account-label">Current password</label>
+                </div>
+                <label><InputCheckbox @bind-Value="showPassword" /> Show password</label>
                 <button type="submit" class="account-button-primary account-button-full">Change email</button>
             </EditForm>
         </div>
@@ -98,58 +93,31 @@ else
             return;
         }
 
-        if (AccountOptions.Enabled)
+        if (string.IsNullOrEmpty(Input.Password))
         {
-            if (string.IsNullOrEmpty(Input.Password))
-            {
-                message = "Enter your current password.";
-                return;
-            }
-
-            var operation = await Accounts.ChangeEmailAsync(new AccountChangeEmailRequest
-            {
-                Password = Input.Password,
-                Email = Input.NewEmail ?? ""
-            });
-            var response = await AccountPageResultReader.ReadAsync(HttpContext, operation);
-            message = response.StatusCode == StatusCodes.Status202Accepted
-                ? "Request received. If this change can proceed, check the new address for a confirmation message."
-                : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
+            message = "Enter your current password.";
             return;
         }
 
-        if (Input.NewEmail is null || Input.NewEmail == email) return;
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateChangeEmailTokenAsync(user, Input.NewEmail);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmailChange").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["email"] = Input.NewEmail, ["code"] = code });
-        await EmailSender.SendConfirmationLinkAsync(user, Input.NewEmail, HtmlEncoder.Default.Encode(callbackUrl));
-        message = "Confirmation link to change email sent. Please check your email.";
+        var operation = await Accounts.ChangeEmailAsync(new AccountChangeEmailRequest
+        {
+            Password = Input.Password,
+            Email = Input.NewEmail ?? ""
+        });
+        var response = await AccountPageResultReader.ReadAsync(HttpContext, operation);
+        message = response.StatusCode == StatusCodes.Status202Accepted
+            ? "Request received. If this change can proceed, check the new address for a confirmation message."
+            : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
     }
 
     private async Task OnSendEmailVerificationAsync()
     {
         if (string.IsNullOrEmpty(email) || user is null) return;
-        if (AccountOptions.Enabled)
-        {
-            var operation = await Accounts.ResendAsync(new AccountEmailRequest { Email = email });
-            var response = await AccountPageResultReader.ReadAsync(HttpContext, operation);
-            message = response.StatusCode == StatusCodes.Status202Accepted
-                ? "Request received. Check your email if applicable; use resend if it does not arrive."
-                : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
-            return;
-        }
-
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-        await EmailSender.SendConfirmationLinkAsync(user, email, HtmlEncoder.Default.Encode(callbackUrl));
-        message = "Verification email sent. Please check your email.";
+        var operation = await Accounts.ResendAsync(new AccountEmailRequest { Email = email });
+        var response = await AccountPageResultReader.ReadAsync(HttpContext, operation);
+        message = response.StatusCode == StatusCodes.Status202Accepted
+            ? "Request received. Check your email if applicable; use resend if it does not arrive."
+            : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
     }
 
     private sealed class InputModel

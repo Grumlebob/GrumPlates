@@ -1,4 +1,3 @@
-using System.Text.Json;
 using GrumPlates.Core.Features.Accounts.Contracts;
 using GrumPlates.Features.Accounts.Blazor.Pages;
 using GrumPlates.Features.Accounts.Blazor.Pages.Manage;
@@ -21,11 +20,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
         ArgumentNullException.ThrowIfNull(endpoints);
 
         var accountGroup = endpoints.MapGroup("/Account");
-        var accountsEnabled = endpoints.ServiceProvider.GetRequiredService<AccountOptions>().Enabled;
-        if (accountsEnabled)
-        {
-            accountGroup.RequireRateLimiting(AppRateLimiting.AccountWritePolicyName);
-        }
+        accountGroup.RequireRateLimiting(AppRateLimiting.AccountWritePolicyName);
 
         accountGroup.MapPost("/PerformExternalLogin", (
             HttpContext context,
@@ -46,7 +41,7 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.Challenge(properties, [provider]);
         });
 
-        var logout = accountGroup.MapPost("/Logout", async (
+        accountGroup.MapPost("/Logout", async (
             [FromServices] SignInManager<ApplicationUser> signInManager,
             [FromForm] string? returnUrl) =>
         {
@@ -57,10 +52,6 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.LocalRedirect($"~{localReturnUrl}");
         })
         .RequireAuthorization();
-        if (!accountsEnabled)
-        {
-            logout.DisableAntiforgery();
-        }
 
         accountGroup.MapPost("/PasskeyCreationOptions", async (
             HttpContext context,
@@ -126,66 +117,23 @@ internal static class IdentityComponentsEndpointRouteBuilderExtensions
             return TypedResults.Challenge(properties, [provider]);
         });
 
-        if (accountsEnabled)
+        manageGroup.MapPost("/DownloadPersonalData", async (
+            HttpContext context,
+            [FromForm] AccountPasswordRequest request,
+            [FromServices] AccountOperations accounts) =>
         {
-            manageGroup.MapPost("/DownloadPersonalData", async (
-                HttpContext context,
-                [FromForm] AccountPasswordRequest request,
-                [FromServices] AccountOperations accounts) =>
+            var operation = await accounts.ExportAsync(request);
+            context.Response.OnStarting(() =>
             {
-                var operation = await accounts.ExportAsync(request);
-                context.Response.OnStarting(() =>
+                if (context.Response.StatusCode == StatusCodes.Status200OK)
                 {
-                    if (context.Response.StatusCode == StatusCodes.Status200OK)
-                    {
-                        context.Response.Headers.ContentDisposition = "attachment; filename=AccountExport.json";
-                    }
-                    return Task.CompletedTask;
-                });
-                await operation.ExecuteAsync(context);
-                return TypedResults.Empty;
+                    context.Response.Headers.ContentDisposition = "attachment; filename=AccountExport.json";
+                }
+                return Task.CompletedTask;
             });
-        }
-        else
-        {
-            var loggerFactory = endpoints.ServiceProvider.GetRequiredService<ILoggerFactory>();
-            var downloadLogger = loggerFactory.CreateLogger("DownloadPersonalData");
-
-            manageGroup.MapPost("/DownloadPersonalData", async (
-                HttpContext context,
-                [FromServices] UserManager<ApplicationUser> userManager) =>
-            {
-                var user = await userManager.GetUserAsync(context.User);
-                if (user is null)
-                {
-                    return Results.NotFound("Unable to load the current user.");
-                }
-
-                var userId = await userManager.GetUserIdAsync(user);
-                downloadLogger.LogInformation("User with ID '{UserId}' asked for their personal data.", userId);
-
-                // Only include personal data for download
-                var personalData = new Dictionary<string, string>();
-                var personalDataProps = typeof(ApplicationUser).GetProperties().Where(
-                    prop => Attribute.IsDefined(prop, typeof(PersonalDataAttribute)));
-                foreach (var p in personalDataProps)
-                {
-                    personalData.Add(p.Name, p.GetValue(user)?.ToString() ?? "null");
-                }
-
-                var logins = await userManager.GetLoginsAsync(user);
-                foreach (var l in logins)
-                {
-                    personalData.Add($"{l.LoginProvider} external login provider key", l.ProviderKey);
-                }
-
-                personalData.Add("Authenticator Key", (await userManager.GetAuthenticatorKeyAsync(user))!);
-                var fileBytes = JsonSerializer.SerializeToUtf8Bytes(personalData);
-
-                context.Response.Headers.TryAdd("Content-Disposition", "attachment; filename=PersonalData.json");
-                return TypedResults.File(fileBytes, contentType: "application/json", fileDownloadName: "PersonalData.json");
-            });
-        }
+            await operation.ExecuteAsync(context);
+            return TypedResults.Empty;
+        });
 
         return accountGroup;
     }

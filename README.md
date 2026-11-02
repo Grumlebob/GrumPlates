@@ -1,6 +1,6 @@
 # GrumPlates
 
-GrumPlates is a .NET 10 application template with two frontend profiles: `BlazorAuto`, the default Interactive Auto Blazor app, and an optional React SPA with public catalog pages and an account feature that is disabled by default. Both use the same ASP.NET Core backend. PostgreSQL stores app data; Redis supports distributed caching and Data Protection.
+GrumPlates is a .NET 10 application template with two frontend profiles: `BlazorAuto`, the default Interactive Auto Blazor app, and an optional React SPA with public catalog pages and an account feature that is disabled by default. Both use the same ASP.NET Core backend. PostgreSQL stores app data and Data Protection keys; Redis supports distributed caching.
 
 Run the local Docker stack:
 

@@ -73,7 +73,6 @@ services:
       Observability__OpenTelemetry__Enabled: "false"
       Observability__OpenTelemetry__DeploymentTarget: localsinglenode
     volumes:
-      - app_storage:/app/Storage
       - type: bind
         source: ${DATA_PROTECTION_CERT_HOST_PATH:?DATA_PROTECTION_CERT_HOST_PATH is required}
         target: /run/secrets/data-protection.pem
@@ -82,7 +81,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  app_storage:
 
 networks:
   default:

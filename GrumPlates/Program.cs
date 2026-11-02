@@ -102,9 +102,6 @@ FrontendComposition.MapFrontendEndpoints(app);
 app.MapAppHealthChecks();
 app.MapBooksFeature();
 app.MapClientConfiguration();
-if (app.Services.GetRequiredService<AccountOptions>().Enabled)
-{
-    app.MapAccountEndpoints();
-}
+app.MapAccountEndpoints();
 
 app.Run();

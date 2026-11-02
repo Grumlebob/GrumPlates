@@ -44,7 +44,6 @@ REDIS_IMAGE="redis:8.8.0-alpine3.23"
 SMTP_FIXTURE_IMAGE="node:26.12.1-bookworm-slim"
 # Browser tests that prove SSR, hydration and pre-hydration control state.
 BROWSER_SMOKE_FILTER="FullyQualifiedName~RenderModeE2ETests|FullyQualifiedName~PreHydrationControlsE2ETests"
-REACT_DISABLED_BROWSER_FILTER="Category=ReactPackagedDisabled"
 REACT_ENABLED_BROWSER_FILTER="Category=ReactPackagedEnabled"
 
 expected_repository="${GITHUB_REPOSITORY:-local}"
@@ -58,6 +57,7 @@ web="${APP_NAME}-ci-web-${session}"
 web_enabled="${APP_NAME}-ci-web-enabled-${session}"
 smtp="${APP_NAME}-ci-smtp-${session}"
 fixture_dir=""
+dp_cert_dir=""
 owned_label_args=(
   --label "localcluster.ci.repository=${expected_repository}"
   --label localcluster.ci.owner=ci-smoke
@@ -96,6 +96,15 @@ cleanup() {
     if owned_container "$container"; then echo "Owned smoke container remains: $container" >&2; status=1; fi
   done
   if owned_network "$network"; then echo "Owned smoke network remains: $network" >&2; status=1; fi
+  if [[ -n "$dp_cert_dir" ]]; then
+    local expected_dp_prefix="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/dp-cert-${session}-"
+    if [[ "$dp_cert_dir" == "$expected_dp_prefix"* ]]; then
+      rm -rf -- "$dp_cert_dir"
+    else
+      echo "Refusing to remove unexpected certificate path: $dp_cert_dir" >&2
+      status=1
+    fi
+  fi
   if [[ -n "$fixture_dir" ]]; then
     local expected_prefix="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/react-auth-${session}-"
     if [[ "$fixture_dir" == "$expected_prefix"* ]]; then
@@ -176,10 +185,25 @@ docker run -d --name "$redis" --network "$network" "${owned_label_args[@]}" \
 wait_until_stable 90 postgres_ready
 wait_until_stable 60 redis_ready
 
+# Data Protection keys are always certificate-protected outside Development.
+mkdir -p "${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+dp_cert_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/dp-cert-${session}-XXXXXXXX")"
+chmod 0755 "$dp_cert_dir"
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 -subj "/CN=ci-data-protection" \
+  -keyout "$dp_cert_dir/key.pem" -out "$dp_cert_dir/cert.pem" >/dev/null 2>&1
+dp_cert_password="$(openssl rand -hex 32)"
+openssl pkcs12 -export -out "$dp_cert_dir/dp.pfx" \
+  -inkey "$dp_cert_dir/key.pem" -in "$dp_cert_dir/cert.pem" -passout "pass:${dp_cert_password}" >/dev/null 2>&1
+rm -f -- "$dp_cert_dir/key.pem"
+chmod 0444 "$dp_cert_dir/dp.pfx"
+
 # The HTTP and browser checks share one client IP. Raise the limits only for
 # this disposable container so the smoke does not trip production budgets.
 docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -p 127.0.0.1::8080 \
+  -v "$dp_cert_dir:/run/dp-cert:ro" \
+  -e DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx \
+  -e "DataProtection__KeyEncryptionCertificatePassword=${dp_cert_password}" \
   -e ASPNETCORE_ENVIRONMENT=Docker \
   -e ASPNETCORE_HTTP_PORTS=8080 \
   -e "APP_VERSION=${APP_VERSION}" \
@@ -189,7 +213,6 @@ docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -e Database__RunMigrationsAtStartup=true \
   -e RateLimiting__Global__PermitLimit=10000 \
   -e RateLimiting__Api__PermitLimit=1000 \
-  -e RateLimiting__Authentication__PermitLimit=1000 \
   -e LocalAccounts__Enabled=false \
   -e Observability__OpenTelemetry__Enabled=false \
   "$IMAGE_REF"
@@ -311,28 +334,11 @@ print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
     -FrontendProfile "$FRONTEND_PROFILE" -AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE" \
     -ForwardedProto https -BaseUrl "$base_url"
   echo "React public HTTP acceptance passed"
-  echo "React disabled HTTP smoke passed"
 
   postgres_host_port="$(docker port "$postgres" 5432/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$postgres_host_port" ]] || { echo "postgres did not publish port 5432" >&2; exit 1; }
   cd "$REPO_ROOT"
   pwsh "$REPO_ROOT/GrumPlates.Test/bin/Release/net10.0/playwright.ps1" install chromium
-  react_disabled_results_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/test-results/${expected_run_id}-${expected_run_attempt}/${GITHUB_JOB:-validate}/docker-smoke/React-disabled"
-  mkdir -p "$react_disabled_results_dir"
-  cd "$REPO_ROOT"
-  E2E_CLEANUP_CONNECTION_STRING="Host=127.0.0.1;Port=${postgres_host_port};Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
-  RUN_E2E=1 \
-  E2E_BASE_URL="$base_url" \
-  E2E_HEADLESS=1 \
-  E2E_SLOW_MO_MS=0 \
-    dotnet test "$REPO_ROOT/GrumPlates.Test/GrumPlates.Test.csproj" \
-      --configuration Release --no-build --no-restore \
-      --filter "$REACT_DISABLED_BROWSER_FILTER" \
-      --logger "trx;LogFileName=react-disabled-browser.trx" \
-      --results-directory "$react_disabled_results_dir"
-  python3 "$REPO_ROOT/Scripts/CI/validate_dotnet_test_results.py" \
-    "$react_disabled_results_dir/react-disabled-browser.trx" \
-    --expected-skipped 0 --suite "Packaged React disabled browser journey"
 
   docker rm -f "$web" >/dev/null
   web="${APP_NAME}-ci-web-disabled-removed-${session}"
@@ -428,7 +434,6 @@ EOF
     -e Database__RunMigrationsAtStartup=true \
     -e RateLimiting__Global__PermitLimit=10000 \
     -e RateLimiting__Api__PermitLimit=1000 \
-    -e RateLimiting__Authentication__PermitLimit=1000 \
     -e Accounts__WriteLimit__PermitLimit=1000 \
     -e LocalAccounts__Enabled=false \
     -e Observability__OpenTelemetry__Enabled=false \

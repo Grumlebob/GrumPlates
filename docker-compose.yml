@@ -46,7 +46,7 @@ services:
       # Override in .env when you want to exercise the real limits locally.
       RateLimiting__Global__PermitLimit: ${RateLimiting__Global__PermitLimit:-10000}
       RateLimiting__Api__PermitLimit: ${RateLimiting__Api__PermitLimit:-1000}
-      RateLimiting__Authentication__PermitLimit: ${RateLimiting__Authentication__PermitLimit:-1000}
+      Accounts__WriteLimit__PermitLimit: ${Accounts__WriteLimit__PermitLimit:-1000}
       Observability__OpenTelemetry__Enabled: ${OBSERVABILITY_ENABLED:-false}
       Observability__OpenTelemetry__Endpoint: ${OBSERVABILITY_OTLP_ENDPOINT:-http://alloy:4317}
       Observability__OpenTelemetry__Protocol: ${OBSERVABILITY_OTLP_PROTOCOL:-Grpc}
@@ -62,8 +62,6 @@ services:
       - "127.0.0.1:${APP_HTTPS_HOST_PORT:-7186}:7186"
     volumes:
       - ./docker/https:/https:ro
-      # Persist runtime storage such as DataProtection keys. This is not upload/media storage.
-      - ./data/storage:/app/Storage
 
   redis:
     image: redis:8.8.0-alpine3.23

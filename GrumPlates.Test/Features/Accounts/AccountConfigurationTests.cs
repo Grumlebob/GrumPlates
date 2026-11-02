@@ -56,7 +56,6 @@ public sealed class AccountOptionsTests
     {
         var configuration = Configuration(new()
         {
-            ["Accounts:Enabled"] = "true",
             [key] = value
         });
         var services = new ServiceCollection();
@@ -95,7 +94,6 @@ public sealed class AccountOptionsTests
         var services = new ServiceCollection();
         services.AddAccountFeature(Configuration(new()
         {
-            ["Accounts:Enabled"] = "true",
             ["Accounts:RegistrationEnabled"] = "true",
             ["Accounts:PublicOrigin"] = origin,
             ["Accounts:Email:Host"] = "localhost",
@@ -127,13 +125,11 @@ public sealed class AccountOptionsTests
 [Collection(TestCollectionNames.StartupIntegration)]
 public sealed class ClientConfigurationTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Capability_IsExplicitCookieFreeAndSecretFree(bool enabled)
+    [Fact]
+    public async Task Capability_IsExplicitCookieFreeAndSecretFree()
     {
         await using var fixture = new RealCookieAccountFixture(
-            new Dictionary<string, string?> { ["Accounts:Enabled"] = enabled.ToString() },
+            new Dictionary<string, string?>(),
             appName: $"capability-{Guid.NewGuid():N}");
         var factory = fixture.Factory;
         await factory.InitializeAsync();
@@ -145,11 +141,11 @@ public sealed class ClientConfigurationTests
         var config = await response.Content.ReadFromJsonAsync<ClientConfiguration>();
         Assert.NotNull(config);
         Assert.Equal(1, config.SchemaVersion);
-        Assert.Equal(enabled, config.AccountsEnabled);
+        Assert.True(config.AccountsEnabled);
         Assert.Matches("^[0-9a-f]{32}$", config.ApplicationId);
         using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.Equal(3, json.RootElement.EnumerateObject().Count());
         using var session = await client.GetAsync("/api/auth/session");
-        Assert.Equal(enabled ? HttpStatusCode.OK : HttpStatusCode.NotFound, session.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, session.StatusCode);
     }
 }

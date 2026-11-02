@@ -862,8 +862,8 @@ for needle, why in [
 for path, needle, why in [
     (
         "GrumPlates/Infrastructure/Hosting/AppCachingExtensions.cs",
-        "PersistKeysToStackExchangeRedis",
-        "Redis-backed Data Protection",
+        "PersistKeysToDbContext<AppDbContext>()",
+        "PostgreSQL-backed Data Protection",
     ),
     ("GrumPlates/Program.cs", "UseForwardedHeaders", "forwarded header middleware"),
     (
@@ -1473,7 +1473,8 @@ if "validate" in ci_jobs and "publish-main" in ci_jobs:
     if 'cp -a -- GrumPlates.Test/TestResults/Playwright "$report_source/playwright"' not in _report_step or '--source "$report_source"' not in _report_step:
         fail(".github/workflows/ci.yml: terminal report storage must include browser diagnostics")
     _smoke_reports = read("Deployment/LocalCluster/Scripts/ci-docker-smoke.sh")
-    if _smoke_reports.count("/${GITHUB_JOB:-validate}/docker-smoke/") != 3:
+    _smoke_report_dirs = _smoke_reports.count("/${GITHUB_JOB:-validate}/docker-smoke/")
+    if _smoke_report_dirs == 0 or _smoke_report_dirs != _smoke_reports.count("--results-directory"):
         fail("Docker browser smoke must retain TRX under its terminal job report source")
     if any("ci_report_store.py save" not in workflow_step(job_id, "Store CI reports on this runner")
            for job_id in ("validate", "publish-main")):
@@ -2976,15 +2977,12 @@ react_smoke = smoke[react_smoke_start:react_smoke_end]
 if "Test-DeployedSite.ps1" not in react_smoke or '-AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE"' not in react_smoke:
     fail("React Docker smoke must run ReactPublicV1 HTTP acceptance")
 for needle, why in [
-    ("Category=ReactPackagedDisabled", "disabled packaged React browser filter"),
     ("Category=ReactPackagedEnabled", "enabled packaged React account browser filter"),
 ]:
     if needle not in smoke:
         fail(f"React Docker smoke: missing {why}")
 for needle, why in [
-    ("$REACT_DISABLED_BROWSER_FILTER", "React Docker smoke runs disabled packaged browser acceptance"),
     ("$REACT_ENABLED_BROWSER_FILTER", "React Docker smoke runs enabled packaged account browser acceptance"),
-    ("Packaged React disabled browser journey", "disabled packaged browser suite rejects skipped tests"),
     ("Packaged React enabled account browser journey", "enabled packaged account browser suite rejects skipped tests"),
     ("--expected-skipped 0", "React packaged browser suites reject skipped tests"),
 ]:

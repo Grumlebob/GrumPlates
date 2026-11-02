@@ -18,7 +18,6 @@ public sealed class PrivateBooksOwnershipTests
         var adminPassword = NewPassword();
         await AdminAccountSeed.SeedConfiguredAdminAsync(new AccountOptions
         {
-            Enabled = true,
             AdminSeed = new AdminSeedOptions { Enabled = true, Email = adminEmail, Password = adminPassword }
         }, fixture.Factory.Services, NullLogger.Instance);
         var alice = await fixture.CreateUserAsync();

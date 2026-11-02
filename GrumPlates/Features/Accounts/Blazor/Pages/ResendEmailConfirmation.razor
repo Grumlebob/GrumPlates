@@ -6,10 +6,6 @@
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 
-@inject UserManager<ApplicationUser> UserManager
-@inject IEmailSender<ApplicationUser> EmailSender
-@inject NavigationManager NavigationManager
-@inject IdentityRedirectManager RedirectManager
 @inject AccountOptions AccountOptions
 @inject AccountOperations Accounts
 
@@ -19,7 +15,7 @@
 <h2>Enter your email.</h2>
 <hr class="account-divider" />
 <StatusMessage Message="@message" />
-@if (AccountOptions.Enabled && !AccountOptions.EmailEnabled)
+@if (!AccountOptions.EmailEnabled)
 {
     <p role="status">This account operation is unavailable.</p>
 }
@@ -57,32 +53,11 @@ else
 
     private async Task OnValidSubmitAsync()
     {
-        if (AccountOptions.Enabled)
-        {
-            var response = await AccountPageResultReader.ReadAsync(HttpContext,
-                await Accounts.ResendAsync(new AccountEmailRequest { Email = Input.Email.Trim() }));
-            message = response.StatusCode == StatusCodes.Status202Accepted
-                ? "Request received. Check your email if applicable; use resend if it does not arrive."
-                : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
-            return;
-        }
-
-        var user = await UserManager.FindByEmailAsync(Input.Email!);
-        if (user is null)
-        {
-            message = "Verification email sent. Please check your email.";
-            return;
-        }
-
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code });
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-        message = "Verification email sent. Please check your email.";
+        var response = await AccountPageResultReader.ReadAsync(HttpContext,
+            await Accounts.ResendAsync(new AccountEmailRequest { Email = Input.Email.Trim() }));
+        message = response.StatusCode == StatusCodes.Status202Accepted
+            ? "Request received. Check your email if applicable; use resend if it does not arrive."
+            : AccountPageResultReader.Message(response.Body, "Unable to process the request. Try again later.");
     }
 
     private sealed class InputModel

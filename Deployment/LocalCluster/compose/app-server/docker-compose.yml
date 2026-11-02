@@ -34,7 +34,6 @@ services:
     ports:
       - "${APP_PORT}:${APP_PORT}"
     volumes:
-      - app_storage:/app/Storage
       - type: bind
         source: ${DATA_PROTECTION_CERT_HOST_PATH:?DATA_PROTECTION_CERT_HOST_PATH is required}
         target: /run/secrets/data-protection.pem
@@ -42,9 +41,6 @@ services:
     networks:
       - default
       - observability
-
-volumes:
-  app_storage:
 
 networks:
   observability:

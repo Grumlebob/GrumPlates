@@ -7,7 +7,6 @@ namespace GrumPlates.Test.Infrastructure.Hosting;
 public sealed class RateLimitingTests(RateLimitingWebAppFixture fixture) : IClassFixture<RateLimitingWebAppFixture>
 {
     internal const int ApiPermitLimit = 60;
-    internal const int AuthenticationPermitLimit = 20;
 
     private readonly WebAppFactory _factory = fixture.Factory;
     private readonly HttpClient _client = fixture.Factory.HttpClient;
@@ -71,7 +70,6 @@ public sealed class RateLimitingWebAppFixture : IAsyncLifetime
     public WebAppFactory Factory { get; } = new(new WebAppFactoryOptions
     {
         ApiRateLimitPermitLimit = RateLimitingTests.ApiPermitLimit,
-        AuthenticationRateLimitPermitLimit = RateLimitingTests.AuthenticationPermitLimit,
         InitializeDatabaseRespawner = false
     });
 

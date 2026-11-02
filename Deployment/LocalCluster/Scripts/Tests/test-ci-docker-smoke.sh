@@ -171,7 +171,6 @@ if [[ "$(basename "$0")" == dotnet ]]; then
   pwd -P >/dev/null 2>&1 || exit 38
   if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
     case "$*" in
-      *"Category=ReactPackagedDisabled"*) result_name="react-disabled-browser.trx"; failure="${FAIL_REACT_DISABLED_BROWSER:-0}" ;;
       *"Category=ReactPackagedEnabled"*) result_name="react-enabled-browser.trx"; failure="${FAIL_REACT_ENABLED_BROWSER:-0}" ;;
       *) exit 34 ;;
     esac
@@ -231,7 +230,6 @@ FAIL_ACCEPTANCE_LABEL=1 run_case 1
 FAIL_REDIS=1 run_case 17
 FAIL_API=1 run_case 1
 FAIL_BROWSER=19 run_case 19
-FRONTEND_PROFILE=React FAIL_REACT_DISABLED_BROWSER=20 run_case 20
 FRONTEND_PROFILE=React FAIL_REACT_ENABLED_BROWSER=21 run_case 21
 FAIL_HTTP_ACCEPTANCE=23 run_case 23
 env -u GITHUB_RUN_ID -u GITHUB_RUN_ATTEMPT bash "$SCRIPT" > "$TMP_ROOT/local-one"
@@ -268,6 +266,9 @@ for args in calls:
                 assert "ASPNETCORE_URLS=http://+:8080;https://+:8443" in args
                 assert any(value.endswith(":8443") for value in args if value.startswith("127.0.0.1:"))
                 assert any(value.endswith(":ro") for value in args if "/run/react-auth-fixture" in value)
+            else:
+                assert "DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx" in args
+                assert any(value.endswith(":/run/dp-cert:ro") for value in args)
         elif "smtp" in name:
             assert "node:26.12.1-bookworm-slim" in args
             assert "--read-only" in args

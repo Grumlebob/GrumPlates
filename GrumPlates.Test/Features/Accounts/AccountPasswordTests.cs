@@ -115,7 +115,7 @@ public sealed class AccountPasswordTests
     [Fact]
     public void EnabledIdentity_UsesOnlyCodePointValidatorAndFixedLockoutAndTokenSettings()
     {
-        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Accounts:Enabled"] = "true" }).Build();
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>()).Build();
         var services = new ServiceCollection();
         services.AddIdentityBackend();
         services.AddAccountFeature(configuration, new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing"));
@@ -133,7 +133,6 @@ public sealed class AccountPasswordTests
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["Accounts:Enabled"] = "true",
             ["Accounts:AdminSeed:Enabled"] = "true",
             ["Accounts:AdminSeed:Email"] = "identity@example.test",
             ["Accounts:AdminSeed:Password"] = "short"
@@ -164,11 +163,5 @@ public sealed class AccountPasswordTests
     {
         [AccountPasswordLength]
         public string Password { get; init; } = "";
-    }
-
-    private sealed class PolicyFormPasswordModel(string password) : AccountPasswordPolicyInputModel
-    {
-        [AccountPasswordLength]
-        public string Password { get; } = password;
     }
 }

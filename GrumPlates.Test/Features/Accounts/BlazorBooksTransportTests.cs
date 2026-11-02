@@ -61,27 +61,6 @@ public sealed class BlazorBooksTransportTests
         Assert.Equal("csrf-b", handler.Requests[^1].CsrfToken);
     }
 
-    [Fact]
-    public async Task DisabledAccounts_PreservesTheExistingTransportWithoutSessionHeaders()
-    {
-        var handler = new RecordingHandler((request, _) => request.RequestUri!.AbsolutePath == "/api/client-config"
-            ? JsonResponse(new { schemaVersion = 1, accountsEnabled = false, applicationId = new string('c', 32) })
-            : new HttpResponseMessage(HttpStatusCode.OK));
-        using var client = CreateClient(handler, "legacy-user");
-
-        using var response = await client.GetAsync("api/books");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Collection(handler.Requests,
-            configuration => Assert.Equal("/api/client-config", configuration.Path),
-            books =>
-            {
-                Assert.Equal("/api/books", books.Path);
-                Assert.Null(books.ExpectedUser);
-                Assert.Null(books.CsrfToken);
-            });
-    }
-
     private static HttpClient CreateClient(RecordingHandler innerHandler, string userId)
     {
         var handler = new BooksAntiforgeryHandler(new FixtureAuthenticationStateProvider(userId))

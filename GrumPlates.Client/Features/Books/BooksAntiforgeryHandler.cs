@@ -29,11 +29,6 @@ public sealed class BooksAntiforgeryHandler(AuthenticationStateProvider authenti
             throw new InvalidDataException("The application client configuration is unavailable.");
         }
 
-        if (!clientConfiguration.AccountsEnabled)
-        {
-            return await base.SendAsync(request, cancellationToken);
-        }
-
         request.Headers.Remove("X-Expected-User");
         if (!string.IsNullOrEmpty(capturedUserId))
         {

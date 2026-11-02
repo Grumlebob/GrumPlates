@@ -193,7 +193,6 @@ public sealed class AdminAccountSeedTests
         AdminAccountSeed.SeedConfiguredAdminAsync(
             new AccountOptions
             {
-                Enabled = true,
                 AdminSeed = new AdminSeedOptions { Enabled = true, Email = email, Password = password }
             },
             fixture.Factory.Services,

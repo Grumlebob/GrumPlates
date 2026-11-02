@@ -14,9 +14,9 @@ internal sealed class AccountOptionsValidator(string appName) : IValidateOptions
         List<string> errors = [];
         ValidateSeed(options, errors);
         ValidateEmail(options, errors);
-        if (options.RegistrationEnabled && (!options.Enabled || !options.EmailEnabled))
+        if (options.RegistrationEnabled && !options.EmailEnabled)
         {
-            errors.Add("Accounts:RegistrationEnabled requires Accounts:Enabled and Accounts:Email:Host.");
+            errors.Add("Accounts:RegistrationEnabled requires Accounts:Email:Host.");
         }
         if (options.WriteLimit.PermitLimit <= 0)
         {
@@ -44,10 +44,6 @@ internal sealed class AccountOptionsValidator(string appName) : IValidateOptions
         {
             errors.Add("Accounts:AdminSeed:Email must be a valid mailbox.");
         }
-        if (seed.Enabled && !options.Enabled)
-        {
-            errors.Add("Accounts:AdminSeed:Enabled requires Accounts:Enabled.");
-        }
         if (seed.Enabled && string.IsNullOrEmpty(seed.Password))
         {
             errors.Add("Accounts:AdminSeed:Password is required.");
@@ -65,10 +61,6 @@ internal sealed class AccountOptionsValidator(string appName) : IValidateOptions
         if (!string.IsNullOrEmpty(email.Host) && (email.Host != email.Host.Trim() || Uri.CheckHostName(email.Host) == UriHostNameType.Unknown))
         {
             errors.Add("Accounts:Email:Host must be a DNS name or IP address.");
-        }
-        if (hasHost && !options.Enabled)
-        {
-            errors.Add("Accounts:Email:Host requires Accounts:Enabled.");
         }
         if (!hasHost && (!string.IsNullOrEmpty(email.From) || !string.IsNullOrEmpty(email.Username) || !string.IsNullOrEmpty(email.Password)))
         {
