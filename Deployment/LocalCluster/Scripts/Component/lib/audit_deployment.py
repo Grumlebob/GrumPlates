@@ -1848,6 +1848,11 @@ apps_pos = site.find("- name: Deploy app servers")
 caddy_pos = site.find("- name: Deploy Caddy and Cloudflare Tunnel")
 if stage_pos < 0 or stop_pos < 0 or stage_pos > stop_pos:
     fail("Deployment/LocalCluster/ansible/playbooks/site.yml: stage the exact app image before stopping apps")
+stop_play = site[stop_pos:site.find("\n- name:", stop_pos + 1)] if stop_pos >= 0 else ""
+gid_fact_pos = stop_play.find("data_protection_certificate_gid:")
+stop_render_pos = stop_play.find("Render protected Compose interpolation allowlist before stopping the app")
+if gid_fact_pos < 0 or stop_render_pos < 0 or gid_fact_pos > stop_render_pos:
+    fail("Deployment/LocalCluster/ansible/playbooks/site.yml: record the certificate group ID before rendering the Compose allowlist in the stop play")
 if "Require the registry digest on the staged image" not in site:
     fail("Deployment/LocalCluster/ansible/playbooks/site.yml: staged image must be checked against the release digest")
 identity_assert_pos = site.find("Require staged release identity before app interruption or migration")
