@@ -799,6 +799,7 @@ Optional, owner only: `agent.md` in the repo root is your private, ignored notes
 | Q2 | Squash the four EF migrations? | Yes (OD-7; P07). The plan keeps live data by rewriting migration history (P14 step 3) instead of recreating databases. |
 | Q3 | Remove the never-enabled CI runner profile routing? | Yes (OD-8; P05). |
 | Q4 | Remove deployment-audit rules that read Markdown? | Yes (OD-9; P11). |
+| Q5 | Lighthouse 13.6.0 also fails audit on `glob` itself (GHSA-3g3m-2fjr-6pw4, glob 9.0.0-14.0.1, published 2026-10-30), so the `glob` → `minimatch` override in P01-A 3a, D01 step 6 and D02 is not enough. | Executor, 2026-11-02: override `"@sentry/bundler-plugins": { "glob": "14.0.3" }` instead. glob 14.0.3 depends on `minimatch ^11.0.2`, so one scoped override fixes both advisories. Verified with Lighthouse 13.6.0: audit clean, `lighthouse --version` runs, and the plugin's CJS and ESM entry points load on Node 26. Downstream packets use the same override. |
 
 If execution uncovers a new decision: when one option is clearly leaner and safe, take it, record it here as Q5 onwards with the reason, and continue. Ask the owner only when every option risks live data, security or a supported feature (both frontends, the three deployment targets).
 
@@ -810,7 +811,7 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | Owner answers Q1–Q4 | Complete | 2026-11-02: seeded accounts; squash; remove routing; remove Markdown audit rules (OD-6 to OD-9). |
 | Downstream review | Complete | 2026-11-02: OD-16 to OD-18, packets D01-D10; facts in section 7.2. |
 | Plan review | Complete | 2026-11-02: OD-10 to OD-15; live databases, pins, images and deploy inputs verified read-only (section 4.2). |
-| P00 | Pending | |
+| P00 | Complete | 2026-11-02: base `origin/main` `7ee5192a43ddf1276edca21bbf4439cd98d4c80b`. Open PRs #405, #406, #407 as in 4.1. New branch `quality/test-cleanup-20261102` (`a74fc18d`, own worktree, another session's work, not in this plan): left alone. |
 | P01-A | Pending | |
 | P01-B | Pending (authorised by the goal) | |
 | P02 | Pending | |
