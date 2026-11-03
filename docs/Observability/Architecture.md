@@ -2,6 +2,8 @@
 
 Use this guide when changing instrumentation or telemetry configuration. See [Operations](Operations.md) to access, query, validate, or recover the stack.
 
+Telemetry is optional and private. Never expose observability services publicly. App startup and requests must continue when telemetry is disabled or export fails.
+
 ## Coverage and flow
 
 Local Docker has an optional Compose profile. LocalCluster and Cloud place a private backend on an existing ingress node, with Alloy and node exporters on each node and database exporters on the data node. They do not add an observability node. LocalSingleNode leaves telemetry disabled.

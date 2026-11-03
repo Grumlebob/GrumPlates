@@ -21,7 +21,7 @@ Run the local Docker stack:
 | Run and verify checks | [Tests](docs/Test.md) |
 | Prepare a fork or a standalone product | [Fork guide](docs/HowToForkThisRepo.md), [standalone product](docs/StandaloneProduct.md) |
 | Choose and operate a deployment target | [Deployment guide](Deployment/README.md) |
-| View or diagnose telemetry | [Observability guide](docs/ObservabilityGuide.md) |
+| View or diagnose telemetry | [Observability operations](docs/Observability/Operations.md) |
 | Run optional quality audits | [Quality tools](docs/Quality/QualityTools.md), [SonarQube](docs/Quality/SonarQubeAnalysis.md) |
 
 Read only the guides needed for your task. The contributor rules point to required checks and integration steps.
