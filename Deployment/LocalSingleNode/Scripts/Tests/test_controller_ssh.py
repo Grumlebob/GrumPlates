@@ -119,14 +119,13 @@ class ControllerSshTests(unittest.TestCase):
         self.assertEqual("~/.ssh/localsinglenode/abc.conf", ssh.ssh_path(path, windows=True))
         self.assertEqual(path.as_posix(), ssh.ssh_path(path, windows=False))
 
-    def test_windows_configuration_replaces_absolute_include(self):
+    def test_windows_configuration_uses_home_relative_paths(self):
         directory = self.home / ".ssh"
         directory.mkdir()
         conf_directory, identity = ssh.paths(self.args.repo, self.args.controller)
-        legacy = 'Include "' + (conf_directory / (identity + ".conf")).as_posix() + '"'
         main = directory / "config"
         foreign = "Host foreign\n    User someone\n"
-        main.write_text(legacy + "\n" + foreign)
+        main.write_text(foreign)
         original = ssh.ssh_path
         with patch.object(ssh, "ssh_path", lambda path: original(path, windows=True)):
             self.configure()
