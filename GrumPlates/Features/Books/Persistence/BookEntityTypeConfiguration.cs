@@ -1,7 +1,7 @@
 using GrumPlates.Core.Features.Books.Contracts;
 using GrumPlates.Core.Features.Books.Domain;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Features.Books.Persistence;
 

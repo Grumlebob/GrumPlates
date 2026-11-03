@@ -5,27 +5,27 @@ namespace GrumPlates.Test.Architecture.Slices;
 public class AccountsBoundaryArchitectureTests
 {
     [Fact]
-    public void ProductionAssemblies_RetainOnlyTheMappedUserInLegacyLoginNamespaces()
+    public void ProductionAssemblies_HaveNoTypesInTheRetiredLoginNamespaces()
     {
-        var legacyPrefixes = new[]
+        var retiredPrefixes = new[]
         {
             "GrumPlates.Core.Features.Login",
             "GrumPlates.Features.Login",
             "GrumPlates.Client.Features.Login"
         };
-        var mappedUser = typeof(GrumPlates.Features.Login.Account.ApplicationUser);
-        var legacyTypes = new[]
+        var offenders = new[]
         {
             ArchitectureAssemblies.Core,
             ArchitectureAssemblies.Server,
             ArchitectureAssemblies.Client
         }.SelectMany(assembly => assembly.GetTypes())
-            .Where(type => type.Namespace is { } typeNamespace && legacyPrefixes.Any(prefix =>
+            .Where(type => type.Namespace is { } typeNamespace && retiredPrefixes.Any(prefix =>
                 typeNamespace == prefix || typeNamespace.StartsWith(prefix + ".", StringComparison.Ordinal)))
+            .Select(type => type.FullName)
             .ToArray();
 
-        Assert.Equal("GrumPlates.Features.Login.Account.ApplicationUser", mappedUser.FullName);
-        Assert.Equal(new[] { mappedUser }, legacyTypes);
+        Assert.True(offenders.Length == 0,
+            "Account types belong under the Accounts feature namespaces:\n" + string.Join("\n", offenders));
     }
 
     [Fact]
@@ -43,7 +43,7 @@ public class AccountsBoundaryArchitectureTests
             .ToArray();
 
         Assert.True(offenders.Length == 0,
-            "Account source belongs under Features/Accounts; only the mapped user's CLR namespace is retained:\n" +
+            "Account source belongs under Features/Accounts:\n" +
             string.Join("\n", offenders));
         Assert.True(File.Exists(Path.Combine(root, "GrumPlates", "Features", "Accounts", "Identity", "ApplicationUser.cs")),
             "The mapped Identity user source belongs to Features/Accounts/Identity.");

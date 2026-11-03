@@ -3,7 +3,7 @@ using GrumPlates.Features.Accounts.Email;
 using GrumPlates.Features.Accounts.Security;
 using Microsoft.Extensions.Options;
 using static GrumPlates.Features.Accounts.Security.AccountResults;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Features.Accounts.Registration;
 

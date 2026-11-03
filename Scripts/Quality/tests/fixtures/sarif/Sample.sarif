@@ -53,7 +53,7 @@
           "level": "warning",
           "message": {"text": "Migration body is empty."},
           "locations": [
-            {"physicalLocation": {"artifactLocation": {"uri": "file:///C:/fake/repo/GrumPlates/Infrastructure/Persistence/Migrations/20260525172002_InitialTemplateSchema.cs"}, "region": {"startLine": 9}}}
+            {"physicalLocation": {"artifactLocation": {"uri": "file:///C:/fake/repo/GrumPlates/Infrastructure/Persistence/Migrations/20261103193952_InitialSchema.cs"}, "region": {"startLine": 9}}}
           ]
         },
         {

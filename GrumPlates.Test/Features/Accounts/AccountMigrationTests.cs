@@ -1,9 +1,6 @@
 using GrumPlates.Infrastructure.Persistence;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
-using Npgsql;
 using Testcontainers.PostgreSql;
 
 namespace GrumPlates.Test.Features.Accounts;
@@ -15,7 +12,7 @@ public sealed class AccountMigrationTests
         .BuildServiceProvider();
 
     [Fact]
-    public async Task CleanUpgrade_CreatesUniqueEmailOutboxAndDataProtectionKeyStorage()
+    public async Task Migrate_CreatesUniqueEmailOutboxAndDataProtectionKeyStorage()
     {
         await using var container = await StartDatabaseAsync();
         await using var db = CreateDb(container);
@@ -32,33 +29,6 @@ public sealed class AccountMigrationTests
         Assert.False(await ColumnExistsAsync(db, "AccountOutbox", "Recipient"));
         Assert.False(await ColumnExistsAsync(db, "AccountOutbox", "Token"));
         Assert.False(await ColumnExistsAsync(db, "AccountOutbox", "Body"));
-    }
-
-    [Fact]
-    public async Task DuplicateOrOversizedNormalizedEmails_RefuseUpgradeWithoutChangingAccounts()
-    {
-        await using var container = await StartDatabaseAsync();
-        await using var db = CreateDb(container);
-        var migrator = db.GetService<IMigrator>();
-        await migrator.MigrateAsync("20260528104203_NormalizeBooksForAuthorBooks");
-        await db.Database.ExecuteSqlRawAsync(
-            """
-            INSERT INTO "AspNetUsers"
-                ("Id", "NormalizedEmail", "EmailConfirmed", "PhoneNumberConfirmed", "TwoFactorEnabled", "LockoutEnabled", "AccessFailedCount")
-            VALUES
-                ('migration-user-1', 'DUPLICATE@example.test', FALSE, FALSE, FALSE, FALSE, 0),
-                ('migration-user-2', 'DUPLICATE@example.test', FALSE, FALSE, FALSE, FALSE, 0),
-                ('migration-user-3', repeat('X', 255), FALSE, FALSE, FALSE, FALSE, 0);
-            """);
-
-        var failure = await Assert.ThrowsAsync<PostgresException>(() => migrator.MigrateAsync());
-        Assert.Equal("23514", failure.SqlState);
-        Assert.Contains("1 duplicate normalized-email groups", failure.MessageText, StringComparison.Ordinal);
-        Assert.Contains("1 incompatible values", failure.MessageText, StringComparison.Ordinal);
-        Assert.Contains("privately remediate", failure.MessageText, StringComparison.Ordinal);
-        Assert.DoesNotContain("DUPLICATE@example.test", failure.MessageText, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(3L, await ScalarAsync<long>(db, "SELECT COUNT(*) FROM \"AspNetUsers\""));
-        Assert.False(await TableExistsAsync(db, "AccountOutbox"));
     }
 
     private static async Task<PostgreSqlContainer> StartDatabaseAsync()

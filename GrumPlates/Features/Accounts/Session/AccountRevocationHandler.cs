@@ -3,7 +3,7 @@ using GrumPlates.Core.Features.Accounts.Contracts;
 using GrumPlates.Features.Accounts.Security;
 using Microsoft.AspNetCore.Identity;
 using static GrumPlates.Features.Accounts.Security.AccountResults;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Features.Accounts.Session;
 

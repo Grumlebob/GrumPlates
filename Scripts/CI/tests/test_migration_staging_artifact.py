@@ -43,7 +43,7 @@ class MigrationStagingArtifactTests(unittest.TestCase):
             "bundle_filename": self.bundle_name,
             "runtime": "net10.0",
             "dotnet_sdk_version": "10.0.303",
-            "ordered_migration_ids": ["20260525172002_InitialTemplateSchema", "20260526083400_UserOwnedBooks"],
+            "ordered_migration_ids": ["20261103193952_InitialSchema"],
             "bundle_sha256": hashlib.sha256(self.bundle_bytes).hexdigest(),
         }
         self.provenance_path = self.root / staging.PROVENANCE_FILENAME
@@ -65,10 +65,7 @@ class MigrationStagingArtifactTests(unittest.TestCase):
 
     def test_observed_dotnet_ef_fixture_is_strict_and_ordered(self) -> None:
         migration_ids = staging.parse_migration_list(FIXTURE.read_text(encoding="utf-8"))
-        self.assertEqual(len(migration_ids), 3)
-        self.assertEqual(migration_ids[0], "20260525172002_InitialTemplateSchema")
-        self.assertEqual(migration_ids[-1], "20260528104203_NormalizeBooksForAuthorBooks")
-        self.assertEqual(migration_ids[1], "20260526083400_UserOwnedBooks")
+        self.assertEqual(migration_ids, ["20261103193952_InitialSchema"])
 
     def test_rejects_unknown_root_and_row_shapes(self) -> None:
         for output in (

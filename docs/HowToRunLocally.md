@@ -37,6 +37,8 @@ Local setup seeds a local Admin and a local User; their emails are printed by se
 
 Reset removes this Compose project's named volumes before rebuilding. This deletes the local PostgreSQL database and stored state for Redis Insight and optional observability services. It cannot be undone. Use it only when you intend to recreate local service data, such as after an incompatible database image upgrade. Ordinary start and stop keep the volumes. Do not delete another clone's data.
 
+After pulling the migration squash (a single `InitialSchema` migration), reset your local database once with the command above. By hand: `docker compose down`, then `docker volume rm grumplates_pgdata`; `docker volume ls` shows the name for your clone. This applies to local Docker only, never to deployment nodes.
+
 ## Run without Docker
 
 Use this only when compatible local PostgreSQL and Redis services already run:
