@@ -28,7 +28,7 @@ on:
         default: ""
         type: string
       refresh_rating_ranks:
-        description: Refresh rating ranks during deployment; LocalCluster does not support this effect.
+        description: Must be false. Kept because the shared LocalCluster coordinator always sends it.
         required: false
         default: "false"
         type: choice

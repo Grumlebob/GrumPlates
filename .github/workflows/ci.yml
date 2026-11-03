@@ -115,9 +115,6 @@ jobs:
       - name: Test native single-node setup and maintenance fixtures
         run: python3 -m unittest discover -s Deployment/LocalSingleNode/Scripts/Tests -v
 
-      - name: Test Caddy repository migration safeguards
-        run: python3 -m unittest Deployment/Common/Scripts/Tests/test_caddy_install.py -v
-
       - name: Test public tunnel ownership and credential safeguards
         run: python3 -m unittest Deployment/Common/Scripts/Tests/test_cloudflare_tunnel.py -v
 

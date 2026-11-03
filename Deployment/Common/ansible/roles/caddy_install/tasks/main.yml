@@ -1,11 +1,4 @@
 ---
-- name: Retire the legacy Caddy Cloudsmith source
-  ansible.builtin.script:
-    cmd: "{{ role_path }}/../../../Scripts/retire-caddy-cloudsmith-source.py"
-    executable: /usr/bin/python3
-  register: caddy_source_retirement
-  changed_when: "'Retired legacy Caddy source' in caddy_source_retirement.stdout"
-
 - name: Require a supported Caddy package architecture
   ansible.builtin.assert:
     that:

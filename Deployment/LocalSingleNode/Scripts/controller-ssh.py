@@ -210,10 +210,8 @@ def configure(args):
     ordinary(main)
     previous = main.read_text() if main.exists() else ""
     include = 'Include "' + ssh_path(config) + '"'
-    # Earlier Windows runs wrote an absolute Include that MSYS ssh ignores.
-    legacy = 'Include "' + config.as_posix() + '"'
     lines = previous.splitlines()
-    if include not in lines and legacy not in lines:
+    if include not in lines:
         # Refuse an explicit alias already owned by another SSH configuration.
         effective = run("ssh", "-G", args.alias)
         hostname = next((line.split(maxsplit=1)[1] for line in effective.splitlines() if line.startswith("hostname ")), "")
@@ -227,10 +225,7 @@ def configure(args):
             "    ServerAliveInterval 30\n    ServerAliveCountMax 3\n    ForwardAgent no\nHost *\n")
     write_private(known, trust)
     write_private(config, text)
-    if legacy in lines and include not in lines:
-        updated = "\n".join(include if line == legacy else line for line in lines)
-        write_private(main, updated + ("\n" if previous.endswith("\n") else ""))
-    elif include not in lines:
+    if include not in lines:
         write_private(main, include + "\n" + previous)
     verify(args, record)
     print("Persistent SSH alias verified. Host trust and controller identity are pinned; password prompts are disabled.")

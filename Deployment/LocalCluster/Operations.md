@@ -126,38 +126,6 @@ Caddy and Cloudflared run on node-main. App containers run on the app nodes. Pos
 
 PostgreSQL and Redis use persistent Docker volumes. Do not prune Docker volumes. They contain database and runtime state. The deployment playbook applies firewall rules, handles database backup and optional migrations, starts app nodes, then checks readiness. See the playbook at ansible/playbooks/site.yml for exact order.
 
-## Replace an app identity
-
-Use this only when intentionally replacing an app identity on the same nodes. It creates a new deploy key, runner, runtime root, Caddy site, Compose project, and ownership marker. Plan data retention or migration before continuing. Review the helper's dry run:
-
-```bash
-bash ./Deployment/LocalCluster/Scripts/prepare-renamed-localcluster-app.sh --old-app-name <old-app-name>
-```
-
-After committing the new settings and inventory, prepare the replacement and confirm the cutover:
-
-```bash
-OLD_APP_NAME="<old-app-name>"
-bash ./Deployment/LocalCluster/Scripts/prepare-renamed-localcluster-app.sh \
-  --old-app-name "$OLD_APP_NAME" \
-  --setup-control-machine \
-  --install-new-key \
-  --existing-key "$HOME/.ssh/${OLD_APP_NAME}_deploy" \
-  --configure-runner \
-  --stop-old-runtime \
-  --remove-old-marker \
-  --preflight \
-  --confirm-cutover
-```
-
-After acceptance-check.sh passes, remove only the old app's owned runtime resources:
-
-```bash
-bash ./Deployment/LocalCluster/Scripts/cleanup-renamed-localcluster-app.sh --old-app-name <old-app-name> --confirm-cleanup
-```
-
-Keep the old deploy key while it may be needed for rollback. Add --remove-old-deploy-key only when the old key is no longer needed.
-
 ## Deployment lock
 
 Every mutating deploy holds one lock directory on node-main. Apps on the same nodes share it. The lock is never removed automatically, even when old. A cancelled job may leave ansible-playbook running.
