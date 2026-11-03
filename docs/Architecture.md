@@ -15,7 +15,7 @@ The application has three production .NET projects and an optional React fronten
 
 Server account composition, endpoints, security, Identity integration, email, account persistence and Blazor Identity UI live under `GrumPlates/Features/Accounts`. Shared account DTOs live in `GrumPlates.Core/Features/Accounts/Contracts`. React account session and private-client decoration remain under `app/features/accounts`.
 
-The shared `AppDbContext`, design-time factory and migration history stay under server `Infrastructure/Persistence`. Books mappings live with Books. Accounts owns its outbox entity and operations, while the outbox mapping remains inline in the shared context. `ApplicationUser` lives in `Features/Accounts/Identity`, while its CLR namespace remains `GrumPlates.Features.Login.Account` for Identity/EF compatibility. Historical migration designer strings retain the type names recorded when those migrations were created. These retained names do not identify active legacy source folders.
+The shared `AppDbContext`, design-time factory and migrations stay under server `Infrastructure/Persistence`. Books mappings live with Books. Accounts owns its outbox entity and operations, while the outbox mapping remains inline in the shared context. `ApplicationUser` lives in `Features/Accounts/Identity`, in the matching namespace.
 
 Books deliberately consumes Accounts' current-user abstraction and protected endpoint policy for private data. Accounts owns cookie identity, security-stamp revocation, captured-owner and antiforgery protection. Books owns its queries, mutations and feature cache invalidation. Keep authorization and owner scoping on the server. [Accounts](Accounts.md) describes enabled/disabled behavior, private state, cookies and Data Protection recovery.
 
@@ -27,6 +27,6 @@ The Blazor book modal has one component-owned `BookModalLifecycle` for loading, 
 
 ## Verification boundaries
 
-The architecture suite identifies Core, Server and Client through assembly markers in `GrumPlates.Test/Architecture/Support/ArchitectureAssemblies.cs`. It checks dependency direction, feature placement, DTO ownership, HTTP use, DI/profile composition, endpoint metadata and persistence mapping. Accounts checks distinguish its retained Identity CLR name and historical migration strings from prohibited legacy source placement.
+The architecture suite identifies Core, Server and Client through assembly markers in `GrumPlates.Test/Architecture/Support/ArchitectureAssemblies.cs`. It checks dependency direction, feature placement, DTO ownership, HTTP use, DI/profile composition, endpoint metadata and persistence mapping. Accounts checks keep account types and source out of the retired `Login` namespaces and folders.
 
 Architecture checks complement behavior tests. Use the complete [local gate](Test.md#local-gate), both frontend profiles and the relevant explicitly enabled [browser checks](Testing/Browser.md). Keep generated React contracts, runtime endpoint metadata, profile-specific publishing, migration tooling and deployment audits consistent with the same source. Runtime secrets and machine-specific settings belong outside these architectural descriptions.

@@ -6,7 +6,7 @@ using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Test.Features.Accounts;
 

@@ -2,7 +2,7 @@
 
 Accounts are always on. Registration, the Admin seed and email are opt-in. React reads the client configuration before starting account requests. The server remains authoritative: hiding a link or route never replaces API authentication, authorization, antiforgery or cache policy.
 
-Server implementation and Blazor Identity UI live under `GrumPlates/Features/Accounts`; shared DTOs live in `GrumPlates.Core/Features/Accounts/Contracts`. `ApplicationUser` resides in the feature's `Identity` folder but retains the CLR namespace `GrumPlates.Features.Login.Account` for Identity/EF compatibility. The shared context, design-time factory and historical migrations stay under `Infrastructure/Persistence`. The outbox entity and operations belong to Accounts; its EF mapping remains inline in the shared `AppDbContext`. See [architecture](Architecture.md) for composition and the deliberate Books-to-Accounts integration.
+Server implementation and Blazor Identity UI live under `GrumPlates/Features/Accounts`; shared DTOs live in `GrumPlates.Core/Features/Accounts/Contracts`. `ApplicationUser` lives in the feature's `Identity` folder and namespace. The shared context, design-time factory and migrations stay under `Infrastructure/Persistence`. The outbox entity and operations belong to Accounts; its EF mapping remains inline in the shared `AppDbContext`. See [architecture](Architecture.md) for composition and the deliberate Books-to-Accounts integration.
 
 ## Capabilities
 

@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Test.Infrastructure.Hosting;
 

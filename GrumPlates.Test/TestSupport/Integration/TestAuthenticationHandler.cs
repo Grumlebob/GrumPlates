@@ -4,7 +4,7 @@ using GrumPlates.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Test.TestSupport.Integration;
 

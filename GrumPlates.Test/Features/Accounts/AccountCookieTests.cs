@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Test.Features.Accounts;
 

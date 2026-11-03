@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Options;
-using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
+using ApplicationUser = GrumPlates.Features.Accounts.Identity.ApplicationUser;
 
 namespace GrumPlates.Test.Features.Accounts;
 
