@@ -38,8 +38,8 @@ jobs:
           ref: ${{ github.sha }}
           clean: true
 
-      - name: Validate quality audit runner
-        run: python3 -m unittest Scripts.Quality.tests.test_run_quality_audit
+      - name: Test quality scripts
+        run: python3 -m unittest discover -s Scripts/Quality/tests -v
 
       - name: Isolate registry credentials for this job
         run: |
@@ -115,13 +115,8 @@ jobs:
       - name: Test native single-node setup and maintenance fixtures
         run: python3 -m unittest discover -s Deployment/LocalSingleNode/Scripts/Tests -v
 
-      - name: Test public tunnel ownership and credential safeguards
-        run: python3 -m unittest Deployment/Common/Scripts/Tests/test_cloudflare_tunnel.py -v
-
-      - name: Test Cloud and LocalCluster settings validation parity
-        run: |
-          python3 -m unittest Deployment/Common/Scripts/Tests/test_settings_validation.py -v
-          python3 -m unittest Deployment/Common/Scripts/Tests/test_account_deploy_settings.py -v
+      - name: Test common deployment scripts
+        run: python3 -m unittest discover -s Deployment/Common/Scripts/Tests -v
 
       # Report only. The self-hosted node's Docker daemon is shared with apps, so CI
       # must not prune it; an operator runs scoped cleanup when space is low.
@@ -147,19 +142,11 @@ jobs:
           echo "profile=${profile}" >> "$GITHUB_OUTPUT"
           echo "acceptance_profile=${acceptance_profile}" >> "$GITHUB_OUTPUT"
 
-      - name: Test Dependabot auto-merge routing
-        run: python3 -m unittest Scripts/CI/tests/test_dependabot_automerge_workflow.py -v
-
-      - name: Test frontend profile and CI result contracts
-        run: python3 -m unittest Scripts/CI/tests/test_frontend_profile.py Scripts/CI/tests/test_frontend_release.py Scripts/CI/tests/test_require_ci_results.py
-
-      - name: Test deployed-site acceptance profile split
+      # test_deployed_site_acceptance.py runs pwsh, so fail early if it is missing.
+      - name: Test CI scripts
         run: |
           command -v pwsh
-          python3 -m unittest Scripts/CI/tests/test_deployed_site_acceptance.py -v
-
-      - name: Test required .NET test-result counts
-        run: python3 -m unittest Scripts/CI/tests/test_validate_dotnet_test_results.py -v
+          python3 -m unittest discover -s Scripts/CI/tests -v
 
       - name: Restore
         env:
@@ -217,39 +204,8 @@ jobs:
               "$profile" "$target" <<< "$compose_config"
           done
 
-      - name: Test migration staging provenance
-        run: python3 -m unittest Scripts/CI/tests/test_migration_staging_artifact.py
-
-      - name: Test release provenance and manifest contract
-        run: |
-          python3 -m unittest \
-            Deployment/Common/Scripts/Tests/test_ci_provenance.py \
-            Deployment/Common/Scripts/Tests/test_release_contract.py \
-            Deployment/Common/Scripts/Tests/test_registry_payload.py \
-            Deployment/Common/Scripts/Tests/test_registry_retention.py \
-            Deployment/Common/Scripts/Tests/test_registry_inventory.py \
-            Deployment/Common/Scripts/Tests/test_registry_inventory_cli.py \
-            Deployment/Common/Scripts/Tests/test_registry_protection.py \
-            Deployment/Common/Scripts/Tests/test_registry_retention_cli.py \
-            Deployment/Common/Scripts/Tests/test_registry_retention_recovery.py \
-            Deployment/Common/Scripts/Tests/test_registry_capacity_recovery.py \
-            Deployment/Common/Scripts/Tests/test_registry_gc.py \
-            Deployment/Common/Scripts/Tests/test_registry_lock_guard.py \
-            Deployment/Common/Scripts/Tests/test_ci_payload_receipt.py \
-            Deployment/Common/Scripts/Tests/test_pull_release_payload.py \
-            Deployment/Common/Scripts/Tests/test_pin_release_payload.py \
-            Deployment/Common/Scripts/Tests/test_release_status.py \
-            Deployment/Common/Scripts/Tests/test_application_image_protection.py \
-            Deployment/Common/Scripts/Tests/test_release_settings.py \
-            Scripts/CI/tests/test_ci_report_store.py
-
-      - name: Test release status snapshots
-        run: |
-          python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_release_status.py -v
-          python3 -m unittest Deployment/LocalSingleNode/Scripts/Tests/test_release_status.py -v
-
-      - name: Test deployment target gates and CI runner profiles
-        run: python3 -m unittest Deployment/Common/Scripts/Tests/test_target_gate.py
+      - name: Test LocalCluster deployment scripts
+        run: python3 -m unittest discover -s Deployment/LocalCluster/Scripts/Tests -p 'test_*.py' -v
 
       - name: Test release identity verification
         run: bash Deployment/LocalCluster/Scripts/Tests/test-verify-release-identity.sh
@@ -263,13 +219,6 @@ jobs:
           bash Deployment/LocalCluster/Scripts/Tests/test-prune-docker-residue-low-disk.sh
           bash Deployment/Common/Scripts/Tests/test-prune-actions-runner-residue.sh
           bash Deployment/Common/Scripts/Tests/test-ensure-actions-runner-prereqs.sh
-          python3 Deployment/LocalCluster/Scripts/Tests/test_prune_ci_residue.py
-          python3 Deployment/LocalCluster/Scripts/Tests/test_runner_identity.py
-          python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_doc_slice_loader.py -v
-          python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_prepare_release_pin_root.py -v
-          python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_prepare_data_protection_vault.py -v
-          python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_read_live_release_ci_run_ids.py -v
-          python3 -m unittest Deployment/Common/Scripts/Tests/test_prune_actions_artifacts.py
 
       - name: GitHub Actions workflow lint
         run: bash Scripts/CI/run-actionlint.sh
@@ -321,7 +270,6 @@ jobs:
       - name: Audit workflow runner, cache, artifact, and report policies
         run: |
           python3 Scripts/CI/workflow_policy.py --repo-root .
-          python3 -m unittest Scripts/CI/tests/test_workflow_policy.py
 
       - name: Read Node version from the Dockerfile
         id: node-version
