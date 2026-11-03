@@ -3086,7 +3086,7 @@ require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'
 require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'SubState=running'", "connector must be running before public acceptance")
 require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'ExecMainStatus=0'", "connector process must have a successful exit status")
 require_contains("Scripts/Test-DeployedSite.ps1", "@('http', 'https')", "HTTP and HTTPS acceptance")
-require_contains("Scripts/Test-DeployedSite.ps1", "'HTTPS-cookie'", "public authentication cookie security")
+require_contains("Scripts/Test-DeployedSite.ps1", "'HTTPS-cookie'", "public account cookie security")
 for path, verify_name, acceptance_name in [
     (".github/workflows/cd-localcluster.yml", "Verify running release identity", "Run acceptance check"),
     (".github/workflows/cd-localsinglenode.yml", "Verify running release identity", "Run HTTP acceptance"),

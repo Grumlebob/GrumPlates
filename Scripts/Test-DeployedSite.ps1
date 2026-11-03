@@ -314,52 +314,34 @@ function Invoke-ReactPublicAcceptance($Anonymous, $Uri, [bool]$AccountsEnabled) 
 }
 
 function Invoke-BlazorAccountAcceptance($Uri) {
-    $registrationSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    $loginSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    $email = 'check-' + [Guid]::NewGuid().ToString('N') + '@example.invalid'
-    $password = 'Check!' + [Guid]::NewGuid().ToString('N') + 'aA9'
-    $registered = $false
-    try {
-        $script:checkName = 'Blazor'
-        $homeResponse = Request -Path '/' -Session $registrationSession -Headers @{ Accept = 'text/html' }
-        Write-Check 'Blazor' ([int]$homeResponse.StatusCode -eq 200 -and $homeResponse.Content.Contains('_framework/blazor.web')) 'Home contains Blazor script'
+    # Accounts are always on. Deployments may keep registration off, and registration needs
+    # email confirmation, so this check never creates an account (OD-6, Q12).
+    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $script:checkName = 'Blazor'
+    $homeResponse = Request -Path '/' -Session $session -Headers @{ Accept = 'text/html' }
+    Write-Check 'Blazor' ([int]$homeResponse.StatusCode -eq 200 -and $homeResponse.Content.Contains('_framework/blazor.web')) 'Home contains Blazor script'
 
-        # Registration signs in automatically. Keep its cookie solely for guaranteed cleanup.
-        $script:checkName = 'registration'
-        $registered = $true
-        $null = Form '/Account/Register' 'register' $registrationSession @{
-            'Input.Email' = $email
-            'Input.Password' = $password
-            'Input.ConfirmPassword' = $password
-        }
-        Write-Check 'registration' (Is-Authenticated $registrationSession) 'Temporary account registered'
+    $script:checkName = 'account-manage-anonymous'
+    $anonymous = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    $manage = Request -Path '/Account/Manage' -Session $anonymous -Headers @{ Accept = 'text/html' } -FollowRedirects $false
+    $location = [string]$manage.Headers['Location']
+    $signInRedirect = $location -and ([Uri]::new([Uri]($script:site + '/'), $location)).AbsolutePath -eq '/Account/Login'
+    Write-Check 'account-manage-anonymous' ([int]$manage.StatusCode -eq 302 -and $signInRedirect) 'Anonymous account page redirects to sign-in'
 
-        # A separate session proves the password login itself succeeded.
-        $script:checkName = 'login'
-        $null = Login $loginSession $email $password
-        Write-Check 'login' (Is-Authenticated $loginSession) 'Fresh session signs in'
-        Write-Check 'account-manage' (Is-Authenticated $loginSession) 'Authenticated account page returns 200'
-        if ($Uri.Scheme -eq 'https') {
-            $authCookies = @($loginSession.Cookies.GetCookies($Uri) | Where-Object { $_.HttpOnly -and $_.Name -notmatch 'Antiforgery' })
-            Write-Check 'HTTPS-cookie' ($authCookies.Count -gt 0 -and @($authCookies | Where-Object { -not $_.Secure }).Count -eq 0) 'Authentication cookies are Secure and HttpOnly'
-            Write-Check 'HTTPS-origin' ((Get-ResponseUri (Request -Path '/Account/Manage' -Session $loginSession)).GetLeftPart([System.UriPartial]::Authority) -eq $script:site) 'Authenticated navigation stays on the requested HTTPS origin'
-        }
+    # Account forms need HTTPS: their antiforgery cookie is Secure. Plain LAN HTTP checks stop here.
+    if ($Uri.Scheme -eq 'https' -or $script:forwardedProto -eq 'https') {
+        $script:checkName = 'account-login-page'
+        $loginPage = Request -Path '/Account/Login' -Session $session -Headers @{ Accept = 'text/html' }
+        Write-Check 'account-login-page' ([int]$loginPage.StatusCode -eq 200 -and $loginPage.Content -match 'name=["'']__RequestVerificationToken["'']' -and $loginPage.Content -match 'name=["'']Input\.Email["'']') 'Sign-in page renders its protected form'
+    }
+    if ($Uri.Scheme -eq 'https') {
+        # The client sends Secure cookies, so form posts and cookie checks need a real HTTPS origin.
+        $antiforgeryCookies = @($session.Cookies.GetCookies($Uri) | Where-Object { $_.Name -like '__Host-CSRF-*' })
+        Write-Check 'HTTPS-cookie' ($antiforgeryCookies.Count -gt 0 -and @($antiforgeryCookies | Where-Object { -not ($_.Secure -and $_.HttpOnly) }).Count -eq 0) 'Account cookies are Secure and HttpOnly'
         $script:checkName = 'default-admin-disabled'
         $negative = New-Object Microsoft.PowerShell.Commands.WebRequestSession
         $denied = Login $negative 'admin@admin.com' 'Admin123'
         Write-Check 'default-admin-disabled' ($denied.Content.Contains('Invalid login attempt') -and -not (Is-Authenticated $negative)) 'Published default credentials rejected'
-    } finally {
-        if ($registered) {
-            try {
-                $null = Form '/Account/Manage/DeletePersonalData' 'delete-user' $registrationSession @{ 'Input.Password' = $password }
-                $deleted = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-                $denied = Login $deleted $email $password
-                Write-Check 'test-account-deleted' ($denied.Content.Contains('Invalid login attempt') -and -not (Is-Authenticated $deleted)) 'Temporary credentials no longer work'
-            } catch {
-                Write-Check 'test-account-deleted' $false 'Temporary account cleanup failed'
-            }
-        }
-        $password = $null
     }
 }
 
