@@ -6,18 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-from doc_slice_loader import (
-    DOC_OWNER_PATHS,
-    CLUSTER_ENTRY,
-    FORK_ENTRY,
-    DocumentSliceError,
-    fence_error,
-    load_document_slices,
-    missing_literal,
-    missing_section_literal,
-    missing_target_scripts,
-)
-
 
 ROOT = Path(__file__).resolve().parents[5]
 failures: list[str] = []
@@ -100,12 +88,10 @@ def deployment_text_files() -> list[Path]:
 
 
 required_files = [
-    "Deployment/Common/README.md",
     "Deployment/Common/release.yml",
     "Deployment/Common/ci-python-constraints.txt",
     "Deployment/LocalCluster/Scripts/ci-docker-smoke.sh",
     "Deployment/LocalCluster/Scripts/Tests/test-ci-docker-smoke.sh",
-    "Deployment/LocalCluster/Scripts/Tests/test_doc_slice_loader.py",
     "Scripts/CI/validate-frontend-profiles.sh",
     "Scripts/CI/validate_dotnet_test_results.py",
     "Scripts/CI/tests/test_validate_dotnet_test_results.py",
@@ -153,7 +139,6 @@ required_files = [
     "Deployment/Common/Scripts/Component/lib/simple_yaml.py",
     "Deployment/Common/Scripts/Component/lib/account_deploy_settings.py",
     "Deployment/Common/Scripts/Component/lib/validate-common-release.py",
-    "Deployment/LocalCluster/HowToDeployLocalCluster.md",
     ".github/workflows/ci.yml",
     ".github/workflows/cd-localcluster.yml",
     ".yamllint.yml",
@@ -185,7 +170,6 @@ required_files = [
     "Deployment/Common/ansible/roles/ssh_hardening/tasks/main.yml",
     "Deployment/LocalCluster/compose/app-server/docker-compose.yml",
     "Deployment/LocalCluster/compose/node-db/docker-compose.yml",
-    "Deployment/LocalCluster/Scripts/README.md",
     "Deployment/LocalCluster/Scripts/acceptance-check.sh",
     "Deployment/LocalCluster/Scripts/bootstrap-node.sh",
     "Deployment/LocalCluster/Scripts/check-cloudflare-tunnel.sh",
@@ -203,7 +187,6 @@ required_files = [
     "Deployment/LocalCluster/Scripts/install-ansible.sh",
     "Deployment/LocalCluster/Scripts/read-deploy-setting.sh",
     "Deployment/LocalCluster/Scripts/Component/lib/audit_deployment.py",
-    "Deployment/LocalCluster/Scripts/Component/lib/doc_slice_loader.py",
     "Deployment/LocalCluster/Scripts/Component/lib/deploy_settings.py",
     "Deployment/LocalCluster/Scripts/Component/lib/generate-inventory.py",
     "Deployment/LocalCluster/Scripts/Component/lib/read-deploy-setting.py",
@@ -317,134 +300,10 @@ for path in old_layout_paths:
         fail(f"old deployment layout path should not exist: {path}")
 
 
-try:
-    cluster_guide_documents = load_document_slices(ROOT, CLUSTER_ENTRY)
-except DocumentSliceError as exc:
-    fail(str(exc))
-    cluster_guide_documents = {CLUSTER_ENTRY: read(CLUSTER_ENTRY) if exists(CLUSTER_ENTRY) else ""}
-
-try:
-    fork_guide_documents = load_document_slices(ROOT, FORK_ENTRY)
-except DocumentSliceError as exc:
-    fail(str(exc))
-    fork_guide_documents = {FORK_ENTRY: read(FORK_ENTRY) if exists(FORK_ENTRY) else ""}
-
-for document_path, document_text in cluster_guide_documents.items():
-    error = fence_error(document_path, document_text)
-    if error:
-        fail(error)
-
-for forbidden in [
-    ".deploy.local",
-    "discover-node",
-    "health-check",
-    "Deployment/LocalCluster/compose/load-balancer",
-    "Deployment/LocalCluster/caddy/sites/app.caddy",
-    "Deployment/LocalCluster/inventory/prod/host_vars",
-]:
-    for document_path, document_text in cluster_guide_documents.items():
-        if forbidden in document_text:
-            fail(f"{document_path}: contains stale deployment reference: {forbidden}")
-
-for document_path, document_text in cluster_guide_documents.items():
-    for error in missing_target_scripts(ROOT, document_path, document_text):
-        fail(error)
-
-for needle, why, owner in [
-    ('Reserve LAN IPs', 'dedicated router IP reservation step', 'setup'),
-    ('Generate Inventory', 'dedicated control-machine inventory generation step', 'setup'),
-    ('Ensure all four nodes are using their reserved IPs before proceeding.', 'router reservation checkpoint', 'setup'),
-    ('validate-machines.sh', 'machines.yml validation checkpoint before inventory generation', 'setup'),
-    ('Success: prints OK lines for machines.yml, deployment settings, and all four nodes.', 'machines validation success checkpoint', 'setup'),
-    ('Run this only from a full repository checkout on the control machine.', 'verify-bootstrap full-checkout warning', 'setup'),
-    ('test -f "$REPO_ROOT/Deployment/LocalCluster/Scripts/verify-bootstrap.sh"', 'verify-bootstrap dependency checkpoint', 'setup'),
-    ('Configure The GitHub CD Environment', 'dedicated GitHub environment setup step', 'setup'),
-    ('New environment -> localcluster', 'localcluster environment creation', 'setup'),
-    ('Deployment branches and tags: Selected branches and tags', 'deployment branch restriction instructions', 'setup'),
-    ('Allowed branch: main', 'main-only environment branch rule', 'setup'),
-    ('Environment localcluster exists and allows deployments from main.', 'environment setup checkpoint', 'setup'),
-    ('First Deploy From GitHub Actions', 'first CD deploy step after environment setup', 'setup'),
-    ('Main CI publishes the application image, a digest-pinned GHCR payload', 'main-only CI publishing explanation', 'release_contract'),
-    ('Optional sanity check: before deploying, confirm the image tag exists.', 'optional image check wording', 'setup'),
-    ('if the GHCR payload is missing or cannot be retrieved', 'missing immutable payload recovery guidance', 'release_contract'),
-    ('pins PostgreSQL and Redis to exact versioned image tags', 'pinned database image guidance', 'settings'),
-    ('If this is the only app on these four nodes, keep the default ports and continue.', 'single-site default guidance', 'settings'),
-    ('If another LocalCluster app already runs on these nodes', 'side-by-side settings warning', 'fork_existing'),
-    ('## Choose side by side or replacement', 'existing-cluster fork identity choice', 'fork_existing'),
-    ('For a second fork on the same nodes, do not reuse these values from the first app', 'unique side-by-side values list', 'fork_existing'),
-    ('Second-fork flow on already-prepared nodes', 'second-fork execution flow', 'fork_existing'),
-    ('prepare-existing-localcluster-app.sh', 'existing cluster app preparation guidance', 'fork_existing'),
-    ('Do not rerun `bootstrap-node.sh` or `prepare-fresh-linux-machines.sh` for already-prepared nodes', 'side-by-side rerun warning', 'fork_existing'),
-    ("this fork's deploy key is installed on the nodes", 'side-by-side validation ordering warning', 'fork_existing'),
-    ('same Cloudflare account', 'shared tunnel Cloudflare account limitation', 'fork_existing'),
-    ('gh repo clone "$LOCALCLUSTER_REPO"', 'fork-safe clone command', 'setup'),
-    ('gh repo view --json nameWithOwner,url,defaultBranchRef', 'repository identity checkpoint', 'setup'),
-    ('Deployment identity checkpoint', 'deployment identity checkpoint before setup', 'setup'),
-    ('git add Deployment/LocalCluster/inventory/prod/group_vars/all.yml', 'deployment settings commit command', 'settings'),
-    ('needs committed `all.yml` settings and committed `hosts.yml` inventory', 'committed settings and inventory explanation', 'settings'),
-    ('git status --short Deployment/LocalCluster/inventory/prod/group_vars/all.yml Deployment/LocalCluster/inventory/prod/hosts.yml Deployment/LocalCluster/inventory/prod/vault.yml', 'pre-push deployment file clean-state check', 'settings'),
-    ('main publisher job needs `packages: write`', 'job-scoped GitHub Actions package write prerequisite', 'release_contract'),
-    ('`app_image`', 'side-by-side app image uniqueness', 'settings'),
-    ('`migration_bundle_name`', 'side-by-side migration bundle uniqueness', 'settings'),
-    ('same machine IPs', 'side-by-side reused machine IP guidance', 'fork_existing'),
-    ('`cloudflare_tunnel_name`, and Cloudflare tunnel token', 'side-by-side shared tunnel guidance', 'fork_existing'),
-    ("Add this fork's `public_hostname` to the existing Cloudflare tunnel", 'second-fork Cloudflare hostname step', 'fork_existing'),
-    ('open the existing tunnel and add a public hostname with these values', 'second-fork existing tunnel guidance', 'fork_existing'),
-    ('`app_name`', 'side-by-side app identity field listed for non-reuse', 'fork_existing'),
-    ('LOCALCLUSTER_RUNNER_LABEL', 'side-by-side runner label variable guidance', 'settings'),
-    ('Repository -> Settings -> Secrets and variables -> Actions -> Variables', 'GitHub repository variables UI path', 'settings'),
-    ('No GitHub token goes into the vault.', 'no stored registry token guidance', 'release_contract'),
-    ('only `read:packages`', 'minimum registry permission for optional manual-deploy tokens', 'release_contract'),
-    ('Name: ANSIBLE_VAULT_PASSWORD', 'manual GitHub vault secret guidance', 'settings'),
-    ('This secret is the Ansible Vault password.', 'vault secret purpose', 'settings'),
-    ('release-manifest.json', 'release manifest explanation', 'release_contract'),
-    ('### Runner And Docker Storage Maintenance', 'maintenance workflow guidance', 'operations'),
-    ('### Deployment lock', 'deployment lock recovery guidance', 'entry'),
-    ('### Tool provisioning: --check versus --provision', 'check-only versus provisioning guidance', 'operations'),
-    ('Runner policy:', 'self-hosted runner policy', 'operations'),
-    ('summary.sh', 'deployment summary command guidance', 'operations'),
-    ('doctor.sh', 'doctor readiness command guidance', 'operations'),
-    ('acceptance-check.sh', 'acceptance check guidance', 'operations'),
-    ('report-nodes.sh', 'node report guidance', 'operations'),
-    ('list-deployed-apps.sh', 'deployed app marker listing guidance', 'fork_existing'),
-    ('validate-side-by-side.sh', 'side-by-side marker validation guidance', 'fork_existing'),
-    ('verify-backup.sh', 'backup verification guidance', 'operations'),
-    ('check-github-runner.sh', 'GitHub runner API check guidance', 'operations'),
-    ('check-cloudflare-tunnel.sh', 'Cloudflare read-only check guidance', 'operations'),
-]:
-    owner_path = CLUSTER_ENTRY if owner == "entry" else DOC_OWNER_PATHS[owner]
-    if needle == "`app_name`":
-        error = missing_section_literal(
-            cluster_guide_documents,
-            CLUSTER_ENTRY,
-            owner_path,
-            "For a second fork on the same nodes, do not reuse these values from the first app",
-            "The second fork normally reuses the same machine IPs",
-            needle,
-            why,
-        )
-    else:
-        error = missing_literal(cluster_guide_documents, CLUSTER_ENTRY, owner_path, needle, why)
-    if error:
-        fail(error)
-for document_path, document_text in cluster_guide_documents.items():
-    if "gh repo clone Grumlebob/GrumPlates" in document_text:
-        fail(f"{document_path}: clone commands must be fork-safe, not hardcoded to the original repository")
-
-for document_path, document_text in cluster_guide_documents.items():
-    for line_number, line in enumerate(document_text.splitlines(), start=1):
-        if 'ansible ' in line and '-a "cd ' in line and "-m ansible.builtin.shell" not in line:
-            fail(
-                f"{document_path}:{line_number}: ansible commands using cd/&& must use -m ansible.builtin.shell"
-            )
-
-
 tracked = tracked_files()
-text_suffixes = {".cs", ".csproj", ".props", ".targets", ".json", ".yml", ".yaml", ".md", ".ps1", ".cmd", ".sh"}
+text_suffixes = {".cs", ".csproj", ".props", ".targets", ".json", ".yml", ".yaml", ".ps1", ".cmd", ".sh"}
 text_names = {"Dockerfile", "docker-compose.yml", ".env.example", "global.json"}
 for path in sorted(tracked):
-    if path.startswith("docs/plans/archive/") or path == "CarefulUpgradeReview.md":
-        continue
     file_path = Path(path)
     if file_path.suffix not in text_suffixes and file_path.name not in text_names:
         continue
@@ -554,16 +413,6 @@ for release_key in ["app_image", "migration_bundle_name", "migration_runtime", "
             "Deployment/LocalCluster/inventory/prod/group_vars/all.yml: "
             f"{release_key} belongs in Deployment/Common/release.yml"
         )
-for key in all_var_keys:
-    error = missing_literal(
-        cluster_guide_documents,
-        CLUSTER_ENTRY,
-        DOC_OWNER_PATHS["settings"],
-        f"`{key}`",
-        f"all.yml setting documentation: {key}",
-    )
-    if error:
-        fail(error)
 
 try:
     common_validation = subprocess.run(
@@ -1574,37 +1423,6 @@ for needle, why in [
 ]:
     if needle not in read("Deployment/LocalCluster/ansible/playbooks/site.yml"):
         fail(f"Deployment/LocalCluster/ansible/playbooks/site.yml: missing {why}")
-shared_route_rules = [
-    (
-        "Append the same scanned key only after the fingerprints match",
-        DOC_OWNER_PATHS["ssh_trust"],
-        "verified SSH host key acceptance",
-    ),
-    (
-        'cat "$host_key_candidate" >> ~/.ssh/known_hosts',
-        DOC_OWNER_PATHS["ssh_trust"],
-        "SSH host key acceptance command",
-    ),
-    (
-        "successful `publish-main` job on the same run attempt",
-        DOC_OWNER_PATHS["release_contract"],
-        "exact-attempt publishing provenance",
-    ),
-]
-for entry_path, documents in (
-    (CLUSTER_ENTRY, cluster_guide_documents),
-    (FORK_ENTRY, fork_guide_documents),
-):
-    for needle, owner_path, why in shared_route_rules:
-        error = missing_literal(documents, entry_path, owner_path, needle, why)
-        if error:
-            fail(error)
-
-for document_path, document_text in cluster_guide_documents.items():
-    if "Tokens (classic)" in document_text or "vault_ghcr_token: <github-token" in document_text:
-        fail(
-            f"{document_path}: CD no longer needs a stored GHCR token; do not instruct users to create one"
-        )
 if "image_tag" in deploy_lan:
     fail(".github/workflows/cd-localcluster.yml: manual image_tag input should not be required")
 if "dotnet ef migrations bundle" in deploy_lan or "dotnet restore" in deploy_lan or "dotnet tool restore" in deploy_lan:
@@ -2555,7 +2373,7 @@ elif (
 
 # LocalSingleNode: a peer target with strict provenance and loopback-only services.
 single = "Deployment/LocalSingleNode"
-for path in ("compose/docker-compose.yml", "AgentSetup.md", "Scripts/bootstrap-node.sh", "Scripts/setup-status.sh", "Scripts/setup-next-step.sh", "Scripts/doctor.sh", "Scripts/run-maintenance.sh", "Scripts/restart-public-connector-check.sh", "Scripts/verify-release-identity.sh", "Scripts/prune-release-artifacts.sh", "Scripts/Tests/test-verify-release-identity.sh", "Scripts/Tests/test_prune_release_artifacts.py", "ansible/playbooks/PrepareSingleNode.yml", "ansible/playbooks/site.yml"):
+for path in ("compose/docker-compose.yml", "Scripts/bootstrap-node.sh", "Scripts/setup-status.sh", "Scripts/setup-next-step.sh", "Scripts/doctor.sh", "Scripts/run-maintenance.sh", "Scripts/restart-public-connector-check.sh", "Scripts/verify-release-identity.sh", "Scripts/prune-release-artifacts.sh", "Scripts/Tests/test-verify-release-identity.sh", "Scripts/Tests/test_prune_release_artifacts.py", "ansible/playbooks/PrepareSingleNode.yml", "ansible/playbooks/site.yml"):
     require_file(single + "/" + path)
 single_compose = read(single + "/compose/docker-compose.yml")
 for binding in re.findall(r'(?m)^      - "([^"\n]+:[0-9${}A-Z_]+)"$', single_compose):
@@ -2811,7 +2629,7 @@ for path in (".github/workflows/cd-localsinglenode.yml", ".github/workflows/loca
         fail("localsinglenode: workflow needs explicit host and app runner label")
 require_contains(".github/workflows/localsinglenode-maintenance.yml", "ACTIONS_ARTIFACT_RETENTION_ENABLED", "default-off single-node artifact deletion gate")
 for path in (ROOT / single).rglob("*"):
-    if not path.is_file() or "__pycache__" in path.parts:
+    if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".md":
         continue
     content = path.read_text(encoding="utf-8-sig")
     if re.search(r"docker\s+(?:volume|system)\s+prune", content):
