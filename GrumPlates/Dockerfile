@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.24
 
-FROM node:26.12.1-bookworm-slim AS react-dependencies
+FROM node:26.13.0-bookworm-slim AS react-dependencies
 WORKDIR /src/GrumPlates.React
 COPY GrumPlates.React/package.json GrumPlates.React/package-lock.json GrumPlates.React/.npmrc ./
 COPY GrumPlates.React/scripts/patch-redocly-minimatch.mjs ./scripts/patch-redocly-minimatch.mjs
