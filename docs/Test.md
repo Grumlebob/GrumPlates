@@ -20,7 +20,7 @@ Publication, deployment and registry retention share a non-cancelling `queue: ma
 
 CI stores full TRX and React unit-test reports, plus available browser screenshots and traces, on the self-hosted runner. Packaged smoke TRX files use the same terminal job directory. Routine reports do not use GitHub artifact storage. Each terminal job summary reports test totals, the runner name, a retrieval command, and observed report-store size. Run that command on the same runner after checking out the reported commit. Reports expire after 3 days for successful jobs and 7 days for failed jobs; pins and active-reader locks protect selected reports. The LocalSingleNode maintenance workflow reports store usage and prunes expired reports under the shared deployment lock.
 
-CI may use optional native/desktop runner profiles; native mode remains the default. Profile mode verifies the selected runner and every configured workspace, Docker, report and temporary filesystem root. The native deployment-volume reserve remains active for native jobs. See [CI runner profiles](CI/RunnerProfiles.md) before enabling the route. The stable `build-test-push` result gate also rejects skipped runner selection, validation or required main publication.
+CI jobs run on the runner labelled by the `CI_RUNNER_LABEL` repository variable. Each job first checks that label's format and that the runner's hostname matches `CI_RUNNER_HOST`. The stable `build-test-push` result gate rejects skipped or failed validation, and skipped or failed publication on `main`.
 
 ## Local Gate
 
@@ -32,7 +32,7 @@ Run every command successfully before pushing non-Markdown changes. Use Linux or
 git diff --check
 dotnet restore GrumPlates.sln
 python3 -m unittest Scripts/CI/tests/test_frontend_profile.py Scripts/CI/tests/test_frontend_release.py Scripts/CI/tests/test_ci_report_store.py
-python3 -m unittest Scripts/CI/tests/test_runner_profiles.py Scripts/CI/tests/test_select_ci_runner.py Scripts/CI/tests/test_verify_ci_runner.py Scripts/CI/tests/test_ci_runner_routing_workflow.py Scripts/CI/tests/test_require_ci_results.py
+python3 -m unittest Scripts/CI/tests/test_require_ci_results.py
 python3 -m unittest Scripts/CI/tests/test_workflow_policy.py
 python3 Scripts/CI/workflow_policy.py --repo-root .
 dotnet format GrumPlates.sln --verify-no-changes --verbosity minimal --no-restore

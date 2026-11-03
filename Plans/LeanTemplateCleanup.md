@@ -828,7 +828,7 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P03-C | Complete | https://github.com/Grumlebob/GrumPlates/pull/419 (one PR for P03-B to P03-E, Q14; head `b835c474`; full local gate PASS on `e2aab6a1` except a stale smoke fixture, fixed and re-gated on `b835c474`) merged `55381b3a`, main CI 41697791997 success. |
 | P03-D | Complete | https://github.com/Grumlebob/GrumPlates/pull/419 (one PR for P03-B to P03-E, Q14; head `b835c474`; full local gate PASS on `e2aab6a1` except a stale smoke fixture, fixed and re-gated on `b835c474`) merged `55381b3a`, main CI 41697791997 success. |
 | P03-E | Complete | https://github.com/Grumlebob/GrumPlates/pull/419 (one PR for P03-B to P03-E, Q14; head `b835c474`; full local gate PASS on `e2aab6a1` except a stale smoke fixture, fixed and re-gated on `b835c474`) merged `55381b3a`, main CI 41697791997 success. |
-| P04 | Pending | |
+| P04 | Complete | https://github.com/Grumlebob/GrumPlates/pull/421 (head `bdee56c4`; full local gate PASS on `7d730456`, same code tree) merged `acc35c79`, main CI 41707778000. |
 | P05 | Pending | |
 | P06 | Pending | |
 | P07 | Pending | |

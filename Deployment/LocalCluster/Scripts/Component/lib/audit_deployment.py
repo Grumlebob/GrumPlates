@@ -138,16 +138,8 @@ required_files = [
     "Scripts/CI/tests/test_migration_staging_artifact.py",
     "Scripts/CI/ci_report_store.py",
     "Scripts/CI/tests/test_ci_report_store.py",
-    "Scripts/CI/runner_profiles.py",
-    "Scripts/CI/select_ci_runner.py",
-    "Scripts/CI/verify_ci_runner.py",
     "Scripts/CI/require_ci_results.py",
-    "Scripts/CI/tests/test_runner_profiles.py",
-    "Scripts/CI/tests/test_select_ci_runner.py",
-    "Scripts/CI/tests/test_verify_ci_runner.py",
-    "Scripts/CI/tests/test_ci_runner_routing_workflow.py",
     "Scripts/CI/tests/test_require_ci_results.py",
-    ".github/workflows/select-ci-runner.yml",
     "Deployment/Common/Scripts/install-ansible.sh",
     "Deployment/Common/Scripts/prune-actions-artifacts.sh",
     "Deployment/Common/Scripts/Component/lib/find-successful-ci-run.py",
@@ -951,7 +943,7 @@ for needle, why in [
 ci = read(".github/workflows/ci.yml")
 for needle, why in [
     ("github.event.pull_request.head.repo.full_name == github.repository", "external-fork pull request guard before self-hosted runner allocation"),
-    ("localcluster-books", "app-specific self-hosted runner label fallback"),
+    ('runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]', "configured CI runner label"),
     ("Verify CI runner", "explicit CI runner verification"),
     ("Ensure self-hosted runner prerequisites", "node-main prerequisite bootstrap step"),
     ("RUNNER_TEMP", "temporary self-hosted runner tool install directories"),
@@ -1013,7 +1005,6 @@ for needle, why in [
     ("bash Deployment/LocalCluster/Scripts/ci-docker-smoke.sh", "Docker and browser smoke"),
     ("bash Deployment/LocalCluster/Scripts/Tests/test-ci-docker-smoke.sh", "Docker smoke resource lifecycle test"),
     ("python3 -m unittest Scripts/CI/tests/test_frontend_profile.py", "frontend profile resolver and MSBuild validation tests"),
-    ("Scripts/CI/tests/test_ci_runner_routing_workflow.py", "native/desktop CI routing workflow fixtures"),
     ("Scripts/CI/tests/test_require_ci_results.py", "strict stable CI result-gate tests"),
     ("python3 -m unittest Scripts/CI/tests/test_deployed_site_acceptance.py -v", "trusted profile split and read-only React HTTP acceptance tests"),
     ("python3 Scripts/Frontend/resolve_frontend_profile.py", "single validated frontend profile resolver"),
@@ -1342,10 +1333,10 @@ ci_jobs = {
     for index, match in enumerate(ci_job_matches)
 }
 allowed_ci_jobs = {
-    "select-validation", "validate", "select-publication", "publish-main",
+    "validate", "publish-main",
     "notify-dependabot-automerge", "ci-result-gate",
 }
-for required_job in ("select-validation", "validate", "select-publication", "publish-main", "ci-result-gate"):
+for required_job in ("validate", "publish-main", "ci-result-gate"):
     if required_job not in ci_jobs:
         fail(f".github/workflows/ci.yml: missing required job {required_job}")
 if not set(ci_jobs) <= allowed_ci_jobs:
@@ -1395,36 +1386,31 @@ if "validate" in ci_jobs and "publish-main" in ci_jobs:
     publisher_gate = workflow_step("publish-main", "Validate required CI results")
     if (
         "    name: validate" not in validate_job
-        or "needs: select-validation" not in validate_job
-        or "needs.select-validation.result == 'success'" not in validate_job
-        or "needs.select-validation.outputs.runner_label" not in validate_job
+        or "    needs:" in validate_job
+        or 'runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]' not in validate_job
         or "    name: publish-main" not in publisher_job
-        or "needs: [validate, select-publication]" not in publisher_job
-        or "needs.select-publication.result == 'success'" not in publisher_job
-        or "needs.select-publication.outputs.runner_label" not in publisher_job
+        or "needs: [validate]" not in publisher_job
+        or 'runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]' not in publisher_job
         or "!cancelled()" not in publisher_job
         or "needs.validate.result == 'success'" not in publisher_job
         or publisher_job.find("Validate required CI results") > publisher_job.find("- name: Checkout")
         or "VALIDATE_RESULT: ${{ needs.validate.result }}" not in publisher_gate
-        or "PUBLICATION_SELECTION_RESULT: ${{ needs.select-publication.result }}" not in publisher_gate
         or "Main release requires validate=success" not in publisher_gate
-        or "Main release requires a fresh publication selection" not in publisher_gate
         or "Unexpected CI event/ref" not in publisher_gate
-        or "needs: [select-validation, validate, select-publication, publish-main]" not in result_gate_job
+        or "needs: [validate, publish-main]" not in result_gate_job
         or "always()" not in result_gate_job
         or "'build-test-push'" not in result_gate_job
         or "python3 Scripts/CI/require_ci_results.py" not in result_gate_job
     ):
-        fail(".github/workflows/ci.yml: selected validation/publication and the stable result gate must fail closed")
-    for job_id, selection_job in (("validate", "select-validation"), ("publish-main", "select-publication")):
-        job = ci_jobs[job_id]
+        fail(".github/workflows/ci.yml: validation, publication and the stable result gate must fail closed")
+    for job_id in ("validate", "publish-main"):
+        runner_step = workflow_step(job_id, "Verify CI runner")
         if (
-            f"needs.{selection_job}.outputs.routing_enabled == 'true'" not in job
-            or "Scripts/CI/verify_ci_runner.py" not in job
-            or "inspect_capacity(profile)" not in read("Scripts/CI/verify_ci_runner.py")
-            or f"needs.{selection_job}.outputs.pool != 'desktop'" not in job
+            "CI_RUNNER_LABEL: ${{ vars.CI_RUNNER_LABEL }}" not in runner_step
+            or "${CI_RUNNER_LABEL:?Set the CI_RUNNER_LABEL repository variable}" not in runner_step
+            or "^[A-Za-z0-9][A-Za-z0-9_.-]*$" not in runner_step
         ):
-            fail(f".github/workflows/ci.yml: {job_id} must verify the selected profile and preserve native capacity admission")
+            fail(f".github/workflows/ci.yml: {job_id} must check the CI_RUNNER_LABEL value before it runs")
     if "docker/login-action@" in validate_job or "docker push" in validate_job:
         fail(".github/workflows/ci.yml: validate must not log into GHCR or push images")
     if "dotnet ef migrations bundle" not in publisher_job:
@@ -2393,7 +2379,6 @@ if not workflow_paths:
 # deployment step, and free CodeQL exists only for public repositories, so it is exempt from the self-hosted rules
 # above and held to its own exact rule below.
 CODEQL_WORKFLOW = ".github/workflows/codeql.yml"
-CI_SELECTOR_WORKFLOW = ".github/workflows/select-ci-runner.yml"
 
 for workflow in workflow_paths:
     if workflow == CODEQL_WORKFLOW:
@@ -2412,31 +2397,17 @@ for workflow in workflow_paths:
     if has_runs_on:
         single_node_workflow = "localsinglenode" in Path(workflow).name
         fallback = "localsinglenode-books" if single_node_workflow else "localcluster-books"
-        require_contains(workflow, fallback, "app-specific self-hosted runner fallback")
+        if workflow != ".github/workflows/ci.yml":
+            require_contains(workflow, fallback, "app-specific self-hosted runner fallback")
         if workflow == ".github/workflows/ci.yml":
-            fallback = "vars.CI_RUNNER_LABEL || vars.LOCALCLUSTER_RUNNER_LABEL || 'localcluster-books'"
-            require_contains(workflow, fallback, "native CI label with its existing fallback")
-            for selection_job in ("select-validation", "select-publication"):
-                body = ci_jobs.get(selection_job, "")
-                if "uses: ./.github/workflows/select-ci-runner.yml" not in body:
-                    fail(f"{workflow}: {selection_job} must use the reviewed native-only selector")
-            for job_id, selector in (("validate", "select-validation"), ("publish-main", "select-publication")):
-                body = ci_jobs.get(job_id, "")
-                runner_line = re.search(r"(?m)^    runs-on:.*$", body)
-                if runner_line is None or f"needs.{selector}.outputs.runner_label" not in runner_line.group(0):
-                    fail(f"{workflow}: {job_id} must use only its exact selector output")
-                if f"needs.{selector}.result == 'success'" not in body:
-                    fail(f"{workflow}: {job_id} must require successful runner selection")
-                if "Scripts/CI/verify_ci_runner.py" not in body or "Verify legacy CI runner" not in body:
-                    fail(f"{workflow}: {job_id} must verify selected profiles and retain exact native host checks")
-                if f"needs.{selector}.outputs.pool != 'desktop'" not in body:
-                    fail(f"{workflow}: {job_id} must keep native deployment-volume admission and skip it only for desktop")
-            for job_id, step_name in (("notify-dependabot-automerge", "Verify CI runner"),
+            for job_id, step_name in (("validate", "Verify CI runner"),
+                                      ("publish-main", "Verify CI runner"),
+                                      ("notify-dependabot-automerge", "Verify CI runner"),
                                       ("ci-result-gate", "Verify native CI result-gate runner")):
                 body = ci_jobs.get(job_id, "")
                 runner_line = re.search(r"(?m)^    runs-on:.*$", body)
-                if runner_line is None or fallback not in runner_line.group(0):
-                    fail(f"{workflow}: {job_id} must stay on the configured native CI route")
+                if runner_line is None or runner_line.group(0).strip() != 'runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]':
+                    fail(f"{workflow}: {job_id} must run on the configured CI runner label")
                 profile = re.search(rf"(?ms)^      - name: {re.escape(step_name)}\n.*?(?=^      - name: |\Z)", body)
                 if profile is None or any(needle not in profile.group(0) for needle in (
                     "CI_RUNNER_HOST: ${{ vars.CI_RUNNER_HOST }}",
@@ -2463,19 +2434,6 @@ for workflow in workflow_paths:
                     'test "$(hostname)" = "$CI_RUNNER_HOST"',
                 )):
                     fail(f"{workflow}: auto-merge must verify the configured native CI host")
-        elif workflow == CI_SELECTOR_WORKFLOW:
-            require_contains(workflow, "vars.CI_RUNNER_LABEL || vars.LOCALCLUSTER_RUNNER_LABEL || 'localcluster-books'", "native-only selector runner fallback")
-            for needle, why in (
-                ("Verify legacy native selector", "exact legacy native host verification"),
-                ("Verify configured native selector", "profile-based native selector verification"),
-                ("actions/create-github-app-token@", "repository-scoped inventory token"),
-                ("permission-administration: read", "read-only runner inventory permission"),
-                ("owner: ${{ inputs.repository_owner }}", "generic repository owner scope"),
-                ("repositories: ${{ inputs.repository_name }}", "single-repository token scope"),
-                ("continue-on-error: true", "native fallback when inventory token creation is unavailable"),
-                ("[A-Za-z0-9_.-]*", "safe legacy label output validation"),
-            ):
-                require_contains(workflow, needle, why)
         elif single_node_workflow:
             require_contains(workflow, "Verify the intended native node", "explicit native deployment host verification")
             if workflow == ".github/workflows/localsinglenode-readiness.yml":

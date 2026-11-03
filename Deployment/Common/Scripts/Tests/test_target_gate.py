@@ -82,15 +82,14 @@ class CiRunnerProfileTests(unittest.TestCase):
             runner_lines = re.findall(r"(?m)^    runs-on:.*$", text)
             fallback = "vars.CI_RUNNER_LABEL || vars.LOCALCLUSTER_RUNNER_LABEL || 'localcluster-books'"
             if name == "ci.yml":
-                self.assertEqual(4, len(runner_lines))
-                self.assertEqual(2, sum(fallback in line for line in runner_lines))
-                self.assertEqual(1, sum("needs.select-validation.outputs.runner_label" in line for line in runner_lines))
-                self.assertEqual(1, sum("needs.select-publication.outputs.runner_label" in line for line in runner_lines))
+                self.assertTrue(runner_lines)
+                self.assertTrue(all(line.strip() == 'runs-on: [self-hosted, linux, x64, "${{ vars.CI_RUNNER_LABEL }}"]'
+                                    for line in runner_lines))
             else:
                 self.assertTrue(runner_lines)
                 self.assertTrue(all(fallback in line for line in runner_lines))
             for match in re.finditer(
-                r"(?ms)^      - name: (?:Verify legacy CI runner|Verify CI runner|Verify native CI result-gate runner)\n.*?(?=^      - name: |\Z)",
+                r"(?ms)^      - name: (?:Verify CI runner|Verify native CI result-gate runner)\n.*?(?=^      - name: |\Z)",
                 text,
             ):
                 count += 1
@@ -102,7 +101,7 @@ class CiRunnerProfileTests(unittest.TestCase):
                 yield name, "\n".join(line[10:] for line in script.splitlines() if line.startswith("          "))
         self.assertEqual(count, 5)
 
-    def check_host(self, expected, actual, succeeds):
+    def check_host(self, expected, actual, succeeds, label="runner-label"):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for name, content in (("hostname", '#!/bin/sh\nprintf "%s\\n" "$FIXTURE_HOST"\n'),
@@ -111,10 +110,13 @@ class CiRunnerProfileTests(unittest.TestCase):
                 stub.write_text(content)
                 stub.chmod(0o755)
             for name, script in self.profiles():
+                if label != "runner-label" and "CI_RUNNER_LABEL" not in script:
+                    continue
                 with self.subTest(workflow=name, expected=expected, actual=actual):
                     result = subprocess.run(["bash", "-euo", "pipefail", "-c", script],
                                             env={**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"],
                                                  "CI_RUNNER_HOST": expected, "FIXTURE_HOST": actual,
+                                                 "CI_RUNNER_LABEL": label,
                                                  "RUNNER_OS": "Linux", "GITHUB_WORKSPACE": directory},
                                             capture_output=True, text=True, check=False)
                     self.assertEqual(result.returncode == 0, succeeds, result.stdout + result.stderr)
@@ -130,6 +132,10 @@ class CiRunnerProfileTests(unittest.TestCase):
 
     def test_empty_host(self):
         self.check_host("", "runner-b", False)
+
+    def test_runner_label_must_be_set_and_safe(self):
+        for label in ("", "bad label", "-leading", "label;x"):
+            self.check_host("runner-a", "runner-a", False, label=label)
 
 
 if __name__ == "__main__":
