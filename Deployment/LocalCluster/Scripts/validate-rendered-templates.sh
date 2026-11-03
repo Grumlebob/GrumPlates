@@ -24,6 +24,7 @@ except ImportError as exc:  # pragma: no cover - exercised in CI if dependency i
 
 
 ROOT = Path(sys.argv[1])
+NODE_IMAGE = re.search(r"^FROM (node:[0-9]+\.[0-9]+\.[0-9]+-bookworm-slim)", (ROOT / "GrumPlates/Dockerfile").read_text(encoding="utf-8"), re.M).group(1)
 JINJA = Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
 
 
@@ -165,7 +166,7 @@ def assert_runtime_account_environment(folder: Path, expected: dict[str, str]) -
             {
                 "services": {
                     "verify": {
-                        "image": "node:26.12.1-bookworm-slim",
+                        "image": NODE_IMAGE,
                         "network_mode": "none",
                         "env_file": [{"path": "./.env", "format": "raw"}],
                         "command": ["node", "-e", node_script],
