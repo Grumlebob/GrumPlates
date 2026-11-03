@@ -1,20 +1,8 @@
 [
   {
-    "id": "20260525172002_InitialTemplateSchema",
-    "name": "InitialTemplateSchema",
-    "safeName": "InitialTemplateSchema",
-    "applied": null
-  },
-  {
-    "id": "20260526083400_UserOwnedBooks",
-    "name": "UserOwnedBooks",
-    "safeName": "UserOwnedBooks",
-    "applied": null
-  },
-  {
-    "id": "20260528104203_NormalizeBooksForAuthorBooks",
-    "name": "NormalizeBooksForAuthorBooks",
-    "safeName": "NormalizeBooksForAuthorBooks",
+    "id": "20261103193952_InitialSchema",
+    "name": "InitialSchema",
+    "safeName": "InitialSchema",
     "applied": null
   }
 ]
