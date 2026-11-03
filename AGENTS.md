@@ -45,6 +45,8 @@ Portable rules for people and coding agents working in this repository. Machine-
 - Keep one purposeful recovery/evidence set. Verify required bundles can restore their refs; a recorded SHA alone is not a backup. Historical diagnostic logs or screenshots with no remaining purpose may be removed after review. Preserve original user inputs, keys and operational data, and validate exact absolute paths and ancestor reparse boundaries before filesystem removal.
 - Invoke scripts noninteractively and inspect background failures promptly. If an owned command unexpectedly enters a REPL or repeats an error, stop only that exact verified failed task and retain a bounded diagnostic sample. Do not leave failed log writers running or replace cleanup with another whole-checkout archive. The primary executor owns deletion/integration decisions; read-only inventory, comparison and drafts can be delegated.
 
+- Inspect actual contents even under `bin`, `obj`, or `.venv`: these folders can contain original documents, private inputs, or editable package mappings. Preserve those inputs before discarding reproducible output.
+
 ## Shared deployment hosts
 
 - LocalCluster and LocalSingleNode hosts can run several apps. Host-level services (Docker, Caddy, cloudflared, the deployment lock) are shared: change them only through the deployment scripts, and only remove resources you can prove this repository owns.
