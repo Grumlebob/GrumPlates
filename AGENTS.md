@@ -41,6 +41,9 @@ Portable rules for people and coding agents working in this repository. Machine-
 - Archive unique required notes/evidence outside the checkout and verify SHA-256. Do not archive whole checkouts or reproducible build output. Preserve private inputs, keys and other sessions' edits.
 - Record each deleted branch's full SHA in its plan or PR. Run `git worktree remove` from another checkout; resolve refusals without force or broad recursive deletion.
 - Verified routine cleanup needs no additional approval, including finished tasks from earlier sessions. Fast-forward primary `main` when clean and idle. Report each retained task worktree with its concrete owner or dependency; age alone is not proof.
+- Apply these checks to human, Claude, Codex and unknown-origin copies alike. Resolve routine leftovers using content, ownership and recovery proof; do not keep a completed generated workspace merely because its creator is unavailable. Preserve useful unfinished work compactly with a concrete next action when immediate integration is inappropriate.
+- Keep one purposeful recovery/evidence set. Verify required bundles can restore their refs; a recorded SHA alone is not a backup. Historical diagnostic logs or screenshots with no remaining purpose may be removed after review. Preserve original user inputs, keys and operational data, and validate exact absolute paths and ancestor reparse boundaries before filesystem removal.
+- Invoke scripts noninteractively and inspect background failures promptly. If an owned command unexpectedly enters a REPL or repeats an error, stop only that exact verified failed task and retain a bounded diagnostic sample. Do not leave failed log writers running or replace cleanup with another whole-checkout archive. The primary executor owns deletion/integration decisions; read-only inventory, comparison and drafts can be delegated.
 
 ## Shared deployment hosts
 
