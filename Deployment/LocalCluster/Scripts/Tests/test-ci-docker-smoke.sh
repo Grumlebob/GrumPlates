@@ -119,11 +119,7 @@ if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
       printf 'HTTP/1.1 200 OK\r\nCache-Control: public,max-age=31536000,immutable\r\n\r\n'
       ;;
     */api/auth/login)
-      if [[ "$url" == https://* ]]; then
-        printf 'HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\n\r\n'
-      else
-        printf '\n404'
-      fi
+      printf 'HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\n\r\n'
       ;;
     */api/auth|*/api/auth/session|*/api/auth/not-a-real-operation|*/Account|*/assets/missing.js) printf '\n404' ;;
     */books|*/books/author/example)
