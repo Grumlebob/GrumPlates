@@ -499,7 +499,7 @@ else
   cd "$REPO_ROOT"
   pwsh -NoProfile -File "$REPO_ROOT/Scripts/Test-DeployedSite.ps1" \
     -FrontendProfile "$FRONTEND_PROFILE" -AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE" \
-    -BaseUrl "$base_url"
+    -ForwardedProto https -BaseUrl "$base_url"
   echo "Blazor HTTP smoke passed"
 
   postgres_host_port="$(docker port "$postgres" 5432/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
