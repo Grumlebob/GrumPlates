@@ -55,6 +55,7 @@ postgres="${APP_NAME}-ci-postgres-${session}"
 redis="${APP_NAME}-ci-redis-${session}"
 web="${APP_NAME}-ci-web-${session}"
 web_mail="${APP_NAME}-ci-web-mail-${session}"
+web_tls="${APP_NAME}-ci-web-tls-${session}"
 smtp="${APP_NAME}-ci-smtp-${session}"
 fixture_dir=""
 dp_cert_dir=""
@@ -84,15 +85,16 @@ cleanup() {
   if [[ "$status" -ne 0 ]]; then
     owned_container "$web" && docker logs --tail 200 --since 10m "$web" || true
     owned_container "$web_mail" && docker logs --tail 200 --since 10m "$web_mail" || true
+    owned_container "$web_tls" && docker logs --tail 200 --since 10m "$web_tls" || true
     owned_container "$smtp" && docker logs --tail 200 --since 10m "$smtp" || true
     owned_container "$postgres" && docker logs --tail 200 --since 10m "$postgres" || true
     owned_container "$redis" && docker logs --tail 200 --since 10m "$redis" || true
   fi
-  for container in "$web" "$web_mail" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$web_tls" "$smtp" "$postgres" "$redis"; do
     owned_container "$container" && docker rm -f "$container" >/dev/null 2>&1 || true
   done
   owned_network "$network" && docker network rm "$network" >/dev/null 2>&1 || true
-  for container in "$web" "$web_mail" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$web_tls" "$smtp" "$postgres" "$redis"; do
     if owned_container "$container"; then echo "Owned smoke container remains: $container" >&2; status=1; fi
   done
   if owned_network "$network"; then echo "Owned smoke network remains: $network" >&2; status=1; fi
@@ -498,6 +500,47 @@ else
     -ForwardedProto https -BaseUrl "$base_url"
   echo "Blazor HTTP smoke passed"
 
+  # The browser journey signs in as the seeded User. Account cookies are Secure, so it runs
+  # against a second container that serves HTTPS with the throwaway smoke certificate.
+  docker rm -f "$web" >/dev/null
+  web="${APP_NAME}-ci-web-removed-${session}"
+  user_email="user-${expected_run_id}-${expected_run_attempt}@example.test"
+  user_password="E2E-$(openssl rand -hex 24)-D3!"
+  docker run -d --name "$web_tls" --network "$network" "${owned_label_args[@]}" \
+    -p 127.0.0.1::8443 \
+    -v "$dp_cert_dir:/run/dp-cert:ro" \
+    -e ASPNETCORE_ENVIRONMENT=Docker \
+    -e ASPNETCORE_URLS=https://+:8443 \
+    -e ASPNETCORE_Kestrel__Certificates__Default__Path=/run/dp-cert/dp.pfx \
+    -e "ASPNETCORE_Kestrel__Certificates__Default__Password=${dp_cert_password}" \
+    -e DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx \
+    -e "DataProtection__KeyEncryptionCertificatePassword=${dp_cert_password}" \
+    -e "APP_VERSION=${APP_VERSION}" \
+    -e "ConnectionStrings__DefaultConnection=Host=ci-postgres;Port=5432;Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
+    -e "Redis__Configuration=ci-redis:6379,abortConnect=false" \
+    -e Redis__AllowMissing=false \
+    -e Database__RunMigrationsAtStartup=true \
+    -e RateLimiting__Global__PermitLimit=10000 \
+    -e RateLimiting__Api__PermitLimit=1000 \
+    -e Accounts__WriteLimit__PermitLimit=1000 \
+    -e Accounts__UserSeed__Enabled=true \
+    -e "Accounts__UserSeed__Email=${user_email}" \
+    -e "Accounts__UserSeed__Password=${user_password}" \
+    -e Observability__OpenTelemetry__Enabled=false \
+    "$IMAGE_REF"
+  tls_host_port="$(docker port "$web_tls" 8443/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
+  [[ -n "$tls_host_port" ]] || { echo "Blazor HTTPS app did not publish port 8443" >&2; exit 1; }
+  tls_base_url="https://127.0.0.1:${tls_host_port}"
+  ready_deadline=$((SECONDS + 180))
+  until [[ "$(curl --silent --insecure --output /dev/null --write-out '%{http_code}' --max-time 5 "${tls_base_url}/health/ready" || true)" == "200" ]]; do
+    if (( SECONDS >= ready_deadline )); then
+      echo "Blazor HTTPS app did not report /health/ready within 180 seconds" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "Blazor HTTPS app ready at ${tls_base_url}"
+
   postgres_host_port="$(docker port "$postgres" 5432/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$postgres_host_port" ]] || { echo "web container did not publish port 5432" >&2; exit 1; }
 
@@ -507,8 +550,10 @@ else
   mkdir -p "$browser_results_dir"
   cd "$REPO_ROOT"
   E2E_CLEANUP_CONNECTION_STRING="Host=127.0.0.1;Port=${postgres_host_port};Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
+  E2E_USER_EMAIL="$user_email" \
+  E2E_USER_PASSWORD="$user_password" \
   RUN_E2E=1 \
-  E2E_BASE_URL="$base_url" \
+  E2E_BASE_URL="$tls_base_url" \
   E2E_HEADLESS=1 \
   E2E_SLOW_MO_MS=0 \
     dotnet test "$REPO_ROOT/GrumPlates.Test/GrumPlates.Test.csproj" \
