@@ -834,13 +834,13 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P04 | Complete | https://github.com/Grumlebob/GrumPlates/pull/421 (head `bdee56c4`; full local gate PASS on `7d730456`, same code tree) merged `acc35c79`, main CI 41707778000. |
 | P05 | Complete | https://github.com/Grumlebob/GrumPlates/pull/423 (head `7f1d9e26`, exact-head CI 41707891410 success; full local gate PASS on `9c8f732b`, same code tree) merged `03b1b541`, main CI 41713411785. |
 | P06 | Complete | https://github.com/Grumlebob/GrumPlates/pull/424 (head `0943e3c6`, exact-head CI 41713555558 success; full local gate PASS on `a890c1e1`, same code tree) merged `28016b14`, main CI 41724047108. P05 follow-up: main CI 41713411785 ran every job on `node-demo-books`; `CI_RUNNER_ROUTING_ENABLED` deleted. |
-| P07 | Pending | |
+| P07 | Complete | https://github.com/Grumlebob/GrumPlates/pull/425 (head `3528ec9d`, exact-head CI 41724189780 success; full local gate PASS on `09209238`, same code tree) merged `49098f82`, main CI 41732967439. New migration `20261103193952_InitialSchema`, EF ProductVersion 10.0.14; normalised old and new schema dumps byte-identical (sha256 `ba5dd6a4…cd4032`). No CD with run_migrations=true until P14 step 3. |
 | P08 | Pending | |
 | P09 | Pending | |
 | P10 | Pending | |
 | P11 | Pending | |
 | P12 | Pending | |
-| P13 | Pending | |
+| P13 | Complete | Local only, 2026-11-03: deleted bin/obj of GrumPlates, GrumPlates.Client, GrumPlates.Core and GrumPlates.Test, GrumPlates.React/build, GrumPlates/BlazorAutoApp.csproj.user and every __pycache__ under Deployment/ and Scripts/ in the primary checkout. Kept .env, .env.cloud, docker/https/aspnetapp.pfx, Plans.local/, GrumPlates.sln.DotSettings.user, agent.md, Cloud OpenTofu state/plans and inventory hosts.yml. git status clean before and after. |
 | P14 | Pending (authorised by the goal) | |
 | D01 Portfolio minimatch + Lighthouse | Complete | https://github.com/Grumlebob/Portfolio/pull/204 (head `455eb7d8`, full local gate PASS, adds the Dockerfile audit rule) merged `507ca71`, main CI 41605501343 success. Dependabot #198, #200, #201 (after one rerun of a React E2E timeout) and #202 merged; #199 awaits its rebase. |
 | D02 Lighthouse override (ImprovedDb, CarbonCalculator) | Complete | CarbonCalculator https://github.com/Grumlebob/CarbonCalculator/pull/446 (head `0b9d7de6`, full `Validate.ps1 -Mode full` passed; CI rerun 41631672955 green after packaged E2E timeouts under memory pressure) merged `950eda88`, main CI 41646559922 success on attempt 2 (same memory timeout on attempt 1). ImprovedDb https://github.com/Grumlebob/ImprovedDb/pull/434 (head `145404ef`, ImprovedDb's applicable local checks: npm ci, npm audit, css build and a Lighthouse 13.6.0 install proof) merged `9fb48265`, main CI 41656363765 success. ImprovedDb Dependabot #426 (Lighthouse 13.6.0) green on head `dd6a0ec7` and merged `8146f512`. |
