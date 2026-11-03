@@ -812,8 +812,8 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | Downstream review | Complete | 2026-11-02: OD-16 to OD-18, packets D01-D10; facts in section 7.2. |
 | Plan review | Complete | 2026-11-02: OD-10 to OD-15; live databases, pins, images and deploy inputs verified read-only (section 4.2). |
 | P00 | Complete | 2026-11-02: base `origin/main` `7ee5192a43ddf1276edca21bbf4439cd98d4c80b`. Open PRs #405, #406, #407 as in 4.1. New branch `quality/test-cleanup-20261102` (`a74fc18d`, own worktree, another session's work, not in this plan): left alone. |
-| P01-A | Pending | |
-| P01-B | Pending (authorised by the goal) | |
+| P01-A | Complete | 2026-11-02/03: `coord/node-inventory-handoff` deleted locally and on GitHub (`c6a59ba3afe8afe4a041400cd088ae9c43dbf4ba`). Client override (Q5) in https://github.com/Grumlebob/GrumPlates/pull/414, head `8adde66b`, full local gate PASS, build-test-push green; merged `5c0fe476`, main CI run 41526721424 success. Dependabot #407 rebased and auto-merged (`a2089a1f`, main CI 41538904179 success). #405 was closed by Dependabot ("updatable in another way"); no replacement PR yet, main keeps StackExchange.Redis 3.4.20. |
+| P01-B | Complete | Run 41465965668 (target `d28a6c7b`) failed before the app stopped: the stop play rendered `compose.env.j2` before `data_protection_certificate_gid` was set (bug since #320); app untouched, lock released. Fix https://github.com/Grumlebob/GrumPlates/pull/415 (head `68d79308`, full local gate PASS) merged `54871c53`, main CI 41551063010 success. CD run 41604062400 (`run_migrations=true`, target `54871c539f55d79550aedfcff9c2288a8886420c`) success: pre-migration backup `predeploy-20261103T083555Z.sql.gz`, migration bundle ran on node-db, acceptance ok. `__EFMigrationsHistory`: `20260525172002_InitialTemplateSchema`, `20260526083400_UserOwnedBooks`, `20260528104203_NormalizeBooksForAuthorBooks`, `20261015183858_AccountOutboxAndDataProtectionKeys`. |
 | P02 | Pending | |
 | P03-A | Pending | |
 | P03-B | Pending | |
@@ -831,16 +831,16 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P12 | Pending | |
 | P13 | Pending | |
 | P14 | Pending (authorised by the goal) | |
-| D01 Portfolio minimatch + Lighthouse | Pending | |
+| D01 Portfolio minimatch + Lighthouse | Complete | https://github.com/Grumlebob/Portfolio/pull/204 (head `455eb7d8`, full local gate PASS, adds the Dockerfile audit rule) merged `507ca71`, main CI 41605501343 success. Dependabot #198, #200, #201 (after one rerun of a React E2E timeout) and #202 merged; #199 awaits its rebase. |
 | D02 Lighthouse override (ImprovedDb, CarbonCalculator) | Pending | |
 | D03 ImprovedDb SHA test | Pending | |
-| D04 CarbonCalculator #341 | Pending | |
+| D04 CarbonCalculator #341 | Complete | https://github.com/Grumlebob/CarbonCalculator/pull/341 merged `96cc443fa5dc13fd95f68e5c16c75c290f661316` (head `ac01ce0d`, run 40234018777 green); main CI 41470049728 success. |
 | D05 Portfolio Node 24 single source | Pending | |
 | D06 CarbonCalculator Node single source | Pending | |
 | D07 Settings tidy downstream | Pending | |
 | D08 CarbonCalculator key import | Pending | |
 | D09 Legacy release path downstream | Pending | |
-| D10 Downstream branches | Pending | |
+| D10 Downstream branches | Complete | Deleted (integrated): JobHunt `codex/portfolio-aware-applications` `6a59bef66f301e17b399f53bda0d424cb853919f` (cherry all `-`, PR #1 merged at that head); CarbonCalculator `task/test-feedback-review-20261027` `8d5f534e3cf46f51b84a081a8210f6272efffd05` on GitHub (merge tree equals main; the local branch is kept because another task's worktree has it checked out). Kept (unique content): `backup/codex/p18-ac26-upload-constraints` `782a007b` (ProjectDocumentUploadLimitTests and P18 docs); `backup/codex/template-trx-run-summary` `de698685` (CI/CD workflow and TRX validation work, 38 files); `backup/codex/third-consumption-conflict-review-20261022` `05255b99` (one review doc); `backup/codex/third-five-consumption-boundaries-20261022` `5c36ce38` (ConsumptionBoundaryAcceptanceTests). |
 | P15 | Pending | |
 
 Packet entry template:
