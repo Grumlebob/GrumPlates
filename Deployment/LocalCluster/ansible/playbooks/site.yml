@@ -129,6 +129,21 @@
         path: "{{ deploy_root }}/docker-compose.yml"
       register: site_app_compose_file
 
+    - name: Read deploy group ID for the Compose interpolation allowlist
+      ansible.builtin.getent:
+        database: group
+        key: deploy
+      when:
+        - run_migrations | default(false) | bool
+        - site_app_compose_file.stat.exists
+
+    - name: Record deploy group ID for the Compose interpolation allowlist
+      ansible.builtin.set_fact:
+        data_protection_certificate_gid: "{{ ansible_facts.getent_group.deploy[1] }}"
+      when:
+        - run_migrations | default(false) | bool
+        - site_app_compose_file.stat.exists
+
     - name: Render protected Compose interpolation allowlist before stopping the app
       ansible.builtin.template:
         src: "{{ playbook_dir }}/../roles/app/templates/compose.env.j2"
