@@ -92,7 +92,6 @@ class AppInstanceTests(unittest.TestCase):
                             if key not in instance.ACCOUNT_SETTING_DEFAULTS}
         self.config["settings"] = legacy_candidate
         candidate, _, _ = self.validate()
-        self.assertFalse(candidate["accounts_enabled"])
         self.assertFalse(candidate["accounts_registration_enabled"])
         self.assertFalse(candidate["accounts_admin_seed_enabled"])
         self.assertEqual("", candidate["accounts_public_origin"])

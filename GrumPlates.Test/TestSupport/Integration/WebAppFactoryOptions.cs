@@ -44,8 +44,6 @@ public sealed class WebAppFactoryOptions
 
     public int? ApiRateLimitPermitLimit { get; init; }
 
-    public int? AuthenticationRateLimitPermitLimit { get; init; }
-
     /// <summary>
     /// Challenge anonymous requests with the real Identity cookie scheme instead of
     /// the test scheme, so tests can assert redirect versus 401 behaviour.

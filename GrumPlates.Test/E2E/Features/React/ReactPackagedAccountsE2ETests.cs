@@ -13,35 +13,6 @@ public sealed class ReactPackagedAccountsE2ETests : BlazorE2ETestBase
     private readonly ConcurrentQueue<string> _browserErrors = new();
 
     [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
-    [Trait("Category", "ReactPackagedDisabled")]
-    public async Task DisabledPackage_RoutesRemainPublicAndAccountViewsStayUnavailable()
-    {
-        MonitorBrowser(Page);
-        await RunWithFailureScreenshotAsync(async () =>
-        {
-            var authResponse = await NavigateAsync(Page, "/auth");
-            Assert.NotNull(authResponse);
-            Assert.Equal(200, authResponse.Status);
-            await Page.WaitForURLAsync("**/auth/login");
-            Assert.Equal("/auth/login", new Uri(Page.Url).AbsolutePath);
-            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Accounts are unavailable" }))
-                .ToBeVisibleAsync();
-            await AssertCspAsync(authResponse);
-            Assert.DoesNotContain(await Context.CookiesAsync(), cookie => cookie.Name.StartsWith("__Host-Accounts-", StringComparison.Ordinal));
-
-            var booksResponse = await NavigateAsync(Page, "/my-books");
-            Assert.NotNull(booksResponse);
-            Assert.Equal(200, booksResponse.Status);
-            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "My books" })).ToBeVisibleAsync();
-            await Expect(Page.GetByText("Sign in to view and save your private books.", new PageGetByTextOptions { Exact = false }))
-                .ToBeVisibleAsync();
-            await AssertCspAsync(booksResponse);
-            Assert.Empty(await Context.CookiesAsync());
-            Assert.Empty(_browserErrors);
-        });
-    }
-
-    [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
     [Trait("Category", "ReactPackagedEnabled")]
     public async Task EnabledPackage_RealMailUsersTabsAndPasswordChangeRemainPrivate()
     {

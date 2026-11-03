@@ -293,7 +293,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
     if f"APP_IMAGE_REF=ghcr.io/example/notes@{release_digest}" not in digest_env:
         fail("rendered app env must pin APP_IMAGE_REF to the release digest when one is set")
     for expected in [
-        "Accounts__Enabled=false",
         "Accounts__RegistrationEnabled=false",
         "Accounts__AdminSeed__Enabled=false",
         "Accounts__AdminSeed__Password=",
@@ -386,7 +385,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         }
         cluster_enabled_context = {
             **app_values,
-            "accounts_enabled": True,
             "accounts_registration_enabled": True,
             "accounts_admin_seed_enabled": True,
             "accounts_admin_seed_email": "admin@example.invalid",
@@ -452,9 +450,11 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         cloud_default_env = render_jinja(cloud_template, cloud_context)
         if "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem" not in cloud_default_env:
             fail("Cloud app env is missing Data Protection certificate path")
-        for expected in ["Accounts__Enabled=false", "Accounts__RegistrationEnabled=false", "Accounts__AdminSeed__Enabled=false"]:
+        for expected in ["Accounts__RegistrationEnabled=false", "Accounts__AdminSeed__Enabled=false"]:
             if expected not in cloud_default_env:
-                fail(f"Cloud app env must default accounts off: {expected}")
+                fail(f"Cloud app env must default registration and seeding off: {expected}")
+        if "Accounts__Enabled" in cloud_default_env:
+            fail("Cloud app env must not render the removed Accounts__Enabled switch")
         cloud_secret_values = {
             "Accounts__AdminSeed__Password": ' cloud-seed $dollar #hash = "double" \'single\' ',
             "Accounts__Email__Username": ' cloud-user $dollar #hash = "double" ',
@@ -462,7 +462,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         }
         cloud_enabled_context = {
             **cloud_context,
-            "accounts_enabled": True,
             "accounts_registration_enabled": True,
             "accounts_admin_seed_enabled": True,
             "accounts_admin_seed_email": "admin@example.invalid",

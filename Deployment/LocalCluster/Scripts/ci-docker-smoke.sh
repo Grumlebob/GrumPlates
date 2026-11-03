@@ -44,7 +44,6 @@ REDIS_IMAGE="redis:8.8.0-alpine3.23"
 SMTP_FIXTURE_IMAGE="node:26.12.1-bookworm-slim"
 # Browser tests that prove SSR, hydration and pre-hydration control state.
 BROWSER_SMOKE_FILTER="FullyQualifiedName~RenderModeE2ETests|FullyQualifiedName~PreHydrationControlsE2ETests"
-REACT_DISABLED_BROWSER_FILTER="Category=ReactPackagedDisabled"
 REACT_ENABLED_BROWSER_FILTER="Category=ReactPackagedEnabled"
 
 expected_repository="${GITHUB_REPOSITORY:-local}"
@@ -55,9 +54,11 @@ network="${APP_NAME}-ci-${session}"
 postgres="${APP_NAME}-ci-postgres-${session}"
 redis="${APP_NAME}-ci-redis-${session}"
 web="${APP_NAME}-ci-web-${session}"
-web_enabled="${APP_NAME}-ci-web-enabled-${session}"
+web_mail="${APP_NAME}-ci-web-mail-${session}"
+web_tls="${APP_NAME}-ci-web-tls-${session}"
 smtp="${APP_NAME}-ci-smtp-${session}"
 fixture_dir=""
+dp_cert_dir=""
 owned_label_args=(
   --label "localcluster.ci.repository=${expected_repository}"
   --label localcluster.ci.owner=ci-smoke
@@ -83,19 +84,29 @@ cleanup() {
   trap - EXIT INT TERM
   if [[ "$status" -ne 0 ]]; then
     owned_container "$web" && docker logs --tail 200 --since 10m "$web" || true
-    owned_container "$web_enabled" && docker logs --tail 200 --since 10m "$web_enabled" || true
+    owned_container "$web_mail" && docker logs --tail 200 --since 10m "$web_mail" || true
+    owned_container "$web_tls" && docker logs --tail 200 --since 10m "$web_tls" || true
     owned_container "$smtp" && docker logs --tail 200 --since 10m "$smtp" || true
     owned_container "$postgres" && docker logs --tail 200 --since 10m "$postgres" || true
     owned_container "$redis" && docker logs --tail 200 --since 10m "$redis" || true
   fi
-  for container in "$web" "$web_enabled" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$web_tls" "$smtp" "$postgres" "$redis"; do
     owned_container "$container" && docker rm -f "$container" >/dev/null 2>&1 || true
   done
   owned_network "$network" && docker network rm "$network" >/dev/null 2>&1 || true
-  for container in "$web" "$web_enabled" "$smtp" "$postgres" "$redis"; do
+  for container in "$web" "$web_mail" "$web_tls" "$smtp" "$postgres" "$redis"; do
     if owned_container "$container"; then echo "Owned smoke container remains: $container" >&2; status=1; fi
   done
   if owned_network "$network"; then echo "Owned smoke network remains: $network" >&2; status=1; fi
+  if [[ -n "$dp_cert_dir" ]]; then
+    local expected_dp_prefix="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/dp-cert-${session}-"
+    if [[ "$dp_cert_dir" == "$expected_dp_prefix"* ]]; then
+      rm -rf -- "$dp_cert_dir"
+    else
+      echo "Refusing to remove unexpected certificate path: $dp_cert_dir" >&2
+      status=1
+    fi
+  fi
   if [[ -n "$fixture_dir" ]]; then
     local expected_prefix="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/react-auth-${session}-"
     if [[ "$fixture_dir" == "$expected_prefix"* ]]; then
@@ -158,6 +169,10 @@ redis_ready() {
 }
 
 docker network create "${owned_label_args[@]}" "$network"
+# Host requests reach the app from this network's gateway. Trust only that
+# address for X-Forwarded-Proto, as production trusts its TLS proxy.
+network_gateway="$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")"
+[[ "$network_gateway" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { echo "smoke network has no IPv4 gateway" >&2; exit 1; }
 # Loopback-only random host port: the browser tests clean up the users they
 # register directly in this disposable database.
 postgres_password="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
@@ -176,12 +191,28 @@ docker run -d --name "$redis" --network "$network" "${owned_label_args[@]}" \
 wait_until_stable 90 postgres_ready
 wait_until_stable 60 redis_ready
 
+# Data Protection keys are always certificate-protected outside Development.
+mkdir -p "${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
+dp_cert_dir="$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/dp-cert-${session}-XXXXXXXX")"
+chmod 0755 "$dp_cert_dir"
+openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 2 -subj "/CN=ci-data-protection" \
+  -keyout "$dp_cert_dir/key.pem" -out "$dp_cert_dir/cert.pem" >/dev/null 2>&1
+dp_cert_password="$(openssl rand -hex 32)"
+openssl pkcs12 -export -out "$dp_cert_dir/dp.pfx" \
+  -inkey "$dp_cert_dir/key.pem" -in "$dp_cert_dir/cert.pem" -passout "pass:${dp_cert_password}" >/dev/null 2>&1
+rm -f -- "$dp_cert_dir/key.pem"
+chmod 0444 "$dp_cert_dir/dp.pfx"
+
 # The HTTP and browser checks share one client IP. Raise the limits only for
 # this disposable container so the smoke does not trip production budgets.
 docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -p 127.0.0.1::8080 \
+  -v "$dp_cert_dir:/run/dp-cert:ro" \
+  -e DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx \
+  -e "DataProtection__KeyEncryptionCertificatePassword=${dp_cert_password}" \
   -e ASPNETCORE_ENVIRONMENT=Docker \
   -e ASPNETCORE_HTTP_PORTS=8080 \
+  -e "ForwardedHeaders__KnownProxies__0=${network_gateway}" \
   -e "APP_VERSION=${APP_VERSION}" \
   -e "ConnectionStrings__DefaultConnection=Host=ci-postgres;Port=5432;Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
   -e "Redis__Configuration=ci-redis:6379,abortConnect=false" \
@@ -189,8 +220,6 @@ docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -e Database__RunMigrationsAtStartup=true \
   -e RateLimiting__Global__PermitLimit=10000 \
   -e RateLimiting__Api__PermitLimit=1000 \
-  -e RateLimiting__Authentication__PermitLimit=1000 \
-  -e LocalAccounts__Enabled=false \
   -e Observability__OpenTelemetry__Enabled=false \
   "$IMAGE_REF"
 
@@ -219,7 +248,7 @@ forwarded_proto=(--header "X-Forwarded-Proto: https")
 
 if [[ "$FRONTEND_PROFILE" == "React" ]]; then
   client_config_response="$(curl --silent --show-error --max-time 30 --dump-header - --output - "${forwarded_proto[@]}" "$base_url/api/client-config")"
-  accounts_enabled="$(python3 -c 'import json,re,sys
+  python3 -c 'import json,re,sys
 raw=sys.stdin.buffer.read()
 headers,body=raw.split(b"\r\n\r\n",1)
 lines=headers.decode("latin1").splitlines()
@@ -229,9 +258,7 @@ assert any(line.startswith("cache-control:") and "no-store" in line for line in 
 assert not any(line.startswith("set-cookie:") for line in header_lines), "client config must not set cookies"
 payload=json.loads(body)
 assert type(payload.get("schemaVersion")) is int and payload["schemaVersion"] == 1, "client config schema version is invalid"
-assert type(payload.get("accountsEnabled")) is bool, "client config capability is invalid"
-assert re.fullmatch(r"[0-9a-fA-F]{32}", payload.get("applicationId", "")), "client config application ID is invalid"
-print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
+assert re.fullmatch(r"[0-9a-fA-F]{32}", payload.get("applicationId", "")), "client config application ID is invalid"' <<< "$client_config_response"
 
   home_html="$(curl --fail --silent --show-error --max-time 30 --header 'Accept: text/html' "${forwarded_proto[@]}" "$base_url/")"
   grep -Fqi '<!DOCTYPE html>' <<< "$home_html" || { echo "React home page did not return HTML" >&2; exit 1; }
@@ -280,14 +307,10 @@ print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
     exit 1
   fi
 
-  if [[ "$accounts_enabled" == "true" ]]; then
-    login_headers="$(curl --silent --show-error --max-time 30 --dump-header - --output /dev/null "${forwarded_proto[@]}" "$base_url/api/auth/login")"
-    grep -Eiq '^HTTP/[^ ]+[[:space:]]+405([[:space:]]|$)' <<< "$login_headers" || { echo "enabled GET /api/auth/login did not return 405" >&2; exit 1; }
-    grep -Eiq '^Allow:[[:space:]]*POST[[:space:]]*$' <<< "$login_headers" || { echo "enabled GET /api/auth/login did not advertise Allow: POST" >&2; exit 1; }
-    inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)
-  else
-    inactive_paths=(/Account /api/auth /api/auth/session /api/auth/login /assets/missing.js)
-  fi
+  login_headers="$(curl --silent --show-error --max-time 30 --dump-header - --output /dev/null "${forwarded_proto[@]}" "$base_url/api/auth/login")"
+  grep -Eiq '^HTTP/[^ ]+[[:space:]]+405([[:space:]]|$)' <<< "$login_headers" || { echo "GET /api/auth/login did not return 405" >&2; exit 1; }
+  grep -Eiq '^Allow:[[:space:]]*POST[[:space:]]*$' <<< "$login_headers" || { echo "GET /api/auth/login did not advertise Allow: POST" >&2; exit 1; }
+  inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)
 
   for path in "${inactive_paths[@]}"; do
     response="$(curl --silent --show-error --max-time 30 --write-out $'\n%{http_code}' --header 'Accept: text/html' "${forwarded_proto[@]}" "$base_url$path")"
@@ -311,31 +334,14 @@ print(str(payload["accountsEnabled"]).lower())' <<< "$client_config_response")"
     -FrontendProfile "$FRONTEND_PROFILE" -AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE" \
     -ForwardedProto https -BaseUrl "$base_url"
   echo "React public HTTP acceptance passed"
-  echo "React disabled HTTP smoke passed"
 
   postgres_host_port="$(docker port "$postgres" 5432/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$postgres_host_port" ]] || { echo "postgres did not publish port 5432" >&2; exit 1; }
   cd "$REPO_ROOT"
   pwsh "$REPO_ROOT/GrumPlates.Test/bin/Release/net10.0/playwright.ps1" install chromium
-  react_disabled_results_dir="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/test-results/${expected_run_id}-${expected_run_attempt}/${GITHUB_JOB:-validate}/docker-smoke/React-disabled"
-  mkdir -p "$react_disabled_results_dir"
-  cd "$REPO_ROOT"
-  E2E_CLEANUP_CONNECTION_STRING="Host=127.0.0.1;Port=${postgres_host_port};Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
-  RUN_E2E=1 \
-  E2E_BASE_URL="$base_url" \
-  E2E_HEADLESS=1 \
-  E2E_SLOW_MO_MS=0 \
-    dotnet test "$REPO_ROOT/GrumPlates.Test/GrumPlates.Test.csproj" \
-      --configuration Release --no-build --no-restore \
-      --filter "$REACT_DISABLED_BROWSER_FILTER" \
-      --logger "trx;LogFileName=react-disabled-browser.trx" \
-      --results-directory "$react_disabled_results_dir"
-  python3 "$REPO_ROOT/Scripts/CI/validate_dotnet_test_results.py" \
-    "$react_disabled_results_dir/react-disabled-browser.trx" \
-    --expected-skipped 0 --suite "Packaged React disabled browser journey"
 
   docker rm -f "$web" >/dev/null
-  web="${APP_NAME}-ci-web-disabled-removed-${session}"
+  web="${APP_NAME}-ci-web-removed-${session}"
 
   runner_temp="${RUNNER_TEMP:-${TMPDIR:-/tmp}}"
   mkdir -p "$runner_temp"
@@ -395,7 +401,7 @@ EOF
   account_password="E2E-$(openssl rand -hex 24)-A9!"
   changed_password="E2E-$(openssl rand -hex 24)-B7!"
   admin_password="E2E-$(openssl rand -hex 24)-C5!"
-  docker run -d --name "$web_enabled" --network "$network" "${owned_label_args[@]}" \
+  docker run -d --name "$web_mail" --network "$network" "${owned_label_args[@]}" \
     -p 127.0.0.1::8080 -p "127.0.0.1:${react_https_host_port}:8443" \
     -v "$app_tls_dir:/run/react-auth-fixture:ro" \
     -e ASPNETCORE_ENVIRONMENT=Docker \
@@ -405,7 +411,6 @@ EOF
     -e SSL_CERT_FILE=/run/react-auth-fixture/ca.pem \
     -e "APP_VERSION=${APP_VERSION}" \
     -e "App__Name=${APP_NAME}" \
-    -e "Accounts__Enabled=true" \
     -e "Accounts__RegistrationEnabled=true" \
     -e "Accounts__PublicOrigin=https://127.0.0.1:${react_https_host_port}" \
     -e Accounts__Email__Host=ci-smtp \
@@ -428,9 +433,7 @@ EOF
     -e Database__RunMigrationsAtStartup=true \
     -e RateLimiting__Global__PermitLimit=10000 \
     -e RateLimiting__Api__PermitLimit=1000 \
-    -e RateLimiting__Authentication__PermitLimit=1000 \
     -e Accounts__WriteLimit__PermitLimit=1000 \
-    -e LocalAccounts__Enabled=false \
     -e Observability__OpenTelemetry__Enabled=false \
     "$IMAGE_REF"
 
@@ -444,7 +447,7 @@ EOF
     sleep 2
   done
   echo "enabled React app ready at ${enabled_base_url}"
-  enabled_http_port="$(docker port "$web_enabled" 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
+  enabled_http_port="$(docker port "$web_mail" 8080/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$enabled_http_port" ]] || { echo "enabled React app did not publish its loopback HTTP port" >&2; exit 1; }
   cd "$REPO_ROOT"
   pwsh -NoProfile -File "$REPO_ROOT/Scripts/Test-DeployedSite.ps1" \
@@ -472,7 +475,7 @@ EOF
   python3 "$REPO_ROOT/Scripts/CI/validate_dotnet_test_results.py" \
     "$react_enabled_results_dir/react-enabled-browser.trx" \
     --expected-skipped 0 --suite "Packaged React enabled account browser journey"
-  echo "React packaged disabled/enabled HTTP and browser journeys passed"
+  echo "React packaged HTTP and account browser journeys passed"
 else
   home_html="$(curl --fail --silent --show-error --max-time 30 "${forwarded_proto[@]}" "${base_url}/")"
   grep -Fqi '<!DOCTYPE html>' <<< "$home_html" || { echo "home page did not return HTML" >&2; exit 1; }
@@ -494,8 +497,49 @@ else
   cd "$REPO_ROOT"
   pwsh -NoProfile -File "$REPO_ROOT/Scripts/Test-DeployedSite.ps1" \
     -FrontendProfile "$FRONTEND_PROFILE" -AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE" \
-    -BaseUrl "$base_url"
+    -ForwardedProto https -BaseUrl "$base_url"
   echo "Blazor HTTP smoke passed"
+
+  # The browser journey signs in as the seeded User. Account cookies are Secure, so it runs
+  # against a second container that serves HTTPS with the throwaway smoke certificate.
+  docker rm -f "$web" >/dev/null
+  web="${APP_NAME}-ci-web-removed-${session}"
+  user_email="user-${expected_run_id}-${expected_run_attempt}@example.test"
+  user_password="E2E-$(openssl rand -hex 24)-D3!"
+  docker run -d --name "$web_tls" --network "$network" "${owned_label_args[@]}" \
+    -p 127.0.0.1::8443 \
+    -v "$dp_cert_dir:/run/dp-cert:ro" \
+    -e ASPNETCORE_ENVIRONMENT=Docker \
+    -e ASPNETCORE_URLS=https://+:8443 \
+    -e ASPNETCORE_Kestrel__Certificates__Default__Path=/run/dp-cert/dp.pfx \
+    -e "ASPNETCORE_Kestrel__Certificates__Default__Password=${dp_cert_password}" \
+    -e DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx \
+    -e "DataProtection__KeyEncryptionCertificatePassword=${dp_cert_password}" \
+    -e "APP_VERSION=${APP_VERSION}" \
+    -e "ConnectionStrings__DefaultConnection=Host=ci-postgres;Port=5432;Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
+    -e "Redis__Configuration=ci-redis:6379,abortConnect=false" \
+    -e Redis__AllowMissing=false \
+    -e Database__RunMigrationsAtStartup=true \
+    -e RateLimiting__Global__PermitLimit=10000 \
+    -e RateLimiting__Api__PermitLimit=1000 \
+    -e Accounts__WriteLimit__PermitLimit=1000 \
+    -e Accounts__UserSeed__Enabled=true \
+    -e "Accounts__UserSeed__Email=${user_email}" \
+    -e "Accounts__UserSeed__Password=${user_password}" \
+    -e Observability__OpenTelemetry__Enabled=false \
+    "$IMAGE_REF"
+  tls_host_port="$(docker port "$web_tls" 8443/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
+  [[ -n "$tls_host_port" ]] || { echo "Blazor HTTPS app did not publish port 8443" >&2; exit 1; }
+  tls_base_url="https://127.0.0.1:${tls_host_port}"
+  ready_deadline=$((SECONDS + 180))
+  until [[ "$(curl --silent --insecure --output /dev/null --write-out '%{http_code}' --max-time 5 "${tls_base_url}/health/ready" || true)" == "200" ]]; do
+    if (( SECONDS >= ready_deadline )); then
+      echo "Blazor HTTPS app did not report /health/ready within 180 seconds" >&2
+      exit 1
+    fi
+    sleep 2
+  done
+  echo "Blazor HTTPS app ready at ${tls_base_url}"
 
   postgres_host_port="$(docker port "$postgres" 5432/tcp | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n 1)"
   [[ -n "$postgres_host_port" ]] || { echo "web container did not publish port 5432" >&2; exit 1; }
@@ -506,8 +550,10 @@ else
   mkdir -p "$browser_results_dir"
   cd "$REPO_ROOT"
   E2E_CLEANUP_CONNECTION_STRING="Host=127.0.0.1;Port=${postgres_host_port};Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
+  E2E_USER_EMAIL="$user_email" \
+  E2E_USER_PASSWORD="$user_password" \
   RUN_E2E=1 \
-  E2E_BASE_URL="$base_url" \
+  E2E_BASE_URL="$tls_base_url" \
   E2E_HEADLESS=1 \
   E2E_SLOW_MO_MS=0 \
     dotnet test "$REPO_ROOT/GrumPlates.Test/GrumPlates.Test.csproj" \

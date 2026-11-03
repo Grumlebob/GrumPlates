@@ -1,3 +1,4 @@
+using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -17,8 +18,11 @@ public sealed class ForwardedHeadersTests
     [Fact]
     public void DefaultConfiguration_DoesNotTrustAllForwardedHeaders()
     {
+        using var certificate = new TestKeyEncryptionCertificate();
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
         {
+            ["DataProtection__KeyEncryptionCertificatePath"] = certificate.Path,
+            ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
             ["Database__RunMigrationsAtStartup"] = "false",
             ["AuthorBooks__SeedAtStartup"] = "false",
             ["Redis__Configuration"] = "CHANGE_ME",
@@ -42,8 +46,11 @@ public sealed class ForwardedHeadersTests
     [Fact]
     public void ConfiguredTrustedNetwork_IsAppliedExplicitly()
     {
+        using var certificate = new TestKeyEncryptionCertificate();
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
         {
+            ["DataProtection__KeyEncryptionCertificatePath"] = certificate.Path,
+            ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
             ["Database__RunMigrationsAtStartup"] = "false",
             ["AuthorBooks__SeedAtStartup"] = "false",
             ["Redis__Configuration"] = "CHANGE_ME",
@@ -66,7 +73,6 @@ public sealed class ForwardedHeadersTests
             ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Port=5432;Database=app;Username=postgres;Password=postgres;GSS Encryption Mode=Disable",
             ["Database:RunMigrationsAtStartup"] = "false",
             ["AuthorBooks:SeedAtStartup"] = "false",
-            ["LocalAccounts:Enabled"] = "false",
             ["Redis:Configuration"] = "CHANGE_ME",
             ["Redis:AllowMissing"] = "true"
         };

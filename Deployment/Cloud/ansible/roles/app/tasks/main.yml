@@ -44,12 +44,12 @@
       - >-
         (accounts_admin_seed_email | default('') ~ accounts_public_origin | default('') ~ accounts_email_host | default('') ~ accounts_email_from | default('') ~ cloud_accounts_admin_seed_password | default('') ~ cloud_accounts_email_username | default('') ~ cloud_accounts_email_password | default(''))
         | regex_search('[\r\n]') is none
-      - not (accounts_admin_seed_enabled | default(false) | bool) or ((accounts_enabled | default(false) | bool) and (accounts_admin_seed_email | default('') | length > 0) and (cloud_accounts_admin_seed_password | default('') | length > 0))
-      - not (accounts_registration_enabled | default(false) | bool) or ((accounts_enabled | default(false) | bool) and (accounts_email_host | default('') | length > 0) and (accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
+      - not (accounts_admin_seed_enabled | default(false) | bool) or ((accounts_admin_seed_email | default('') | length > 0) and (cloud_accounts_admin_seed_password | default('') | length > 0))
+      - not (accounts_registration_enabled | default(false) | bool) or ((accounts_email_host | default('') | length > 0) and (accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
       - (accounts_admin_seed_email | default('') | length == 0) == (cloud_accounts_admin_seed_password | default('') | length == 0)
       - (cloud_accounts_email_username | default('') | length == 0) == (cloud_accounts_email_password | default('') | length == 0)
       - (accounts_email_host | default('') | length > 0) or ((accounts_email_from | default('') | length == 0) and (cloud_accounts_email_username | default('') | length == 0) and (cloud_accounts_email_password | default('') | length == 0))
-      - (accounts_email_host | default('') | length == 0) or ((accounts_enabled | default(false) | bool) and (accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
+      - (accounts_email_host | default('') | length == 0) or ((accounts_email_from | default('') | length > 0) and (accounts_public_origin | default('') | length > 0))
     fail_msg: "Account deployment settings are incomplete or contain unsupported line breaks."
   no_log: true
 - name: Validate encrypted Data Protection certificate inputs

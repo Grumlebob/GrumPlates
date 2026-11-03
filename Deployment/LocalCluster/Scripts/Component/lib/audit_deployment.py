@@ -791,13 +791,17 @@ for path, checks in {
             fail(f"{path}: missing {why}")
 
 
-# Deployments use Docker, but published demo logins must never be seeded there.
+# Deployments provision only the configured Admin; the local User seed must never reach them.
 for seeded_path in [
     "Deployment/LocalCluster/compose/app-server/docker-compose.yml",
     "Deployment/Cloud/compose/app-server/docker-compose.yml",
+    "Deployment/LocalSingleNode/compose/docker-compose.yml",
+    "Deployment/LocalCluster/ansible/roles/app/templates/app.env.j2",
+    "Deployment/Cloud/ansible/roles/app/templates/app.env.j2",
+    "Deployment/LocalSingleNode/ansible/templates/app.env.j2",
 ]:
-    if 'LocalAccounts__Enabled: "false"' not in read(seeded_path):
-        fail(f'{seeded_path}: missing LocalAccounts__Enabled: "false" (no seeded demo logins in deployments)')
+    if "UserSeed" in read(seeded_path):
+        fail(f"{seeded_path}: deployments must not seed the local User account")
 
 ci_provenance = read("Deployment/Common/Scripts/Component/lib/find-successful-ci-run.py")
 for needle in ['ALLOWED_EVENTS = {"push", "workflow_dispatch"}', "verify_publishing_job", "/attempts/{attempt}/jobs", 'job.get("run_attempt")', 'job.get("head_sha")']:
@@ -862,8 +866,8 @@ for needle, why in [
 for path, needle, why in [
     (
         "GrumPlates/Infrastructure/Hosting/AppCachingExtensions.cs",
-        "PersistKeysToStackExchangeRedis",
-        "Redis-backed Data Protection",
+        "PersistKeysToDbContext<AppDbContext>()",
+        "PostgreSQL-backed Data Protection",
     ),
     ("GrumPlates/Program.cs", "UseForwardedHeaders", "forwarded header middleware"),
     (
@@ -1473,7 +1477,8 @@ if "validate" in ci_jobs and "publish-main" in ci_jobs:
     if 'cp -a -- GrumPlates.Test/TestResults/Playwright "$report_source/playwright"' not in _report_step or '--source "$report_source"' not in _report_step:
         fail(".github/workflows/ci.yml: terminal report storage must include browser diagnostics")
     _smoke_reports = read("Deployment/LocalCluster/Scripts/ci-docker-smoke.sh")
-    if _smoke_reports.count("/${GITHUB_JOB:-validate}/docker-smoke/") != 3:
+    _smoke_report_dirs = _smoke_reports.count("/${GITHUB_JOB:-validate}/docker-smoke/")
+    if _smoke_report_dirs == 0 or _smoke_report_dirs != _smoke_reports.count("--results-directory"):
         fail("Docker browser smoke must retain TRX under its terminal job report source")
     if any("ci_report_store.py save" not in workflow_step(job_id, "Store CI reports on this runner")
            for job_id in ("validate", "publish-main")):
@@ -1913,7 +1918,6 @@ for path, checks in {
         ("release_image_digest", "digest-pinned image reference"),
         ("POSTGRES_PORT={{ postgres_port }}", "PostgreSQL port env rendering"),
         ("REDIS_PORT={{ redis_port }}", "Redis port env rendering"),
-        ("Accounts__Enabled={{ accounts_enabled | default(false) | string | lower }}", "accounts disabled when settings are absent"),
         ("Accounts__AdminSeed__Password={{ vault_accounts_admin_seed_password | default('') }}", "Admin seed password from the protected vault"),
         ("Accounts__Email__Password={{ vault_accounts_email_password | default('') }}", "SMTP password from the protected vault"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
@@ -2001,7 +2005,6 @@ for path in [
 
 for path, needles in {
     "Deployment/Cloud/ansible/roles/app/templates/app.env.j2": [
-        ("Accounts__Enabled={{ accounts_enabled | default(false) | string | lower }}", "accounts disabled when settings are absent"),
         ("Accounts__AdminSeed__Password={{ cloud_accounts_admin_seed_password | default('') }}", "Admin seed password from an optional workflow secret"),
         ("Accounts__Email__Password={{ cloud_accounts_email_password | default('') }}", "SMTP password from an optional workflow secret"),
         ("DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "read-only app Data Protection certificate path"),
@@ -2668,7 +2671,6 @@ for binding in re.findall(r'(?m)^      - "([^"\n]+:[0-9${}A-Z_]+)"$', single_com
         fail("localsinglenode: published ports must bind loopback")
 if single_compose.count('"127.0.0.1:') != 3:
     fail("localsinglenode: all three service publications must bind loopback")
-require_contains(single + "/compose/docker-compose.yml", 'LocalAccounts__Enabled: "false"', "deployment account seeding disabled")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem", "single-node app certificate path")
 require_contains(single + "/ansible/templates/app.env.j2", "DataProtection__KeyEncryptionCertificatePassword={{ vault_data_protection_certificate_password }}", "single-node protected certificate passphrase")
 require_contains(single + "/ansible/templates/backup.service.j2", "SupplementaryGroups=deploy", "backup service can read the root:deploy Data Protection certificate")
@@ -2960,8 +2962,8 @@ for needle, why in [
     ('^Cache-Control:[[:space:]]*public, ?max-age=31536000, ?immutable', "React image smoke verifies immutable fingerprinted assets"),
     ('^Cache-Control:[[:space:]]*private, ?no-store', "React image smoke verifies private API cache denial"),
     ('/api/client-config', "React image smoke reads explicit capability before account-route expectations"),
-    ('payload["accountsEnabled"]', "React image smoke validates the account capability"),
-    ('if [[ "$accounts_enabled" == "true" ]]; then', "React image smoke selects enabled versus disabled route expectations"),
+    ("client config application ID is invalid", "React image smoke validates the client configuration"),
+    ("GET /api/auth/login did not return 405", "React image smoke checks that account routes are POST-only"),
     ("Allow:[[:space:]]*POST", "React image smoke verifies enabled POST-only reads return 405"),
     ('/api/auth/not-a-real-operation', "React image smoke verifies unknown enabled routes remain 404"),
     ('inactive_paths=(/Account /api/auth/not-a-real-operation /assets/missing.js)', "React image smoke verifies unknown API, React-only and missing paths stay 404"),
@@ -2976,15 +2978,12 @@ react_smoke = smoke[react_smoke_start:react_smoke_end]
 if "Test-DeployedSite.ps1" not in react_smoke or '-AcceptanceProfile "$FRONTEND_ACCEPTANCE_PROFILE"' not in react_smoke:
     fail("React Docker smoke must run ReactPublicV1 HTTP acceptance")
 for needle, why in [
-    ("Category=ReactPackagedDisabled", "disabled packaged React browser filter"),
     ("Category=ReactPackagedEnabled", "enabled packaged React account browser filter"),
 ]:
     if needle not in smoke:
         fail(f"React Docker smoke: missing {why}")
 for needle, why in [
-    ("$REACT_DISABLED_BROWSER_FILTER", "React Docker smoke runs disabled packaged browser acceptance"),
     ("$REACT_ENABLED_BROWSER_FILTER", "React Docker smoke runs enabled packaged account browser acceptance"),
-    ("Packaged React disabled browser journey", "disabled packaged browser suite rejects skipped tests"),
     ("Packaged React enabled account browser journey", "enabled packaged account browser suite rejects skipped tests"),
     ("--expected-skipped 0", "React packaged browser suites reject skipped tests"),
 ]:
@@ -3021,10 +3020,10 @@ for needle, why in [
 ]:
     if needle not in react_acceptance:
         fail(f"Scripts/Test-DeployedSite.ps1: React acceptance lacks {why}")
-capability_request = deployed_site_acceptance.index("$capability = Get-ReactCapability")
+capability_request = deployed_site_acceptance.index("Get-ReactCapability $capabilitySession $uri")
 common_request = deployed_site_acceptance.index("Invoke-CommonAcceptance $anonymous $FrontendProfile", capability_request)
 if capability_request > common_request:
-    fail("React acceptance must read explicit capability before common or profile checks")
+    fail("React acceptance must read the client configuration before common or profile checks")
 if "Form " in react_acceptance or "Login " in react_acceptance or "RequestMethod 'POST'" in react_acceptance:
     fail("React public HTTP acceptance must not submit forms or credentials")
 require_contains(single + "/Scripts/lib/platform_check.py", '"WSL_DISTRO_NAME"', "native deployment boundary")
@@ -3088,7 +3087,7 @@ require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'
 require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'SubState=running'", "connector must be running before public acceptance")
 require_contains(single + "/ansible/roles/single_node_public/tasks/main.yml", "'ExecMainStatus=0'", "connector process must have a successful exit status")
 require_contains("Scripts/Test-DeployedSite.ps1", "@('http', 'https')", "HTTP and HTTPS acceptance")
-require_contains("Scripts/Test-DeployedSite.ps1", "'HTTPS-cookie'", "public authentication cookie security")
+require_contains("Scripts/Test-DeployedSite.ps1", "'HTTPS-cookie'", "public account cookie security")
 for path, verify_name, acceptance_name in [
     (".github/workflows/cd-localcluster.yml", "Verify running release identity", "Run acceptance check"),
     (".github/workflows/cd-localsinglenode.yml", "Verify running release identity", "Run HTTP acceptance"),

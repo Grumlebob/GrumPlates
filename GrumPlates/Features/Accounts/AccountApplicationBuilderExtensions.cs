@@ -25,11 +25,6 @@ internal static class AccountApplicationBuilderExtensions
 
     public static void UseAccountRequestPolicies(this WebApplication app)
     {
-        if (!app.Services.GetRequiredService<AccountOptions>().Enabled)
-        {
-            return;
-        }
-
         app.Use(async (context, next) =>
         {
             var accountRequest = context.Request.Path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase)
@@ -72,11 +67,6 @@ internal static class AccountApplicationBuilderExtensions
 
     public static void UseAccountJsonBodyLimits(this WebApplication app)
     {
-        if (!app.Services.GetRequiredService<AccountOptions>().Enabled)
-        {
-            return;
-        }
-
         app.Use(async (context, next) =>
         {
             if (!IsAccountJsonMutation(context))

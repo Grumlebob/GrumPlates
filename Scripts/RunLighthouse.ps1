@@ -6,8 +6,8 @@ param(
   [string]$Label = "local",
   [switch]$IgnoreCertificateErrors,
   [switch]$AuthenticatedLocalUser,
-  [string]$Email = "user@user.com",
-  [string]$Password = "User123",
+  [string]$Email = "",
+  [string]$Password = "",
   [string]$OutputRoot = "TestResults/Lighthouse",
   [string]$BrowserProxy,
   [string]$Minimum
@@ -122,6 +122,22 @@ if (-not (Test-Path -LiteralPath $lighthouseCli)) {
 $profiles = if ($Profile -eq "both") { @("mobile", "desktop") } else { @($Profile) }
 $extraHeadersPath = $null
 if ($AuthenticatedLocalUser) {
+  if ([string]::IsNullOrEmpty($Email) -or [string]::IsNullOrEmpty($Password)) {
+    # Local setup writes the seeded User to the ignored .env as raw KEY=value lines.
+    $envPath = Join-Path $repoRoot ".env"
+    $seed = @{}
+    if (Test-Path -LiteralPath $envPath) {
+      foreach ($line in Get-Content -LiteralPath $envPath) {
+        $separator = $line.IndexOf("=")
+        if ($separator -gt 0 -and -not $line.StartsWith("#")) { $seed[$line.Substring(0, $separator)] = $line.Substring($separator + 1) }
+      }
+    }
+    if ([string]::IsNullOrEmpty($Email)) { $Email = $seed["Accounts__UserSeed__Email"] }
+    if ([string]::IsNullOrEmpty($Password)) { $Password = $seed["Accounts__UserSeed__Password"] }
+    if ([string]::IsNullOrEmpty($Email) -or [string]::IsNullOrEmpty($Password)) {
+      throw "-AuthenticatedLocalUser needs -Email and -Password, or the seeded User in .env from docker/setup-local.ps1."
+    }
+  }
   Write-Host "Creating authenticated local Lighthouse session for $Email..."
   $extraHeadersPath = Join-Path $runDirectory "authenticated-headers.json"
   Get-AuthenticatedHeadersJson | Set-Content -LiteralPath $extraHeadersPath -Encoding utf8

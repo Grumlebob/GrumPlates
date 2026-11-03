@@ -2,11 +2,8 @@
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text
-@using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
 
-@inject UserManager<ApplicationUser> UserManager
-@inject SignInManager<ApplicationUser> SignInManager
 @inject AccountOptions AccountOptions
 @inject AccountOperations Accounts
 @inject IdentityRedirectManager RedirectManager
@@ -14,32 +11,28 @@
 <PageTitle>Confirm email change</PageTitle>
 
 <h1>Confirm email change</h1>
-<StatusMessage Message="@message" />
-@if (AccountOptions.Enabled)
+<StatusMessage />
+@if (!AccountOptions.EmailEnabled)
 {
-    @if (!AccountOptions.EmailEnabled)
-    {
-        <p role="status">This account operation is unavailable.</p>
-    }
-    else if (string.IsNullOrEmpty(Input.UserId) || string.IsNullOrEmpty(Input.Email) || string.IsNullOrEmpty(Input.Code))
-    {
-        <p role="alert">Open the full confirmation link from your email.</p>
-    }
-    else
-    {
-        <p>Confirm the change to your email address.</p>
-        <EditForm Model="Input" FormName="confirm-email-change" OnValidSubmit="ConfirmEnabledEmailChangeAsync" method="post">
-            <DataAnnotationsValidator />
-            <input type="hidden" name="Input.UserId" value="@Input.UserId" />
-            <input type="hidden" name="Input.Email" value="@Input.Email" />
-            <input type="hidden" name="Input.Code" value="@Input.Code" />
-            <button type="submit" class="account-button-primary">Confirm email change</button>
-        </EditForm>
-    }
+    <p role="status">This account operation is unavailable.</p>
+}
+else if (string.IsNullOrEmpty(Input.UserId) || string.IsNullOrEmpty(Input.Email) || string.IsNullOrEmpty(Input.Code))
+{
+    <p role="alert">Open the full confirmation link from your email.</p>
+}
+else
+{
+    <p>Confirm the change to your email address.</p>
+    <EditForm Model="Input" FormName="confirm-email-change" OnValidSubmit="ConfirmEnabledEmailChangeAsync" method="post">
+        <DataAnnotationsValidator />
+        <input type="hidden" name="Input.UserId" value="@Input.UserId" />
+        <input type="hidden" name="Input.Email" value="@Input.Email" />
+        <input type="hidden" name="Input.Code" value="@Input.Code" />
+        <button type="submit" class="account-button-primary">Confirm email change</button>
+    </EditForm>
 }
 
 @code {
-    private string? message;
 
     [CascadingParameter]
     private HttpContext HttpContext { get; set; } = default!;
@@ -56,64 +49,21 @@
     [SupplyParameterFromForm(FormName = "confirm-email-change")]
     private InputModel Input { get; set; } = default!;
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         Input ??= new();
-        if (AccountOptions.Enabled)
-        {
-            try
-            {
-                Input.UserId = UserId ?? "";
-                Input.Email = Email ?? "";
-                Input.Code = Code is null ? "" : Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
-            }
-            catch (FormatException)
-            {
-                Input.UserId = "";
-                Input.Email = "";
-                Input.Code = "";
-            }
-            return;
-        }
-
-        // Keep the disabled template path compatible. Enabled account links are read-only on GET.
-        if (UserId is null || Email is null || Code is null)
-        {
-            RedirectManager.RedirectToWithStatus(
-                "Account/Login", "Error: Invalid email change confirmation link.", HttpContext);
-            return;
-        }
-
-        var user = await UserManager.FindByIdAsync(UserId);
-        if (user is null)
-        {
-            message = "The email change confirmation is invalid or unavailable.";
-            return;
-        }
-
+        // Account links are read-only on GET; the change happens on the POST below.
         try
         {
-            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
-            var result = await UserManager.ChangeEmailAsync(user, Email, code);
-            if (!result.Succeeded)
-            {
-                message = "The email change confirmation is invalid or unavailable.";
-                return;
-            }
-
-            var setUserNameResult = await UserManager.SetUserNameAsync(user, Email);
-            if (!setUserNameResult.Succeeded)
-            {
-                message = "The email change confirmation is invalid or unavailable.";
-                return;
-            }
-
-            await SignInManager.RefreshSignInAsync(user);
-            message = "Thank you for confirming your email change.";
+            Input.UserId = UserId ?? "";
+            Input.Email = Email ?? "";
+            Input.Code = Code is null ? "" : Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
         }
         catch (FormatException)
         {
-            message = "The email change confirmation is invalid or unavailable.";
+            Input.UserId = "";
+            Input.Email = "";
+            Input.Code = "";
         }
     }
 

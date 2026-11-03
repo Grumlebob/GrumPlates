@@ -65,7 +65,6 @@ services:
       ASPNETCORE_HTTP_PORTS: ${APP_PORT}
       APP_VERSION: ${APP_VERSION}
       App__Name: ${APP_NAME}
-      LocalAccounts__Enabled: "false"
       Database__RunMigrationsAtStartup: "false"
       ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       Redis__Configuration: redis:6379,password=${REDIS_PASSWORD},abortConnect=false
@@ -73,7 +72,6 @@ services:
       Observability__OpenTelemetry__Enabled: "false"
       Observability__OpenTelemetry__DeploymentTarget: localsinglenode
     volumes:
-      - app_storage:/app/Storage
       - type: bind
         source: ${DATA_PROTECTION_CERT_HOST_PATH:?DATA_PROTECTION_CERT_HOST_PATH is required}
         target: /run/secrets/data-protection.pem
@@ -82,7 +80,6 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  app_storage:
 
 networks:
   default:

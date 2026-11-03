@@ -9,8 +9,6 @@ internal static class AccountPrincipalGuard
 {
     public static void UseAccountPrincipalGuards(this WebApplication app)
     {
-        if (!app.Services.GetRequiredService<AccountOptions>().Enabled) return;
-
         app.Use(async (context, next) =>
         {
             // Endpoint metadata limits this guard to real private operations.

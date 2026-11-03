@@ -18,16 +18,9 @@ internal sealed class AppRateLimitingOptions
         QueueLimit = 0
     };
 
-    public RateLimitRuleOptions Authentication { get; set; } = new()
-    {
-        PermitLimit = 120,
-        WindowSeconds = 300,
-        QueueLimit = 0
-    };
-
     public bool AllRulesAreValid()
     {
-        return Global.IsValid() && Api.IsValid() && Authentication.IsValid();
+        return Global.IsValid() && Api.IsValid();
     }
 }
 

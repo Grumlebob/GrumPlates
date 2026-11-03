@@ -17,7 +17,6 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
             var title = $"Snapshot Book {suffix}";
             var author = $"Snapshot Author {suffix}";
             var url = $"https://example.test/books/{suffix}";
-            var email = $"snapshot-{suffix}@example.test";
 
             await GoHomeAndWaitForInteractivityAsync();
             await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
@@ -28,7 +27,6 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
             await Expect(Page.GetByTestId("bookcase-login-cta")).ToContainTextAsync("Create your own bookcase by logging in.");
             await CaptureAsync("home");
 
-            TrackCreatedUser(email);
             TrackCreatedBook(title, url);
 
             await GoToAsync("/Account/Login");
@@ -36,10 +34,7 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
 
             await GoToAsync("/Account/Register");
             await CaptureAsync("register");
-            await Page.Locator("#Input\\.Email").FillAsync(email);
-            await Page.Locator("#Input\\.Password").FillAsync(E2EPassword);
-            await Page.Locator("#Input\\.ConfirmPassword").FillAsync(E2EPassword);
-            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Register" }).ClickAsync();
+            await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
             await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
 

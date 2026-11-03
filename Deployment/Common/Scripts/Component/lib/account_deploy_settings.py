@@ -4,7 +4,6 @@ import re
 
 
 ACCOUNT_SETTING_KEYS = {
-    "accounts_enabled",
     "accounts_registration_enabled",
     "accounts_admin_seed_enabled",
     "accounts_admin_seed_email",
@@ -29,7 +28,6 @@ def _bool_setting(values: dict[str, object], key: str, errors: list[str]) -> boo
 def validate_account_deploy_settings(values: dict[str, object]) -> list[str]:
     """Validate public account deployment settings without inspecting credentials."""
     errors: list[str] = []
-    enabled = _bool_setting(values, "accounts_enabled", errors)
     registration = _bool_setting(values, "accounts_registration_enabled", errors)
     seed_enabled = _bool_setting(values, "accounts_admin_seed_enabled", errors)
 
@@ -68,12 +66,12 @@ def validate_account_deploy_settings(values: dict[str, object]) -> list[str]:
     host = text.get("accounts_email_host", "")
     sender = text.get("accounts_email_from", "")
     admin_email = text.get("accounts_admin_seed_email", "")
-    if registration and (not enabled or not host or not sender or not origin):
-        errors.append("accounts_registration_enabled requires enabled accounts and complete email settings")
-    if seed_enabled and (not enabled or not admin_email):
-        errors.append("accounts_admin_seed_enabled requires enabled accounts and an Admin seed email")
-    if host and (not enabled or not sender or not origin):
-        errors.append("accounts_email_host requires enabled accounts, a sender and a public origin")
+    if registration and (not host or not sender or not origin):
+        errors.append("accounts_registration_enabled requires complete email settings")
+    if seed_enabled and not admin_email:
+        errors.append("accounts_admin_seed_enabled requires an Admin seed email")
+    if host and (not sender or not origin):
+        errors.append("accounts_email_host requires a sender and a public origin")
     if not host and sender:
         errors.append("accounts_email_from requires accounts_email_host")
 

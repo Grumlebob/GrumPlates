@@ -35,7 +35,7 @@ internal static class OpenApiMetadataHosting
 
         builder.Services.AddRouting();
         builder.Services.AddAuthorization();
-        builder.Services.AddSingleton(new AccountOptions { Enabled = true });
+        builder.Services.AddSingleton(new AccountOptions());
         builder.Services.AddSingleton(new AccountApplicationIdentity("OpenApiMetadata", Environments.Production));
         builder.Services.AddAppApiJson();
         builder.Services.AddRateLimiter(options =>

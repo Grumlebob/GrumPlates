@@ -1,9 +1,9 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createApiClient, type ApiClient } from "../../api/api-client";
 import { ApiError, isAbortError, invalidApiResponse, isJsonContentType, toHttpApiError } from "../../api/errors";
-import { AccountChangedError, disabledSession, type ClientConfiguration, type Session } from "./account-api";
+import { AccountChangedError, emptySession, type ClientConfiguration, type Session } from "./account-api";
 
-export type AccountStatus = "loading" | "disabled" | "anonymous" | "authenticated" | "unavailable";
+export type AccountStatus = "loading" | "anonymous" | "authenticated" | "unavailable";
 
 export interface AccountSnapshot {
   status: AccountStatus;
@@ -29,7 +29,7 @@ interface SessionRefreshAttempt {
 
 const emptySnapshot: AccountSnapshot = {
   status: "loading",
-  session: disabledSession,
+  session: emptySession,
   loading: true,
   checking: true,
   error: null,
@@ -117,7 +117,7 @@ export class AccountSessionController {
           if (this.isCurrent(attempt.generation)) {
             this.publish({
               status: "unavailable",
-              session: disabledSession,
+              session: emptySession,
               loading: false,
               checking: false,
               error: getSafeAccountError(error),
@@ -166,11 +166,6 @@ export class AccountSessionController {
     }
     this.publish({ applicationId: configuration.applicationId });
 
-    if (!configuration.accountsEnabled) {
-      await this.publishSession(attempt, "disabled", disabledSession);
-      return disabledSession;
-    }
-
     const sessionResponse = await this.fetchJson("/api/auth/session", "same-origin", signal);
     const session = await this.readJson<Session>(sessionResponse);
     if (!isEnabledSession(session)) throw invalidApiResponse(sessionResponse.status);
@@ -178,7 +173,7 @@ export class AccountSessionController {
     return session;
   }
 
-  private async publishSession(attempt: SessionRefreshAttempt, status: "disabled" | "anonymous" | "authenticated", session: Session): Promise<void> {
+  private async publishSession(attempt: SessionRefreshAttempt, status: "anonymous" | "authenticated", session: Session): Promise<void> {
     if (!this.isCurrent(attempt.generation)) throw createAbortError();
     const previousUserId = this.snapshot.session.user?.id ?? null;
     const nextUserId = session.user?.id ?? null;
@@ -342,7 +337,6 @@ function isClientConfiguration(value: unknown): value is ClientConfiguration {
   if (!value || typeof value !== "object") return false;
   const configuration = value as Partial<ClientConfiguration>;
   return configuration.schemaVersion === 1
-    && typeof configuration.accountsEnabled === "boolean"
     && typeof configuration.applicationId === "string"
     && /^[0-9a-f]{32}$/.test(configuration.applicationId);
 }

@@ -1,6 +1,6 @@
 # Accounts
 
-Accounts are optional and disabled by default. React reads the server capability before starting account requests. The server remains authoritative: hiding a link or route never replaces API authentication, authorization, antiforgery or cache policy.
+Accounts are always on. Registration, the Admin seed and email are opt-in. React reads the client configuration before starting account requests. The server remains authoritative: hiding a link or route never replaces API authentication, authorization, antiforgery or cache policy.
 
 Server implementation and Blazor Identity UI live under `GrumPlates/Features/Accounts`; shared DTOs live in `GrumPlates.Core/Features/Accounts/Contracts`. `ApplicationUser` resides in the feature's `Identity` folder but retains the CLR namespace `GrumPlates.Features.Login.Account` for Identity/EF compatibility. The shared context, design-time factory and historical migrations stay under `Infrastructure/Persistence`. The outbox entity and operations belong to Accounts; its EF mapping remains inline in the shared `AppDbContext`. See [architecture](Architecture.md) for composition and the deliberate Books-to-Accounts integration.
 
@@ -8,52 +8,39 @@ Server implementation and Blazor Identity UI live under `GrumPlates/Features/Acc
 
 | Configuration | Behavior |
 | --- | --- |
-| `Accounts:Enabled=false` | Account API routes are absent. React stays public-only, offers no private Books and creates no account session cookie. Legacy Blazor Identity behavior is retained. |
-| `Accounts:Enabled=true`, email host empty | Login, logout, password change, export, deletion and private Books work. Registration, confirmation, recovery and email change stay unavailable. A configured Admin can be provisioned once with `Accounts:AdminSeed`. |
-| `Accounts:Enabled=true`, email host and sender configured | The mail worker can send confirmation and recovery links. Registration additionally requires `Accounts:RegistrationEnabled=true`. `Accounts:PublicOrigin` must be a bare HTTPS origin. |
+| Email host empty | Login, logout, password change, export, deletion and private Books work. Registration, confirmation, recovery and email change stay unavailable. A configured Admin can be provisioned once with `Accounts:AdminSeed`. |
+| Email host and sender configured | The mail worker can send confirmation and recovery links. Registration additionally requires `Accounts:RegistrationEnabled=true`. `Accounts:PublicOrigin` must be a bare HTTPS origin. |
 
-`GET /api/client-config` returns the account capability without user data or secrets. When enabled, React reads `GET /api/auth/session` for the current user, feature flags and an antiforgery token. The UI lives at `/auth/login`, `/auth/register` and related `/auth/*` routes; `/auth` redirects to login. `/my-books` is private. Account mutations use POST and the antiforgery header. API failures stay JSON responses rather than login redirects.
+`GET /api/client-config` returns the schema version and application ID without user data or secrets. React reads `GET /api/auth/session` for the current user, feature flags and an antiforgery token. The UI lives at `/auth/login`, `/auth/register` and related `/auth/*` routes; `/auth` redirects to login. `/my-books` is private. Account mutations use POST and the antiforgery header. API failures stay JSON responses rather than login redirects.
 
 The authentication cookie is `Secure`, `HttpOnly`, `SameSite=Lax`, host-only and fixed at eight hours, or fourteen days when “remember me” is selected. Account and private API responses use `Cache-Control: private, no-store`. Passwords must contain 15–128 Unicode characters, contain no control characters, and differ from the application name and email; common passwords are rejected. Password changes, resets and confirmed email changes rotate the security stamp; account deletion removes the user. Each action revokes existing sessions.
 
-Blazor retains its existing MFA, passkey and configured external-login capabilities in enabled mode. React's password-only sign-in does not bypass MFA. Blazor password recovery preserves MFA, and sensitive management still requires a valid session and current-password proof. New external users complete email-first registration, then sign in to link their provider; disabling registration also prevents external callbacks from creating accounts.
+Blazor retains its existing MFA, passkey and configured external-login capabilities. React's password-only sign-in does not bypass MFA. Blazor password recovery preserves MFA, and sensitive management still requires a valid session and current-password proof. New external users complete email-first registration, then sign in to link their provider; disabling registration also prevents external callbacks from creating accounts.
 
 React hides private data while rechecking the session and clears private query caches when the account changes. Unsaved book drafts remain bound to their original application and user; another user must explicitly discard the previous draft before adding or editing a book. Deletion confirmation and account-management credentials do not carry across application or user changes. These boundaries follow [React's guidance on preserving and resetting state](https://react.dev/learn/preserving-and-resetting-state).
 
-## Create a local React Admin
+## Local seeded accounts
 
-Use the Docker development setup from [How to run locally](HowToRunLocally.md). It generates the local HTTPS certificate used to protect the local PostgreSQL Data Protection key ring. Select `React` in `frontend-profile.txt` for this run; the file is the persisted profile selection.
-
-Run setup if `.env` or the local certificate is missing:
+Local setup seeds one Admin and one User for both frontends. Run it once, or again if `.env` or the local certificate is missing:
 
 ```powershell
 pwsh -File ./docker/setup-local.ps1
 ```
 
-In the ignored `.env`, set the account values below. Keep values unquoted and edit the file directly; do not put the password in shell history. Replace the example address and placeholder password with local values.
+Setup fills `Accounts__AdminSeed__*` with `admin@localhost.test` and `Accounts__UserSeed__*` with `user@localhost.test` in the ignored `.env`, each with a generated 24-character password. It prints the emails, never the passwords. It leaves a seed alone when its email or password is already set, so your own values are kept. Startup creates each account once, confirmed, with the `Admin` or `User` role. It never changes an existing password or email, and it refuses an email that belongs to an account without that role. Local self-registration stays off because there is no local mail server.
 
-```dotenv
-Accounts__Enabled=true
-Accounts__RegistrationEnabled=false
-Accounts__AdminSeed__Enabled=true
-Accounts__AdminSeed__Email=operator@example.test
-Accounts__AdminSeed__Password=<private 15–128 character passphrase>
-Accounts__PublicOrigin=
-Accounts__Email__Host=
-Accounts__Email__From=
-Accounts__Email__Username=
-Accounts__Email__Password=
-```
-
-Start the app and open the local HTTPS URL, normally `https://localhost:7186/auth/login`:
+Start the app and sign in at `https://localhost:7186/Account/Login` (Blazor) or `https://localhost:7186/auth/login` (React):
 
 ```powershell
 .\Scripts\RunLocal.ps1 -NoBrowser
 ```
 
-Startup creates the confirmed Admin account and `Admin` role if the address is new. It refuses to assign the role if that address already belongs to a non-admin account. The seed never changes an existing password. After the first successful startup, set `Accounts__AdminSeed__Enabled=false`, clear the seed email and password, save `.env`, and restart the app. Keep `Accounts__Enabled=true` to retain account access. The seeded role does not add an admin dashboard to the template.
+| Setting | Meaning |
+| --- | --- |
+| `Accounts:AdminSeed` | `Enabled`, `Email`, `Password`. Creates the Admin once. Deployments use it too. |
+| `Accounts:UserSeed` | Same shape. Creates an ordinary User once. Local development only; deployments do not set it. |
 
-The password must satisfy the account password policy and must not be common or match the email or application name. Do not use the legacy Blazor demo credentials or carry local seed values into a deployed environment. Keep `.env`, local databases and generated certificates out of commits and images.
+Seed passwords must satisfy the account password policy and must not be common or match the email or application name. Do not carry local seed values into a deployed environment. Keep `.env`, local databases and generated certificates out of commits and images. The seeded Admin role does not add an admin dashboard to the template.
 
 ## Email, quotas and delivery
 
@@ -65,7 +52,7 @@ A database restore may replay an active pending job and produce a duplicate emai
 
 ## Production key and backup recovery
 
-When accounts are enabled, Data Protection keys and account data share the PostgreSQL database. Production keys are wrapped with the app-owned certificate and private key stored outside that database. A database dump alone cannot restore sign-in cookies or decrypt outbox jobs. Preserve the same app identity, deployment environment, database, certificate/private key and certificate password. Replicas of one app share those inputs; unrelated apps must not.
+Data Protection keys and account data share the PostgreSQL database. Production keys are wrapped with the app-owned certificate and private key stored outside that database. A database dump alone cannot restore sign-in cookies or decrypt outbox jobs. Preserve the same app identity, deployment environment, database, certificate/private key and certificate password. Replicas of one app share those inputs; unrelated apps must not.
 
 Keep the wrapping key across ordinary redeploys. Store it with protected off-host backups and never bake it into an image. Follow the selected target's backup verification and recovery procedures: [LocalCluster](../Deployment/LocalCluster/Operations.md#backup-and-restore), [Cloud](../Deployment/Cloud/Operations.md#back-up-and-restore-postgresql), or [LocalSingleNode](../Deployment/LocalSingleNode/Operations.md#backups-and-recovery).
 

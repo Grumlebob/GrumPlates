@@ -35,7 +35,6 @@ observability_prometheus_retention_size: 4GB
 observability_loki_retention_period: 3d
 observability_tempo_retention_period: 24h
 
-accounts_enabled: false
 accounts_registration_enabled: false
 accounts_admin_seed_enabled: false
 accounts_admin_seed_email: ""

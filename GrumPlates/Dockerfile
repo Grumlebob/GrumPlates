@@ -15,7 +15,6 @@ RUN npm run build && test -s build/client/index.html \
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
-RUN mkdir -p /app/Storage && chown -R app:app /app/Storage
 EXPOSE 8080
 EXPOSE 7186
 

@@ -18,7 +18,6 @@ These are the settings currently used by the target. Keep committed defaults unl
 | `deploy_root` | App runtime directory under /opt. Keep unique per app. |
 | `cloudflare_tunnel_name` | Tunnel used by this app. Apps can share one tunnel. |
 | `cloudflared_version` | Pinned Cloudflared release. Keep the same version across apps sharing a host. |
-| `accounts_enabled` | Enable application accounts. Defaults to false. |
 | `accounts_registration_enabled` | Allow public registration; requires accounts, public origin, SMTP host and sender. Defaults to false. |
 | `accounts_admin_seed_enabled` | Create the configured initial Admin account. Defaults to false. |
 | `accounts_admin_seed_email` | Email address for the optional initial Admin account. |
@@ -49,7 +48,7 @@ These are the settings currently used by the target. Keep committed defaults unl
 
 The source file remains authoritative; review its values for your own host and account. Keep observability paths, network, and published ports unique when apps deploy separate telemetry stacks on the same nodes. Increase retention only after checking disk use.
 
-Account settings are opt-in on both LocalCluster and Cloud. An Admin seed can be enabled without SMTP by setting `accounts_enabled`, `accounts_admin_seed_enabled`, and `accounts_admin_seed_email`; store its password as `vault_accounts_admin_seed_password` in the encrypted LocalCluster vault. Public registration also needs `accounts_public_origin`, `accounts_email_host`, and `accounts_email_from`. Set both `vault_accounts_email_username` and `vault_accounts_email_password` when the SMTP server requires authentication. See [vault.example.yml](inventory/prod/vault.example.yml) for the optional secret names. Keep account credentials out of all.yml.
+Accounts are always on. Registration, the Admin seed and email are opt-in on both LocalCluster and Cloud. An Admin seed can be enabled without SMTP by setting `accounts_admin_seed_enabled` and `accounts_admin_seed_email`; store its password as `vault_accounts_admin_seed_password` in the encrypted LocalCluster vault. Public registration also needs `accounts_public_origin`, `accounts_email_host`, and `accounts_email_from`. Set both `vault_accounts_email_username` and `vault_accounts_email_password` when the SMTP server requires authentication. See [vault.example.yml](inventory/prod/vault.example.yml) for the optional secret names. Keep account credentials out of all.yml.
 
 The optional `inventory_dns_suffix` setting enables a preflight check that each generated inventory address matches the corresponding node name published by local DNS. Set it only when the router publishes matching node DNS names. Regenerate `hosts.yml` from `machines.yml` after an address change. Do not add undocumented keys; the validator rejects unknown settings.
 

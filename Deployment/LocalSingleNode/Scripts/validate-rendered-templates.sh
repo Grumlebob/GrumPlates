@@ -54,8 +54,7 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
         for port in service.get('ports', []):
             assert port['host_ip'] == '127.0.0.1', 'Compose published a non-loopback port'
     assert config['services']['web']['image'] == context['app_image'] + '@' + context['release_image_digest']
-    assert config['services']['web']['environment']['LocalAccounts__Enabled'] == 'false'
-    assert config['services']['web']['environment']['Accounts__Enabled'] == 'false'
+    assert 'Accounts__Enabled' not in config['services']['web']['environment']
     assert config['services']['web']['environment']['Accounts__RegistrationEnabled'] == 'false'
     assert config['services']['web']['environment']['DataProtection__KeyEncryptionCertificatePath'] == '/run/secrets/data-protection.pem'
     assert config['services']['web']['environment']['DataProtection__KeyEncryptionCertificatePassword'] == 'd' * 64
@@ -67,7 +66,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     special_password = "SMTP $one #two = \"three\" 'four' spaced"
     enabled_context = {
         **context,
-        'accounts_enabled': True,
         'accounts_registration_enabled': True,
         'accounts_admin_seed_enabled': False,
         'accounts_public_origin': 'https://books.example.invalid',
@@ -87,7 +85,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     enabled_output = subprocess.check_output(['docker', 'compose', '--project-directory', str(single_fixture), '--env-file', str(interpolation_env), '-f', str(single_compose), 'config', '--format', 'json'], text=True)
     enabled_config = json.loads(enabled_output)
     web_environment = enabled_config['services']['web']['environment']
-    assert web_environment['Accounts__Enabled'] == 'true'
     assert web_environment['Accounts__RegistrationEnabled'] == 'true'
     assert_runtime_environment(single_fixture, {
         'username': enabled_context['vault_accounts_email_username'],
@@ -99,7 +96,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     root_fixture = folder / 'root-compose'
     root_fixture.mkdir()
     root_env = (root / '.env.example').read_text()
-    root_env = root_env.replace('Accounts__Enabled=false', 'Accounts__Enabled=true')
     root_env = root_env.replace('Accounts__RegistrationEnabled=false', 'Accounts__RegistrationEnabled=true')
     root_env = root_env.replace('Accounts__PublicOrigin=\n', 'Accounts__PublicOrigin=https://books.example.invalid\n')
     root_env = root_env.replace('Accounts__Email__Host=\n', 'Accounts__Email__Host=smtp.example.invalid\n')

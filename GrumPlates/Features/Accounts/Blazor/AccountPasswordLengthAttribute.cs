@@ -12,16 +12,6 @@ public sealed class AccountPasswordLengthAttribute : ValidationAttribute
     {
     }
 
-    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
-    {
-        if (validationContext.ObjectInstance is AccountPasswordPolicyInputModel model && !model.EnforceAccountPasswordPolicy)
-        {
-            return ValidationResult.Success;
-        }
-
-        return base.IsValid(value, validationContext);
-    }
-
     public override bool IsValid(object? value)
     {
         if (value is not string password || string.IsNullOrEmpty(password)) return true;

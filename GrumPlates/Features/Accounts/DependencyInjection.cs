@@ -62,11 +62,6 @@ internal static class AccountsServiceCollectionExtensions
         services.AddScoped<AccountSessionOperations>();
         services.TryAddSingleton(TimeProvider.System);
 
-        if (!settings.Enabled)
-        {
-            return services;
-        }
-
         if (settings.EmailEnabled)
         {
             services.AddOptions<AccountMailWorkerSchedule>();

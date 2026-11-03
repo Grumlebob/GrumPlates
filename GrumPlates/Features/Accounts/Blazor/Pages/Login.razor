@@ -4,12 +4,10 @@
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
 
-@inject UserManager<ApplicationUser> UserManager
 @inject SignInManager<ApplicationUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-@inject AccountOptions AccountOptions
 
 <PageTitle>Log in</PageTitle>
 
@@ -29,7 +27,7 @@
                     <ValidationMessage For="() => Input.Email" class="account-text-danger" />
                 </div>
                 <div class="account-field">
-                    <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="account-input" autocomplete="current-password" maxlength="@(AccountOptions.Enabled ? "256" : null)" aria-required="true" placeholder="password" />
+                    <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="account-input" autocomplete="current-password" maxlength="256" aria-required="true" placeholder="password" />
                     <label for="Input.Password" class="account-label">Password</label>
                     <ValidationMessage For="() => Input.Password" class="account-text-danger" />
                 </div>
@@ -121,7 +119,7 @@
                 return;
             }
 
-            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: AccountOptions.Enabled);
+            result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: true);
         }
 
         if (result.Succeeded)

@@ -19,7 +19,7 @@ public sealed class BlazorBooksTransportTests
         {
             Content = request.RequestUri!.AbsolutePath switch
             {
-                "/api/client-config" => Json(new { schemaVersion = 1, accountsEnabled = true, applicationId = new string('a', 32) }),
+                "/api/client-config" => Json(new { schemaVersion = 1, applicationId = new string('a', 32) }),
                 "/api/auth/session" => Json(new { enabled = true, registrationEnabled = false, emailEnabled = false, csrfToken = "fresh-csrf", user = (object?)null }),
                 _ => Json(new { id = 7, title = "Fixture" })
             }
@@ -46,7 +46,7 @@ public sealed class BlazorBooksTransportTests
         var handler = new RecordingHandler((request, captured) =>
         {
             var path = request.RequestUri!.AbsolutePath;
-            if (path == "/api/client-config") return JsonResponse(new { schemaVersion = 1, accountsEnabled = true, applicationId = new string('b', 32) });
+            if (path == "/api/client-config") return JsonResponse(new { schemaVersion = 1, applicationId = new string('b', 32) });
             if (path == "/api/auth/session") return JsonResponse(new { enabled = true, registrationEnabled = false, emailEnabled = false, csrfToken = "csrf-b", user = new { id = "owner-b", email = "b@example.test", roles = Array.Empty<string>() } });
             return captured.ExpectedUser == "owner-a"
                 ? new HttpResponseMessage(HttpStatusCode.Conflict)
@@ -59,27 +59,6 @@ public sealed class BlazorBooksTransportTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("owner-a", handler.Requests[^1].ExpectedUser);
         Assert.Equal("csrf-b", handler.Requests[^1].CsrfToken);
-    }
-
-    [Fact]
-    public async Task DisabledAccounts_PreservesTheExistingTransportWithoutSessionHeaders()
-    {
-        var handler = new RecordingHandler((request, _) => request.RequestUri!.AbsolutePath == "/api/client-config"
-            ? JsonResponse(new { schemaVersion = 1, accountsEnabled = false, applicationId = new string('c', 32) })
-            : new HttpResponseMessage(HttpStatusCode.OK));
-        using var client = CreateClient(handler, "legacy-user");
-
-        using var response = await client.GetAsync("api/books");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Collection(handler.Requests,
-            configuration => Assert.Equal("/api/client-config", configuration.Path),
-            books =>
-            {
-                Assert.Equal("/api/books", books.Path);
-                Assert.Null(books.ExpectedUser);
-                Assert.Null(books.CsrfToken);
-            });
     }
 
     private static HttpClient CreateClient(RecordingHandler innerHandler, string userId)

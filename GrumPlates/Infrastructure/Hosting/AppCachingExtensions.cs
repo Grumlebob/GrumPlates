@@ -16,12 +16,9 @@ internal static class AppCachingExtensions
     {
         var redisConnection = configuration.GetSection("Redis").GetValue<string>("Configuration");
         var hasRedis = !AppOptionsExtensions.IsPlaceholder(redisConnection);
-        var accountsEnabled = configuration.GetValue<bool>("Accounts:Enabled");
         var allowMissingRedis = AllowMissingRedis(configuration, environment);
         services.AddOptions<DataProtectionKeyStorageOptions>()
-            .Bind(configuration.GetSection(DataProtectionKeyStorageOptions.SectionName))
-            .Validate(options => accountsEnabled || !string.IsNullOrWhiteSpace(options.KeyStoragePath), "DataProtection:KeyStoragePath must be configured.")
-            .ValidateOnStart();
+            .Bind(configuration.GetSection(DataProtectionKeyStorageOptions.SectionName));
 
         if (!hasRedis && !allowMissingRedis)
         {
@@ -69,36 +66,8 @@ internal static class AppCachingExtensions
         var dataProtection = services.AddDataProtection()
             .SetApplicationName(appName);
 
-        if (accountsEnabled)
-        {
-            dataProtection.PersistKeysToDbContext<AppDbContext>();
-        }
-        else if (redis is not null)
-        {
-            dataProtection.PersistKeysToStackExchangeRedis(redis, "DataProtection-Keys");
-        }
-        else
-        {
-            var keyStorageOptions = configuration
-                .GetSection(DataProtectionKeyStorageOptions.SectionName)
-                .Get<DataProtectionKeyStorageOptions>() ?? new DataProtectionKeyStorageOptions();
-            var keysPath = ResolveDataProtectionKeyStoragePath(keyStorageOptions, environment);
-            Directory.CreateDirectory(keysPath);
-            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
-        }
-
-        if (accountsEnabled)
-        {
-            ConfigureEnabledAccountKeyEncryption(dataProtection, configuration, environment, services);
-        }
-        else if (environment.IsEnvironment("Docker"))
-        {
-            ProtectKeysWithDockerCertificate(dataProtection);
-        }
-        else if (OperatingSystem.IsWindows())
-        {
-            dataProtection.ProtectKeysWithDpapi();
-        }
+        dataProtection.PersistKeysToDbContext<AppDbContext>();
+        ConfigureKeyEncryption(dataProtection, configuration, environment, services, OperatingSystem.IsWindows());
 
         services.AddHybridCache(options =>
         {
@@ -116,40 +85,16 @@ internal static class AppCachingExtensions
         || environment.IsEnvironment("Testing")
         || configuration.GetSection("Redis").GetValue<bool>("AllowMissing");
 
-    private static string ResolveDataProtectionKeyStoragePath(
-        DataProtectionKeyStorageOptions options,
-        IHostEnvironment environment)
-    {
-        return Path.GetFullPath(options.KeyStoragePath, environment.ContentRootPath);
-    }
-
-    private static void ProtectKeysWithDockerCertificate(IDataProtectionBuilder dataProtection)
-    {
-        var certificatePath = Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__Certificates__Default__Path");
-        var certificatePassword = Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__Certificates__Default__Password");
-        if (string.IsNullOrWhiteSpace(certificatePath) || !File.Exists(certificatePath))
-        {
-            return;
-        }
-
-        try
-        {
-            dataProtection.ProtectKeysWithCertificate(
-                X509CertificateLoader.LoadPkcs12FromFile(certificatePath, certificatePassword));
-        }
-        catch (Exception ex)
-        {
-            Log.Warning(ex, "Failed to configure Data Protection certificate encryption from {CertificatePath}", certificatePath);
-        }
-    }
-
-    private static void ConfigureEnabledAccountKeyEncryption(
+    // isWindows is a parameter so tests can cover the non-Windows Development fallback on any OS.
+    internal static void ConfigureKeyEncryption(
         IDataProtectionBuilder dataProtection,
         IConfiguration configuration,
         IHostEnvironment environment,
-        IServiceCollection services)
+        IServiceCollection services,
+        bool isWindows)
     {
-        if (OperatingSystem.IsWindows() && environment.IsDevelopment())
+        // OperatingSystem.IsWindows() also tells the platform analyzer that DPAPI is safe here.
+        if (isWindows && OperatingSystem.IsWindows() && environment.IsDevelopment())
         {
             dataProtection.ProtectKeysWithDpapi();
             return;
@@ -160,10 +105,16 @@ internal static class AppCachingExtensions
         var certificatePassword = configuration[$"{DataProtectionKeyStorageOptions.SectionName}:KeyEncryptionCertificatePassword"]
             ?? Environment.GetEnvironmentVariable("ASPNETCORE_Kestrel__Certificates__Default__Password");
 
+        if (string.IsNullOrWhiteSpace(certificatePath) && environment.IsDevelopment())
+        {
+            Log.Warning("Data Protection keys are stored unencrypted because no key-encryption certificate is configured. This is allowed only in Development.");
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(certificatePath) || !File.Exists(certificatePath))
         {
             throw new InvalidOperationException(
-                "Enabled accounts require DataProtection:KeyEncryptionCertificatePath and its password outside Windows Development.");
+                "Data Protection requires DataProtection:KeyEncryptionCertificatePath and its password outside Development.");
         }
 
         X509Certificate2 certificate;
@@ -194,13 +145,4 @@ internal static class AppCachingExtensions
             .ProtectKeysWithCertificate(certificate)
             .UnprotectKeysWithAnyCertificate(certificate);
     }
-}
-
-internal sealed class DataProtectionKeyStorageOptions
-{
-    public const string SectionName = "DataProtection";
-
-    public string KeyStoragePath { get; init; } = Path.Combine("..", "data", "storage", "DataProtection-Keys");
-    public string KeyEncryptionCertificatePath { get; init; } = string.Empty;
-    public string KeyEncryptionCertificatePassword { get; init; } = string.Empty;
 }

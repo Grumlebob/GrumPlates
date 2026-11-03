@@ -1,3 +1,4 @@
+using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -32,8 +33,11 @@ public sealed class RedisConfigurationTests
     [Fact]
     public async Task Production_AllowsMissingRedis_WhenFallbackIsExplicitlyAllowed()
     {
+        using var certificate = new TestKeyEncryptionCertificate();
         using var environment = new EnvironmentVariableScope(new Dictionary<string, string?>
         {
+            ["DataProtection__KeyEncryptionCertificatePath"] = certificate.Path,
+            ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
             ["Redis__Configuration"] = "CHANGE_ME",
             ["Redis__AllowMissing"] = "true"
         });

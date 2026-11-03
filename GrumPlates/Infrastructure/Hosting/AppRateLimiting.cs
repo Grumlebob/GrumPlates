@@ -8,7 +8,6 @@ namespace GrumPlates.Infrastructure.Hosting;
 internal static class AppRateLimiting
 {
     public const string ApiPolicyName = "api";
-    public const string AuthenticationPolicyName = "authentication";
     public const string AccountWritePolicyName = "account-writes";
 
     // A WebAssembly boot downloads dozens of framework files. Counting them
@@ -45,7 +44,6 @@ internal static class AppRateLimiting
     {
         var configuredOptions = new AppRateLimitingOptions();
         configuration.GetSection(AppRateLimitingOptions.SectionName).Bind(configuredOptions);
-        var accountsEnabled = configuration.GetValue<bool>("Accounts:Enabled");
 
         services.AddOptions<AppRateLimitingOptions>()
             .Bind(configuration.GetSection(AppRateLimitingOptions.SectionName))
@@ -66,16 +64,9 @@ internal static class AppRateLimiting
                     return RateLimitPartition.GetNoLimiter("static-assets");
                 }
 
-                // Enabled accounts have an independent named write policy. Keep the legacy
-                // authentication bucket only for the disabled template's existing /Account flow.
-                var isLegacyAccountWrite = !accountsEnabled
-                    && IsAccountWriteRequest(context);
-                var policy = isLegacyAccountWrite ? AuthenticationPolicyName : "global";
-                var rule = isLegacyAccountWrite ? configuredOptions.Authentication : configuredOptions.Global;
-
                 return RateLimitPartition.GetFixedWindowLimiter(
-                    GetPartitionKey(context, policy),
-                    _ => ToFixedWindow(rule));
+                    GetPartitionKey(context, "global"),
+                    _ => ToFixedWindow(configuredOptions.Global));
             });
 
             options.AddPolicy(ApiPolicyName, context =>
@@ -124,14 +115,6 @@ internal static class AppRateLimiting
         }
 
         return $"{policy}:ip:{context.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
-    }
-
-    private static bool IsAccountWriteRequest(HttpContext context)
-    {
-        return (context.Request.Path.StartsWithSegments("/Account", StringComparison.OrdinalIgnoreCase)
-            || context.Request.Path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase))
-            && !HttpMethods.IsGet(context.Request.Method)
-            && !HttpMethods.IsHead(context.Request.Method);
     }
 
     internal static bool IsStaticAssetRequest(PathString path)

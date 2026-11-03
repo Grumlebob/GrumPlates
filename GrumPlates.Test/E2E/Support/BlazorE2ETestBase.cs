@@ -6,8 +6,6 @@ namespace GrumPlates.Test.E2E.Support;
 
 public abstract class BlazorE2ETestBase : PageTest
 {
-    protected const string E2EPassword = E2ETestCredentials.Password;
-
     private static readonly JsonSerializerOptions AxeJsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Uri BaseUri = new(GetBaseUrl());
     private readonly E2ETestDataCleanup _testDataCleanup;
@@ -444,7 +442,7 @@ public abstract class BlazorE2ETestBase : PageTest
         }
     }
 
-    protected void TrackCreatedUser(string email, string password = E2EPassword) =>
+    protected void TrackCreatedUser(string email, string password) =>
         _testDataCleanup.TrackCreatedUser(email, password);
 
     protected void TrackCreatedBook(string title, string? url = null, int? id = null) =>
@@ -453,19 +451,20 @@ public abstract class BlazorE2ETestBase : PageTest
     protected Task TrackCreatedBookFromRowAsync(ILocator row, string title, string? url = null) =>
         _testDataCleanup.TrackCreatedBookFromRowAsync(row, title, url);
 
-    protected async Task<string> RegisterUniqueUserAsync(string emailPrefix)
+    /// <summary>
+    /// Signs in as the local seeded User. Never tracked for deletion; tests must not change its account.
+    /// </summary>
+    protected async Task<string> SignInAsSeededUserAsync()
     {
-        var suffix = Guid.NewGuid().ToString("N")[..10];
-        var email = $"{emailPrefix}-{suffix}@example.test";
-        TrackCreatedUser(email);
+        var (email, password) = E2ESeededUser.Resolve();
 
-        await GoToAsync("/Account/Register");
+        await GoToAsync("/Account/Login");
         await Page.Locator("#Input\\.Email").FillAsync(email);
-        await Page.Locator("#Input\\.Password").FillAsync(E2EPassword);
-        await Page.Locator("#Input\\.ConfirmPassword").FillAsync(E2EPassword);
-        await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Register" }).ClickAsync();
+        await Page.Locator("#Input\\.Password").FillAsync(password);
+        await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Log in", Exact = true }).ClickAsync();
+        // Attached rather than visible: a mobile viewport keeps the account link in the collapsed menu.
         await Expect(Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = email }).First)
-            .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            .ToBeAttachedAsync(new LocatorAssertionsToBeAttachedOptions { Timeout = 30_000 });
 
         return email;
     }

@@ -64,7 +64,7 @@ class AdditionalResourceTests(unittest.TestCase):
         self.inspect(True,
                      containers=[{"Name": "/catalog-web-1", "Config": {"Labels": {"com.docker.compose.project": "catalog", "localsinglenode.app": "catalog"}}}],
                      networks=[{"Name": "catalog_default", "Labels": {"com.docker.compose.project": "catalog"}}],
-                     volumes=[{"Name": "catalog_app_storage", "Labels": {"com.docker.compose.project": "catalog"}}])
+                     volumes=[{"Name": "catalog_redis_data", "Labels": {"com.docker.compose.project": "catalog"}}])
         for case in (
             {"containers": [{"Name": "/catalog-web-1", "Config": {"Labels": {"com.docker.compose.project": "catalog"}}}]},
             {"volumes": [{"Name": "catalog_postgres_data", "Labels": {}}]},

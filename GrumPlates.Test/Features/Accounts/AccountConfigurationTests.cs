@@ -3,6 +3,7 @@ using GrumPlates.Features.Accounts;
 using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Options;
 
 namespace GrumPlates.Test.Features.Accounts;
@@ -14,7 +15,7 @@ public sealed class AccountOptionsTests
     {
         var configuration = Configuration(new() { ["Accounts:WriteLimit:PermitLimit"] = "5" });
         var services = new ServiceCollection();
-        services.AddAccountFeature(configuration, new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing"));
+        services.AddAccountFeature(configuration, new HostingEnvironment { EnvironmentName = "Testing" });
         using var provider = services.BuildServiceProvider();
         var snapshot = provider.GetRequiredService<AccountOptions>();
         configuration["Accounts:WriteLimit:PermitLimit"] = "6";
@@ -44,7 +45,7 @@ public sealed class AccountOptionsTests
         var configuration = Configuration(new() { [key] = value });
         var services = new ServiceCollection();
         var error = Assert.Throws<OptionsValidationException>(() => services.AddAccountFeature(configuration,
-            new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing")));
+            new HostingEnvironment { EnvironmentName = "Testing" }));
         Assert.Contains("Accounts:", error.Message);
         if (value.StartsWith("private", StringComparison.Ordinal)) Assert.DoesNotContain(value, error.Message);
     }
@@ -56,13 +57,12 @@ public sealed class AccountOptionsTests
     {
         var configuration = Configuration(new()
         {
-            ["Accounts:Enabled"] = "true",
             [key] = value
         });
         var services = new ServiceCollection();
 
         var error = Assert.Throws<OptionsValidationException>(() => services.AddAccountFeature(configuration,
-            new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing")));
+            new HostingEnvironment { EnvironmentName = "Testing" }));
 
         Assert.Contains("Accounts:AdminSeed:Email and Accounts:AdminSeed:Password", error.Message);
         Assert.DoesNotContain(value, error.Message);
@@ -82,7 +82,7 @@ public sealed class AccountOptionsTests
     {
         Assert.Throws<OptionsValidationException>(() => new ServiceCollection().AddAccountFeature(
             Configuration(new() { ["Accounts:PublicOrigin"] = origin }),
-            new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing")));
+            new HostingEnvironment { EnvironmentName = "Testing" }));
     }
 
     [Theory]
@@ -95,12 +95,11 @@ public sealed class AccountOptionsTests
         var services = new ServiceCollection();
         services.AddAccountFeature(Configuration(new()
         {
-            ["Accounts:Enabled"] = "true",
             ["Accounts:RegistrationEnabled"] = "true",
             ["Accounts:PublicOrigin"] = origin,
             ["Accounts:Email:Host"] = "localhost",
             ["Accounts:Email:From"] = "sender@example.test"
-        }), new Blazor.LocalLoginAccountSeedingRulesTests.StubEnvironment("Testing"));
+        }), new HostingEnvironment { EnvironmentName = "Testing" });
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<AccountOptions>();
         Assert.True(options.EmailEnabled);
@@ -127,13 +126,11 @@ public sealed class AccountOptionsTests
 [Collection(TestCollectionNames.StartupIntegration)]
 public sealed class ClientConfigurationTests
 {
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Capability_IsExplicitCookieFreeAndSecretFree(bool enabled)
+    [Fact]
+    public async Task Capability_IsExplicitCookieFreeAndSecretFree()
     {
         await using var fixture = new RealCookieAccountFixture(
-            new Dictionary<string, string?> { ["Accounts:Enabled"] = enabled.ToString() },
+            new Dictionary<string, string?>(),
             appName: $"capability-{Guid.NewGuid():N}");
         var factory = fixture.Factory;
         await factory.InitializeAsync();
@@ -145,11 +142,10 @@ public sealed class ClientConfigurationTests
         var config = await response.Content.ReadFromJsonAsync<ClientConfiguration>();
         Assert.NotNull(config);
         Assert.Equal(1, config.SchemaVersion);
-        Assert.Equal(enabled, config.AccountsEnabled);
         Assert.Matches("^[0-9a-f]{32}$", config.ApplicationId);
         using var json = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.Equal(3, json.RootElement.EnumerateObject().Count());
+        Assert.Equal(2, json.RootElement.EnumerateObject().Count());
         using var session = await client.GetAsync("/api/auth/session");
-        Assert.Equal(enabled ? HttpStatusCode.OK : HttpStatusCode.NotFound, session.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, session.StatusCode);
     }
 }

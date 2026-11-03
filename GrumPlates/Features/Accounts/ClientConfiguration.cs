@@ -16,10 +16,10 @@ internal static class ClientConfigurationEndpoints
 {
     public static IEndpointRouteBuilder MapClientConfiguration(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/client-config", (HttpContext context, AccountOptions options, AccountApplicationIdentity identity) =>
+        endpoints.MapGet("/api/client-config", (HttpContext context, AccountApplicationIdentity identity) =>
         {
             context.Response.Headers.CacheControl = "no-store";
-            return TypedResults.Ok(new ClientConfiguration(1, options.Enabled, identity.Id));
+            return TypedResults.Ok(new ClientConfiguration(1, identity.Id));
         }).WithName("ClientConfiguration").WithTags("Accounts").AllowAnonymous();
         return endpoints;
     }

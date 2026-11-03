@@ -75,7 +75,7 @@ COMPOSE_INTERPOLATION_KEYS = (
     "APP_VERSION",
     "RateLimiting__Global__PermitLimit",
     "RateLimiting__Api__PermitLimit",
-    "RateLimiting__Authentication__PermitLimit",
+    "Accounts__WriteLimit__PermitLimit",
     "OBSERVABILITY_ENABLED",
     "OBSERVABILITY_OTLP_ENDPOINT",
     "OBSERVABILITY_OTLP_PROTOCOL",

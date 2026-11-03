@@ -66,7 +66,7 @@ elif args[:2] == ["network", "create"] or args[0] == "run":
                 elif len(mapping) == 4 and mapping[-1] in ("5432", "8080", "8443"):
                     metadata["ports"][mapping[-1] + "/tcp"] = mapping[2]
     state(name).write_text(json.dumps(metadata))
-    if "web-enabled" in name and os.environ.get("SMOKE_REMOVE_CALLER"):
+    if "web-mail" in name and os.environ.get("SMOKE_REMOVE_CALLER"):
         caller = Path(os.environ["SMOKE_REMOVE_CALLER"])
         assert caller.name == "caller" and caller.parent.resolve() == root.parent.resolve()
         caller.rmdir()
@@ -98,9 +98,7 @@ cat > "$TMP_ROOT/bin/curl" <<'SH'
 url="${*: -1}"
 if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
   if [[ "$url" == */api/client-config ]]; then
-    enabled="false"
-    [[ "$url" != https://* ]] || enabled="true"
-    printf 'HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/json\r\n\r\n{"schemaVersion":1,"accountsEnabled":%s,"applicationId":"1234567890abcdef1234567890abcdef"}' "$enabled"
+    printf 'HTTP/1.1 200 OK\r\nCache-Control: no-store\r\nContent-Type: application/json\r\n\r\n{"schemaVersion":1,"applicationId":"1234567890abcdef1234567890abcdef"}'
     exit
   fi
   if [[ "$url" == */ && "$*" == *"--dump-header"* ]]; then
@@ -121,11 +119,7 @@ if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
       printf 'HTTP/1.1 200 OK\r\nCache-Control: public,max-age=31536000,immutable\r\n\r\n'
       ;;
     */api/auth/login)
-      if [[ "$url" == https://* ]]; then
-        printf 'HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\n\r\n'
-      else
-        printf '\n404'
-      fi
+      printf 'HTTP/1.1 405 Method Not Allowed\r\nAllow: POST\r\n\r\n'
       ;;
     */api/auth|*/api/auth/session|*/api/auth/not-a-real-operation|*/Account|*/assets/missing.js) printf '\n404' ;;
     */books|*/books/author/example)
@@ -171,7 +165,6 @@ if [[ "$(basename "$0")" == dotnet ]]; then
   pwd -P >/dev/null 2>&1 || exit 38
   if [[ "${FRONTEND_PROFILE:-BlazorAuto}" == "React" ]]; then
     case "$*" in
-      *"Category=ReactPackagedDisabled"*) result_name="react-disabled-browser.trx"; failure="${FAIL_REACT_DISABLED_BROWSER:-0}" ;;
       *"Category=ReactPackagedEnabled"*) result_name="react-enabled-browser.trx"; failure="${FAIL_REACT_ENABLED_BROWSER:-0}" ;;
       *) exit 34 ;;
     esac
@@ -231,7 +224,6 @@ FAIL_ACCEPTANCE_LABEL=1 run_case 1
 FAIL_REDIS=1 run_case 17
 FAIL_API=1 run_case 1
 FAIL_BROWSER=19 run_case 19
-FRONTEND_PROFILE=React FAIL_REACT_DISABLED_BROWSER=20 run_case 20
 FRONTEND_PROFILE=React FAIL_REACT_ENABLED_BROWSER=21 run_case 21
 FAIL_HTTP_ACCEPTANCE=23 run_case 23
 env -u GITHUB_RUN_ID -u GITHUB_RUN_ATTEMPT bash "$SCRIPT" > "$TMP_ROOT/local-one"
@@ -260,14 +252,15 @@ for args in calls:
             assert any(value.startswith("ConnectionStrings__DefaultConnection=Host=ci-postgres;") for value in args)
             assert "Redis__Configuration=ci-redis:6379,abortConnect=false" in args
             assert "RateLimiting__Api__PermitLimit=1000" in args
-            assert "LocalAccounts__Enabled=false" in args
-            if "web-enabled" in name:
-                assert "Accounts__Enabled=true" in args
+            if "web-mail" in name:
                 assert "Accounts__RegistrationEnabled=true" in args
                 assert "Accounts__Email__Security=StartTls" in args
                 assert "ASPNETCORE_URLS=http://+:8080;https://+:8443" in args
                 assert any(value.endswith(":8443") for value in args if value.startswith("127.0.0.1:"))
                 assert any(value.endswith(":ro") for value in args if "/run/react-auth-fixture" in value)
+            else:
+                assert "DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx" in args
+                assert any(value.endswith(":/run/dp-cert:ro") for value in args)
         elif "smtp" in name:
             assert "node:26.12.1-bookworm-slim" in args
             assert "--read-only" in args
@@ -294,7 +287,7 @@ import json, os
 from pathlib import Path
 root = Path(os.environ['SMOKE_STATE'])
 labels = {'localcluster.ci.repository': 'example/repo', 'localcluster.ci.owner': 'ci-smoke', 'localcluster.ci.run_id': '123', 'localcluster.ci.run_attempt': '2'}
-for name in ('sample-ci-postgres-123-2', 'sample-ci-redis-123-2', 'sample-ci-web-enabled-123-2', 'sample-ci-smtp-123-2', 'sample-ci-123-2'):
+for name in ('sample-ci-postgres-123-2', 'sample-ci-redis-123-2', 'sample-ci-web-mail-123-2', 'sample-ci-smtp-123-2', 'sample-ci-123-2'):
     (root / name).write_text(json.dumps(labels))
 (root / 'sample-ci-postgres-456-1').write_text(json.dumps({**labels, 'localcluster.ci.run_id': '456', 'localcluster.ci.run_attempt': '1'}))
 PY

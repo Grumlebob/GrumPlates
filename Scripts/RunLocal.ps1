@@ -149,7 +149,7 @@ function Write-StartupFailureHelp {
 $composeEnvNames = @(
   'COMPOSE_PROJECT_NAME', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_DB', 'POSTGRES_HOST_PORT',
   'FRONTEND_DOCKER_TARGET', 'FRONTEND_PROFILE_OVERRIDE', 'APP_NODE_NAME', 'APP_VERSION',
-  'RateLimiting__Global__PermitLimit', 'RateLimiting__Api__PermitLimit', 'RateLimiting__Authentication__PermitLimit',
+  'RateLimiting__Global__PermitLimit', 'RateLimiting__Api__PermitLimit', 'Accounts__WriteLimit__PermitLimit',
   'OBSERVABILITY_ENABLED', 'OBSERVABILITY_OTLP_ENDPOINT', 'OBSERVABILITY_OTLP_PROTOCOL',
   'OBSERVABILITY_TRACE_SAMPLE_RATIO', 'OBSERVABILITY_DEPLOYMENT_TARGET',
   'APP_HTTPS_HOST_PORT', 'REDIS_HOST_PORT', 'REDIS_INSIGHT_HOST_PORT',
