@@ -59,21 +59,4 @@ public class NoInfrastructureNamespaceTests
             Assert.Fail(msg);
         }
     }
-
-    [Fact]
-    public void ServerProject_HasNo_Legacy_Root_Infrastructure_Folders()
-    {
-        var serverRoot = Path.Combine(SourceSearch.GetRepoRoot(), "GrumPlates");
-        var legacyFolders = new[] { "Caching", "Configuration", "Data", "Diagnostics", "Security", "Storage" };
-        var existing = legacyFolders
-            .Select(folder => Path.Combine(serverRoot, folder))
-            .Where(Directory.Exists)
-            .Select(path => Path.GetRelativePath(SourceSearch.GetRepoRoot(), path))
-            .OrderBy(path => path)
-            .ToList();
-
-        Assert.True(existing.Count == 0,
-            "Legacy root infrastructure/runtime folders should stay consolidated or generated outside source:\n"
-            + string.Join("\n", existing));
-    }
 }

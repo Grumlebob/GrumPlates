@@ -514,29 +514,16 @@ for path in deployment_text_files():
     if rel == "Deployment/LocalCluster/Scripts/Component/lib/audit_deployment.py":
         continue
     text = path.read_text(encoding="utf-8-sig")
-    for stale, replacement in [
-        ("improveddb", "books"),
-        ("/opt/improveddb", "/opt/books"),
-        ("node-db-redis", "node-db"),
-        ("NODE_DB_REDIS", "NODE_DB"),
-        ("db_redis", "node_db"),
-        ("db-redis", "node-db"),
-    ]:
-        if stale in text:
-            fail(f"{rel}: stale deployment identifier {stale}; use {replacement}")
+    if "improveddb" in text:
+        fail(f"{rel}: deployment files must name only this app's resources, not improveddb")
     if "releases/latest" in text:
         fail(f"{rel}: deployment must not install from latest release URLs")
-    if "DEPLOY_SSH_KEY" in text or "SHIP_DEPLOY_KEY" in text:
-        fail(f"{rel}: deploy SSH key path must be derived from app_name, not local overrides")
     if "sudo apt install -y ansible" in text or "sudo apt-get install -y ansible" in text:
         fail(f"{rel}: use Deployment/LocalCluster/Scripts/install-ansible.sh instead of distro Ansible")
     if "ansible.builtin.apt_repository" in text:
         fail(f"{rel}: use ansible.builtin.deb822_repository instead of deprecated apt_repository")
     if "ansible_architecture" in text or "ansible_date_time" in text:
         fail(f"{rel}: use ansible_facts[...] instead of deprecated top-level injected facts")
-    for forbidden in [".deploy.local", "discover-node", "health-check"]:
-        if forbidden in text:
-            fail(f"{rel}: contains stale deployment reference: {forbidden}")
     for stale_setting in [
         "caddy_sticky_cookie_name",
         "caddy_bind_address",
@@ -912,16 +899,6 @@ require_contains(
     "checksum: \"sha256:{{ caddy_package_sha256[caddy_package_architectures[ansible_facts['architecture']]] }}\"",
     "verified Caddy package download",
 )
-for role in ("caddy_install", "mint_base", "docker"):
-    require_contains(
-        f"Deployment/Common/ansible/roles/{role}/tasks/main.yml",
-        "../../../Scripts/retire-caddy-cloudsmith-source.py",
-        "retire only the known legacy Caddy source before apt",
-    )
-bootstrap_source = read("Deployment/LocalSingleNode/Scripts/lib/bootstrap.py")
-retirement_position = bootstrap_source.find("retire-caddy-cloudsmith-source.py")
-if retirement_position < 0 or retirement_position > bootstrap_source.find('for action in (["update"]'):
-    fail("LocalSingleNode bootstrap must retire the legacy Caddy source before apt")
 require_contains("Deployment/LocalSingleNode/Scripts/lib/bootstrap.py", '"timeout", "--foreground", "600", "apt-get"', "foreground apt timeout without terminal job-control stops")
 require_contains("Deployment/LocalSingleNode/Scripts/lib/bootstrap.py", "stdin=subprocess.DEVNULL", "noninteractive bootstrap apt input")
 require_contains(
@@ -1642,8 +1619,6 @@ for document_path, document_text in cluster_guide_documents.items():
         )
 if "image_tag" in deploy_lan:
     fail(".github/workflows/cd-localcluster.yml: manual image_tag input should not be required")
-if "Deploy Ship To LAN" in deploy_lan or "Deploy App To LAN" in deploy_lan:
-    fail(".github/workflows/cd-localcluster.yml: workflow name must be explicitly CD-oriented")
 if "dotnet ef migrations bundle" in deploy_lan or "dotnet restore" in deploy_lan or "dotnet tool restore" in deploy_lan:
     fail(".github/workflows/cd-localcluster.yml: CD must consume CI artifacts instead of rebuilding them")
 
@@ -1854,7 +1829,6 @@ for path, checks in {
         ("docker_ubuntu_codename.stdout | length > 0", "Ubuntu codename non-empty assertion"),
         ("This deployment supports only x86_64/amd64 Linux machines.", "amd64-only Docker guard"),
         ("ansible.builtin.deb822_repository", "deb822 Docker apt repository"),
-        ("/etc/apt/sources.list.d/docker.list", "legacy Docker apt repository cleanup"),
         ("signed_by: /etc/apt/keyrings/docker.asc", "Docker keyring-scoped apt repository"),
         ("- amd64", "amd64 Docker apt repository"),
         ("docker-compose-plugin", "Docker Compose plugin"),

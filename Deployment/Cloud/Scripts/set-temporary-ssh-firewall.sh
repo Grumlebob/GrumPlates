@@ -126,7 +126,6 @@ with open(response_path, encoding="utf-8") as response_file:
     payload = json.load(response_file)
 
 exact_matches = []
-role_matches = []
 for firewall in payload.get("firewalls", []):
     labels = firewall.get("labels") or {}
     firewall_id = firewall.get("id")
@@ -142,16 +141,6 @@ for firewall in payload.get("firewalls", []):
     )
     if name_matches or labels_match:
         exact_matches.append(str(firewall_id))
-        continue
-
-    legacy_role_match = (
-        labels.get("deployment") == "cloud"
-        and labels.get("managed_by") == "opentofu"
-        and labels.get("role") == "temporary-ssh"
-    )
-    legacy_name_match = str(firewall.get("name", "")).endswith("-temporary-ssh")
-    if legacy_role_match or legacy_name_match:
-        role_matches.append(str(firewall_id))
 
 if len(exact_matches) == 1:
     print(exact_matches[0])
@@ -163,16 +152,6 @@ if len(exact_matches) > 1:
         file=sys.stderr,
     )
     raise SystemExit(1)
-
-if len(role_matches) == 1:
-    print(role_matches[0])
-    raise SystemExit(0)
-
-if len(role_matches) > 1:
-    print(
-        f"Expected one legacy temporary SSH firewall, found {len(role_matches)}.",
-        file=sys.stderr,
-    )
 
 raise SystemExit(1)
 PY
