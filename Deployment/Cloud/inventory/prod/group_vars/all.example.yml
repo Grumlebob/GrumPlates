@@ -44,5 +44,3 @@ accounts_email_host: ""
 accounts_email_port: 587
 accounts_email_security: StartTls
 accounts_email_from: ""
-data_protection_legacy_key_store: None
-data_protection_legacy_redis_key: ""

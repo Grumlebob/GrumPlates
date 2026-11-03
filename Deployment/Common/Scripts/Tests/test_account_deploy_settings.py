@@ -16,7 +16,6 @@ COMMON_LIB = ROOT / "Deployment/Common/Scripts/Component/lib"
 sys.path.insert(0, str(COMMON_LIB))
 
 from account_deploy_settings import validate_account_deploy_settings  # noqa: E402
-from data_protection_deploy_settings import validate_legacy_data_protection_settings  # noqa: E402
 
 
 def load_module(name: str, path: Path):
@@ -122,34 +121,6 @@ class AccountDeploymentSettingsTests(unittest.TestCase):
         for target, module in (("LocalCluster", LOCAL_CLUSTER), ("Cloud", CLOUD)):
             with self.subTest(target=target):
                 self.assertEqual([], module.validate(valid_settings(target)))
-
-    def test_legacy_data_protection_source_is_optional_and_pairing_is_strict(self):
-        self.assertEqual([], validate_legacy_data_protection_settings({}))
-        for store, redis_key in (("None", ""), ("FileSystem", ""), ("Redis", "fixture:legacy-keys")):
-            with self.subTest(store=store):
-                values = {
-                    "data_protection_legacy_key_store": store,
-                    "data_protection_legacy_redis_key": redis_key,
-                }
-                self.assertEqual([], validate_legacy_data_protection_settings(values))
-                for target, module in (("LocalCluster", LOCAL_CLUSTER), ("Cloud", CLOUD)):
-                    self.assertEqual([], module.validate({**valid_settings(target), **values}))
-
-        invalid_values = (
-            ({"data_protection_legacy_key_store": "unknown", "data_protection_legacy_redis_key": ""},
-             "data_protection_legacy_key_store must be None, Redis, or FileSystem"),
-            ({"data_protection_legacy_key_store": "Redis", "data_protection_legacy_redis_key": ""},
-             "data_protection_legacy_redis_key is required when the legacy key store is Redis"),
-            ({"data_protection_legacy_key_store": "FileSystem", "data_protection_legacy_redis_key": "fixture:key"},
-             "data_protection_legacy_redis_key requires the legacy key store to be Redis"),
-            ({"data_protection_legacy_key_store": "Redis", "data_protection_legacy_redis_key": "fixture:key\nsecond"},
-             "data_protection_legacy_redis_key must be a single-line value"),
-        )
-        for values, expected_error in invalid_values:
-            with self.subTest(values=values):
-                self.assertIn(expected_error, validate_legacy_data_protection_settings(values))
-                for target, module in (("LocalCluster", LOCAL_CLUSTER), ("Cloud", CLOUD)):
-                    self.assertIn(expected_error, module.validate({**valid_settings(target), **values}))
 
     def test_seed_only_is_valid_without_smtp_and_registration_requires_complete_email(self):
         seed_only = {

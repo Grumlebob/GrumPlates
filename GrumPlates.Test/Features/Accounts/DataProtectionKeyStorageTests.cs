@@ -8,107 +8,15 @@ using GrumPlates.Infrastructure.Persistence;
 using GrumPlates.Test.TestSupport.Accounts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.DataProtection.KeyManagement;
-using Microsoft.AspNetCore.DataProtection.Repositories;
-using Microsoft.AspNetCore.DataProtection.StackExchangeRedis;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using Microsoft.Extensions.Logging.Abstractions;
-using StackExchange.Redis;
 using ApplicationUser = GrumPlates.Features.Login.Account.ApplicationUser;
 
 namespace GrumPlates.Test.Features.Accounts;
 
 [Collection(TestCollectionNames.StartupIntegration)]
-public sealed class DataProtectionKeyImportTests
+public sealed class DataProtectionKeyStorageTests
 {
     private const string CertificatePassword = "fixture-key-encryption-password";
-    private const string ProtectorPurpose = "legacy-import-fixture";
-
-    [Fact]
-    public async Task FileSystemImport_WrapsLegacyKeysAndRepeatsWithoutChangingTheRing()
-    {
-        var appName = $"legacy-file-{Guid.NewGuid():N}";
-        using var certificate = new FixtureCertificate();
-        using var legacy = LegacyKeyRing.Create(appName, revoke: false);
-        var configuration = ImportConfiguration(legacy.Directory, certificate);
-
-        await using var first = new RealCookieAccountFixture(configuration, appName: appName);
-        await first.InitializeAsync();
-        var firstRows = await ReadKeyRowsAsync(first);
-        Assert.Contains(firstRows, row => row.KeyId == legacy.KeyId);
-        Assert.All(firstRows, row => Assert.Contains("encryptedSecret", row.Xml, StringComparison.Ordinal));
-        Assert.Equal("legacy protected payload", Unprotect(first.Factory, legacy.ProtectedPayload));
-
-        await using var second = new RealCookieAccountFixture(
-            configuration,
-            appName: appName,
-            postgresConnectionString: first.Factory.ConnectionString);
-        await second.InitializeAsync();
-        var secondRows = await ReadKeyRowsAsync(second);
-        Assert.Equal(firstRows.Count, secondRows.Count);
-        Assert.Single(secondRows, row => row.KeyId == legacy.KeyId);
-        Assert.Equal("legacy protected payload", Unprotect(second.Factory, legacy.ProtectedPayload));
-    }
-
-    [Fact]
-    public async Task FileSystemImport_PreservesRevocationAndRejectsLegacyPayloads()
-    {
-        var appName = $"legacy-revocation-{Guid.NewGuid():N}";
-        using var certificate = new FixtureCertificate();
-        using var legacy = LegacyKeyRing.Create(appName, revoke: true);
-        var configuration = ImportConfiguration(legacy.Directory, certificate);
-        await using var fixture = new RealCookieAccountFixture(configuration, appName: appName);
-        await fixture.InitializeAsync();
-
-        var keyManager = fixture.Factory.Services.GetRequiredService<IKeyManager>();
-        var imported = Assert.Single(keyManager.GetAllKeys(), key => key.KeyId == legacy.KeyId);
-        Assert.True(imported.IsRevoked);
-        var provider = fixture.Factory.Services.GetRequiredService<IDataProtectionProvider>();
-        var protector = provider.CreateProtector(ProtectorPurpose);
-        Assert.Throws<CryptographicException>(() => protector.Unprotect(legacy.ProtectedPayload));
-    }
-
-    [Fact]
-    public async Task MissingFileSystemSource_FailsStartupWithoutRevealingThePath()
-    {
-        var appName = $"legacy-missing-{Guid.NewGuid():N}";
-        var missingPath = Path.Combine(Path.GetTempPath(), $"missing-legacy-keys-{Guid.NewGuid():N}");
-        Assert.False(Directory.Exists(missingPath));
-        using var certificate = new FixtureCertificate();
-        await using var fixture = new RealCookieAccountFixture(
-            new Dictionary<string, string?>
-            {
-                ["DataProtection:LegacyKeyStore"] = "FileSystem",
-                ["DataProtection:LegacyKeyStoragePath"] = missingPath,
-                ["DataProtection:KeyEncryptionCertificatePath"] = certificate.Path,
-                ["DataProtection:KeyEncryptionCertificatePassword"] = CertificatePassword
-            },
-            appName: appName);
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.InitializeAsync());
-        Assert.Equal("Data Protection key validation or legacy import failed; enabled accounts will not start.", error.Message);
-        Assert.DoesNotContain(missingPath, error.ToString(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task FileSystemImport_RejectsConflictingDuplicateKeyIdsWithoutLeakingXml()
-    {
-        var appName = $"legacy-ambiguous-{Guid.NewGuid():N}";
-        using var certificate = new FixtureCertificate();
-        using var legacy = LegacyKeyRing.Create(appName, revoke: false);
-        var keyPath = Directory.GetFiles(legacy.Directory, "*.xml").Single();
-        var duplicate = XElement.Load(keyPath);
-        duplicate.Element("expirationDate")!.Value = DateTimeOffset.UtcNow.AddDays(1).ToString("O");
-        File.WriteAllText(
-            Path.Combine(legacy.Directory, "conflicting-copy.xml"),
-            duplicate.ToString(SaveOptions.DisableFormatting));
-        var configuration = ImportConfiguration(legacy.Directory, certificate);
-        await using var fixture = new RealCookieAccountFixture(configuration, appName: appName);
-
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => fixture.InitializeAsync());
-        Assert.Equal("Data Protection key validation or legacy import failed; enabled accounts will not start.", error.Message);
-        Assert.DoesNotContain("<key", error.ToString(), StringComparison.OrdinalIgnoreCase);
-    }
 
     [Fact]
     public async Task EnabledAccounts_FailClosedWhenCertificateIsMissing()
@@ -147,74 +55,12 @@ public sealed class DataProtectionKeyImportTests
         Assert.All(rows, row => Assert.Contains("encryptedSecret", row.Xml, StringComparison.Ordinal));
     }
 
-    [Fact]
-    public async Task ExistingRowsWithChangedImportIdentity_FailStartupWithoutLeakingXml()
-    {
-        var appName = $"legacy-conflict-{Guid.NewGuid():N}";
-        using var certificate = new FixtureCertificate();
-        using var legacy = LegacyKeyRing.Create(appName, revoke: false);
-        var configuration = ImportConfiguration(legacy.Directory, certificate);
-        await using var first = new RealCookieAccountFixture(configuration, appName: appName);
-        await first.InitializeAsync();
-
-        await using (var scope = first.Factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var imported = (await db.DataProtectionKeys.ToListAsync())
-                .Single(row => row.FriendlyName!.StartsWith("source-key:", StringComparison.Ordinal));
-            imported.FriendlyName = "tampered-fixture-identity";
-            await db.SaveChangesAsync();
-        }
-
-        await using var second = new RealCookieAccountFixture(
-            configuration,
-            appName: appName,
-            postgresConnectionString: first.Factory.ConnectionString);
-        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => second.InitializeAsync());
-        Assert.Equal("Data Protection key validation or legacy import failed; enabled accounts will not start.", error.Message);
-        Assert.DoesNotContain("<key", error.ToString(), StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static Dictionary<string, string?> ImportConfiguration(string legacyPath, FixtureCertificate certificate) => new()
-    {
-        ["DataProtection:LegacyKeyStore"] = "FileSystem",
-        ["DataProtection:LegacyKeyStoragePath"] = legacyPath,
-        ["DataProtection:KeyEncryptionCertificatePath"] = certificate.Path,
-        ["DataProtection:KeyEncryptionCertificatePassword"] = CertificatePassword
-    };
-
-    internal static string Unprotect(WebAppFactory factory, string payload) =>
-        factory.Services.GetRequiredService<IDataProtectionProvider>()
-            .CreateProtector(ProtectorPurpose)
-            .Unprotect(payload);
-
     internal static async Task<List<(Guid KeyId, string Xml)>> ReadKeyRowsAsync(RealCookieAccountFixture fixture)
     {
         await using var scope = fixture.Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var rows = await db.DataProtectionKeys.AsNoTracking().ToListAsync();
         return rows.Select(row => (KeyId: (Guid)XElement.Parse(row.Xml!).Attribute("id")!, row.Xml!)).ToList();
-    }
-
-    private sealed class FixtureCertificate : IDisposable
-    {
-        private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("GrumPlates-dp-cert-");
-        public string Path { get; }
-
-        public FixtureCertificate()
-        {
-            Path = System.IO.Path.Combine(_directory.FullName, "fixture.pfx");
-            using var rsa = RSA.Create(2048);
-            using var certificate = new CertificateRequest(
-                    "CN=GrumPlates data protection fixture",
-                    rsa,
-                    HashAlgorithmName.SHA256,
-                    RSASignaturePadding.Pkcs1)
-                .CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddYears(5));
-            File.WriteAllBytes(Path, certificate.Export(X509ContentType.Pfx, CertificatePassword));
-        }
-
-        public void Dispose() => _directory.Delete(recursive: true);
     }
 
     private sealed class FixturePemCertificate : IDisposable
@@ -247,44 +93,6 @@ public sealed class DataProtectionKeyImportTests
         }
 
         public void Dispose() => _directory.Delete(recursive: true);
-    }
-
-    internal sealed class LegacyKeyRing : IDisposable
-    {
-        private readonly DirectoryInfo _directory = System.IO.Directory.CreateTempSubdirectory("GrumPlates-legacy-dp-");
-        private readonly ServiceProvider _services;
-
-        public string Directory => _directory.FullName;
-        public Guid KeyId { get; }
-        public string ProtectedPayload { get; }
-
-        private LegacyKeyRing(string appName, bool revoke)
-        {
-            var services = new ServiceCollection();
-            services.AddLogging();
-            services.AddDataProtection()
-                .SetApplicationName(appName)
-                .PersistKeysToFileSystem(_directory);
-            _services = services.BuildServiceProvider();
-
-            var protector = _services.GetRequiredService<IDataProtectionProvider>().CreateProtector(ProtectorPurpose);
-            ProtectedPayload = protector.Protect("legacy protected payload");
-            var keys = _services.GetRequiredService<IKeyManager>();
-            var key = Assert.Single(keys.GetAllKeys());
-            KeyId = key.KeyId;
-            if (revoke)
-            {
-                keys.RevokeKey(KeyId, "synthetic legacy revocation");
-            }
-        }
-
-        public static LegacyKeyRing Create(string appName, bool revoke) => new(appName, revoke);
-
-        public void Dispose()
-        {
-            _services.Dispose();
-            _directory.Delete(recursive: true);
-        }
     }
 }
 
@@ -481,7 +289,7 @@ public sealed class DataProtectionDatabaseRestoreTests : IClassFixture<SharedInt
             restored.Clock.Advance(TimeSpan.FromSeconds(1));
             var revokedSession = await RealCookieAccountFixture.ReadSessionAsync(client);
             Assert.Null(revokedSession.User);
-            var keyRows = await DataProtectionKeyImportTests.ReadKeyRowsAsync(restored);
+            var keyRows = await DataProtectionKeyStorageTests.ReadKeyRowsAsync(restored);
             Assert.NotEmpty(keyRows);
             Assert.All(keyRows, row => Assert.Contains("encryptedSecret", row.Xml, StringComparison.Ordinal));
         }
@@ -660,63 +468,13 @@ public sealed class DataProtectionDatabaseRestoreTests : IClassFixture<SharedInt
     }
 }
 
+
 [Collection(TestCollectionNames.CrossNodeRedis)]
-public sealed class DataProtectionKeyRedisAndReplicaTests(SharedIntegrationEnvironment environment)
+public sealed class DataProtectionKeyReplicaTests(SharedIntegrationEnvironment environment)
     : IClassFixture<SharedIntegrationEnvironment>
 {
     private const string CertificatePassword = "fixture-key-encryption-password";
 
-    [Fact]
-    public async Task RedisImport_UsesTheFrameworkRepositoryAndWrapsKeyXml()
-    {
-        await ResetSharedDatabaseAsync();
-        var appName = $"legacy-redis-{Guid.NewGuid():N}";
-        var redisKey = $"{appName}:DataProtection-Keys";
-        using var certificate = new ReplicaCertificate();
-        using var legacy = DataProtectionKeyImportTests.LegacyKeyRing.Create(appName, revoke: false);
-        using var redis = await ConnectionMultiplexer.ConnectAsync(environment.RedisConnectionString);
-        var database = redis.GetDatabase();
-        await database.KeyDeleteAsync(redisKey);
-        var source = new RedisXmlRepository(() => redis.GetDatabase(), redisKey);
-        var fileSource = new FileSystemXmlRepository(
-            new DirectoryInfo(legacy.Directory),
-            NullLoggerFactory.Instance);
-        foreach (var element in fileSource.GetAllElements())
-        {
-            var identity = (Guid?)element.Attribute("id");
-            source.StoreElement(element, element.Name == "key"
-                ? $"key-{identity!.Value:D}"
-                : $"revocation-{identity?.ToString("D") ?? Guid.NewGuid().ToString("D")}");
-        }
-
-        var configuration = new Dictionary<string, string?>
-        {
-            ["DataProtection:LegacyKeyStore"] = "Redis",
-            ["DataProtection:LegacyRedisKey"] = redisKey,
-            ["DataProtection:KeyEncryptionCertificatePath"] = certificate.Path,
-            ["DataProtection:KeyEncryptionCertificatePassword"] = CertificatePassword
-        };
-
-        try
-        {
-            await using var fixture = new RealCookieAccountFixture(
-                configuration,
-                appName: appName,
-                postgresConnectionString: environment.PostgresConnectionString,
-                redisConnectionString: environment.RedisConnectionString);
-            await fixture.InitializeAsync();
-            Assert.Equal("legacy protected payload", DataProtectionKeyImportTests.Unprotect(
-                fixture.Factory,
-                legacy.ProtectedPayload));
-            var rows = await DataProtectionKeyImportTests.ReadKeyRowsAsync(fixture);
-            Assert.Contains(rows, row => row.KeyId == legacy.KeyId);
-            Assert.All(rows, row => Assert.Contains("encryptedSecret", row.Xml, StringComparison.Ordinal));
-        }
-        finally
-        {
-            await database.KeyDeleteAsync(redisKey);
-        }
-    }
 
     [Fact]
     public async Task SameApplicationReplicas_ShareCookieAndPostgreSqlKeyRing()
@@ -754,45 +512,9 @@ public sealed class DataProtectionKeyRedisAndReplicaTests(SharedIntegrationEnvir
         var session = await RealCookieAccountFixture.ReadSessionAsync(secondClient);
         Assert.Equal(user.Id, session.User?.Id);
 
-        var rows = await DataProtectionKeyImportTests.ReadKeyRowsAsync(second);
+        var rows = await DataProtectionKeyStorageTests.ReadKeyRowsAsync(second);
         Assert.NotEmpty(rows);
         Assert.All(rows, row => Assert.Contains("encryptedSecret", row.Xml, StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task ConcurrentReplicas_ImportTheSameLegacyRingOnceUnderTheDatabaseLock()
-    {
-        await ResetSharedDatabaseAsync();
-        var appName = $"legacy-concurrent-{Guid.NewGuid():N}";
-        using var certificate = new ReplicaCertificate();
-        using var legacy = DataProtectionKeyImportTests.LegacyKeyRing.Create(appName, revoke: false);
-        var configuration = new Dictionary<string, string?>
-        {
-            ["DataProtection:LegacyKeyStore"] = "FileSystem",
-            ["DataProtection:LegacyKeyStoragePath"] = legacy.Directory,
-            ["DataProtection:KeyEncryptionCertificatePath"] = certificate.Path,
-            ["DataProtection:KeyEncryptionCertificatePassword"] = CertificatePassword
-        };
-
-        await using var first = new RealCookieAccountFixture(
-            configuration,
-            appName: appName,
-            postgresConnectionString: environment.PostgresConnectionString,
-            redisConnectionString: environment.RedisConnectionString,
-            runMigrationsAtStartup: false);
-        await using var second = new RealCookieAccountFixture(
-            configuration,
-            appName: appName,
-            postgresConnectionString: environment.PostgresConnectionString,
-            redisConnectionString: environment.RedisConnectionString,
-            runMigrationsAtStartup: false);
-
-        await Task.WhenAll(first.InitializeAsync(), second.InitializeAsync());
-
-        var rows = await DataProtectionKeyImportTests.ReadKeyRowsAsync(first);
-        Assert.Single(rows, row => row.KeyId == legacy.KeyId);
-        Assert.Equal("legacy protected payload", DataProtectionKeyImportTests.Unprotect(first.Factory, legacy.ProtectedPayload));
-        Assert.Equal("legacy protected payload", DataProtectionKeyImportTests.Unprotect(second.Factory, legacy.ProtectedPayload));
     }
 
     private async Task ResetSharedDatabaseAsync()

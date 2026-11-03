@@ -12,7 +12,7 @@ from jinja2 import Environment, StrictUndefined
 
 def assert_runtime_environment(folder, expected):
     verifier = folder / 'verify-env.yml'
-    node_script = "console.log(JSON.stringify({username:process.env.Accounts__Email__Username,password:process.env.Accounts__Email__Password,legacyKey:process.env.DataProtection__LegacyRedisKey ?? ''}))"
+    node_script = "console.log(JSON.stringify({username:process.env.Accounts__Email__Username,password:process.env.Accounts__Email__Password}))"
     verifier.write_text(json.dumps({'services': {'verify': {
         'image': 'node:26.12.1-bookworm-slim',
         'network_mode': 'none',
@@ -33,8 +33,6 @@ target = Path(sys.argv[1]).resolve()
 root = target.parents[1]
 context = dict(app_name='books', inventory_hostname='node-rehearsal', node_ip='192.0.2.10', lan_http_port=80, app_port=8080, postgres_port=5432, redis_port=6379, lan_hostnames=['books.example.invalid'], docker_subnet='172.30.10.0/24', app_image='ghcr.io/fixture-owner/books', release_image_digest='sha256:' + 'a' * 64, app_version='b' * 40, vault_postgres_password='FixturePassword12345678901234567890', vault_redis_password='FixtureRedis12345678901234567890123', vault_data_protection_certificate_password='d' * 64, data_protection_certificate_gid='1001')
 jinja = Environment(undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True)
-context['data_protection_legacy_key_store'] = 'None'
-context['data_protection_legacy_redis_key'] = ''
 with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     folder = Path(directory)
     template = jinja.from_string((target / 'ansible/templates/app.env.j2').read_text())
@@ -61,21 +59,14 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     assert config['services']['web']['environment']['Accounts__RegistrationEnabled'] == 'false'
     assert config['services']['web']['environment']['DataProtection__KeyEncryptionCertificatePath'] == '/run/secrets/data-protection.pem'
     assert config['services']['web']['environment']['DataProtection__KeyEncryptionCertificatePassword'] == 'd' * 64
-    assert config['services']['web']['environment']['DataProtection__LegacyKeyStore'] == 'None'
-    assert config['services']['web']['environment']['DataProtection__LegacyKeyStoragePath'] == ''
-    filesystem_environment = template.render(**{**context, 'data_protection_legacy_key_store': 'FileSystem'})
-    assert 'DataProtection__LegacyKeyStoragePath=/run/legacy-data-protection' in filesystem_environment
     assert config['services']['web']['group_add'] == ['1001']
     assert any(volume.get('target') == '/run/secrets/data-protection.pem' and volume.get('read_only') for volume in config['services']['web']['volumes'])
-    assert any(volume.get('target') == '/run/legacy-data-protection' and volume.get('read_only') for volume in config['services']['web']['volumes'])
     assert 'Accounts__Email__Password' not in (config['services']['postgres'].get('environment') or {})
     assert config['networks']['default']['ipam']['config'][0]['subnet'] == context['docker_subnet']
 
     special_password = "SMTP $one #two = \"three\" 'four' spaced"
     enabled_context = {
         **context,
-        'data_protection_legacy_key_store': 'Redis',
-        'data_protection_legacy_redis_key': 'legacy:keys $dollar #hash = "quoted"',
         'accounts_enabled': True,
         'accounts_registration_enabled': True,
         'accounts_admin_seed_enabled': False,
@@ -101,7 +92,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     assert_runtime_environment(single_fixture, {
         'username': enabled_context['vault_accounts_email_username'],
         'password': special_password,
-        'legacyKey': enabled_context['data_protection_legacy_redis_key'],
     })
     for service_name in ('postgres', 'redis'):
         assert 'Accounts__Email__Password' not in (enabled_config['services'][service_name].get('environment') or {})
@@ -132,7 +122,6 @@ with tempfile.TemporaryDirectory(prefix='single-node-render-') as directory:
     assert_runtime_environment(root_fixture, {
         'username': '',
         'password': special_password,
-        'legacyKey': '',
     })
     site = jinja.from_string((target / 'ansible/roles/single_node_caddy_site/templates/app.caddy.j2').read_text()).render(**context)
     assert 'http://192.0.2.10:80' in site and 'http://node-rehearsal.local:80' in site

@@ -281,19 +281,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         fail("rendered app env is missing stable app node name")
     if "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem" not in app_env:
         fail("LocalCluster app env is missing Data Protection certificate path")
-    for expected in [
-        "DataProtection__LegacyKeyStore=None",
-        "DataProtection__LegacyRedisKey=",
-        "DataProtection__LegacyKeyStoragePath=",
-    ]:
-        if expected not in app_env:
-            fail(f"LocalCluster app env has unexpected legacy Data Protection defaults: {expected}")
-    filesystem_app_env = render_jinja(
-        cluster_app_template,
-        {**app_values, "data_protection_legacy_key_store": "FileSystem"},
-    )
-    if "DataProtection__LegacyKeyStoragePath=/run/legacy-data-protection" not in filesystem_app_env:
-        fail("LocalCluster FileSystem import must use the mounted legacy key directory")
     if "COMPOSE_PROJECT_NAME=notes" not in app_env or "COMPOSE_PROJECT_NAME=notes" not in db_env:
         fail("rendered env files are missing explicit Compose project names")
     if "APP_IMAGE_REF=ghcr.io/example/notes:abcdef123456" not in app_env:
@@ -339,7 +326,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         "OBSERVABILITY_DOCKER_NETWORK": "notes_observability",
         "DATA_PROTECTION_CERT_HOST_PATH": "/etc/notes/data-protection/certificate.pem",
         "DATA_PROTECTION_CERT_GID": "1001",
-        "DATA_PROTECTION_LEGACY_HOST_PATH": "/etc/notes/data-protection/legacy",
         "NODE_HOST": "10.10.0.20",
         "OBSERVABILITY_POSTGRES_EXPORTER_PORT": "9187",
         "OBSERVABILITY_REDIS_EXPORTER_PORT": "9121",
@@ -356,8 +342,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
         fail("LocalCluster app compose must pass its raw environment file to the app service")
     if "/run/secrets/data-protection.pem" not in app_compose.read_text(encoding="utf-8"):
         fail("LocalCluster app compose must mount its protected Data Protection certificate")
-    if "/run/legacy-data-protection" not in app_compose.read_text(encoding="utf-8"):
-        fail("LocalCluster app compose must mount the read-only legacy Data Protection import source")
     db_compose_text = render_compose(ROOT / "Deployment/LocalCluster/compose/node-db/docker-compose.yml", compose_env)
     db_compose.write_text(db_compose_text, encoding="utf-8")
     for required in [
@@ -399,8 +383,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "Accounts__AdminSeed__Password": ' seed $dollar #hash = "double" \'single\' ',
             "Accounts__Email__Username": ' smtp $dollar #hash = "double" ',
             "Accounts__Email__Password": ' smtp-password $dollar #hash = "double" \'single\' ',
-            "DataProtection__LegacyKeyStore": "Redis",
-            "DataProtection__LegacyRedisKey": 'legacy:keys $dollar #hash = "quoted"',
         }
         cluster_enabled_context = {
             **app_values,
@@ -413,8 +395,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "accounts_email_port": 587,
             "accounts_email_security": "StartTls",
             "accounts_email_from": "accounts@example.invalid",
-            "data_protection_legacy_key_store": cluster_secret_values["DataProtection__LegacyKeyStore"],
-            "data_protection_legacy_redis_key": cluster_secret_values["DataProtection__LegacyRedisKey"],
             "vault_accounts_admin_seed_password": cluster_secret_values["Accounts__AdminSeed__Password"],
             "vault_accounts_email_username": cluster_secret_values["Accounts__Email__Username"],
             "vault_accounts_email_password": cluster_secret_values["Accounts__Email__Password"],
@@ -466,22 +446,12 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "cloud_data_protection_certificate_password": "c" * 64,
             "cloud_data_protection_certificate_base64": "U1lOVEhFVElDX0VORFJZUFRFRF9QRU0=",
             "data_protection_certificate_gid": "1002",
-            "data_protection_legacy_key_store": "None",
-            "data_protection_legacy_redis_key": "",
             "observability_trace_sample_ratio": "0.1",
         }
         cloud_template = ROOT / "Deployment/Cloud/ansible/roles/app/templates/app.env.j2"
         cloud_default_env = render_jinja(cloud_template, cloud_context)
         if "DataProtection__KeyEncryptionCertificatePath=/run/secrets/data-protection.pem" not in cloud_default_env:
             fail("Cloud app env is missing Data Protection certificate path")
-        if "DataProtection__LegacyKeyStore=None" not in cloud_default_env or "DataProtection__LegacyKeyStoragePath=" not in cloud_default_env:
-            fail("Cloud app env must default the legacy Data Protection import off")
-        cloud_filesystem_env = render_jinja(
-            cloud_template,
-            {**cloud_context, "data_protection_legacy_key_store": "FileSystem"},
-        )
-        if "DataProtection__LegacyKeyStoragePath=/run/legacy-data-protection" not in cloud_filesystem_env:
-            fail("Cloud FileSystem import must use the mounted legacy key directory")
         for expected in ["Accounts__Enabled=false", "Accounts__RegistrationEnabled=false", "Accounts__AdminSeed__Enabled=false"]:
             if expected not in cloud_default_env:
                 fail(f"Cloud app env must default accounts off: {expected}")
@@ -489,8 +459,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "Accounts__AdminSeed__Password": ' cloud-seed $dollar #hash = "double" \'single\' ',
             "Accounts__Email__Username": ' cloud-user $dollar #hash = "double" ',
             "Accounts__Email__Password": ' cloud-password $dollar #hash = "double" \'single\' ',
-            "DataProtection__LegacyKeyStore": "Redis",
-            "DataProtection__LegacyRedisKey": 'legacy:keys $dollar #hash = "quoted"',
         }
         cloud_enabled_context = {
             **cloud_context,
@@ -503,8 +471,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "accounts_email_port": 587,
             "accounts_email_security": "StartTls",
             "accounts_email_from": "accounts@example.invalid",
-            "data_protection_legacy_key_store": cloud_secret_values["DataProtection__LegacyKeyStore"],
-            "data_protection_legacy_redis_key": cloud_secret_values["DataProtection__LegacyRedisKey"],
             "cloud_accounts_admin_seed_password": cloud_secret_values["Accounts__AdminSeed__Password"],
             "cloud_accounts_email_username": cloud_secret_values["Accounts__Email__Username"],
             "cloud_accounts_email_password": cloud_secret_values["Accounts__Email__Password"],
@@ -539,7 +505,6 @@ with tempfile.TemporaryDirectory(prefix="localcluster-render-") as tmp:
             "OBSERVABILITY_DOCKER_NETWORK": "fixture_observability",
             "DATA_PROTECTION_CERT_HOST_PATH": "/etc/fixture-books/data-protection/certificate.pem",
             "DATA_PROTECTION_CERT_GID": "1002",
-            "DATA_PROTECTION_LEGACY_HOST_PATH": "/etc/fixture-books/data-protection/legacy",
         }
         cloud_compose = cloud_root / "docker-compose.yml"
         cloud_compose_text = (ROOT / "Deployment/Cloud/compose/app-server/docker-compose.yml").read_text(encoding="utf-8-sig")

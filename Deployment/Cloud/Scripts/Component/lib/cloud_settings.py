@@ -17,10 +17,6 @@ from settings_validation import (  # noqa: E402
     validate_observability_ports,
 )
 from account_deploy_settings import ACCOUNT_SETTING_KEYS, validate_account_deploy_settings  # noqa: E402
-from data_protection_deploy_settings import (  # noqa: E402
-    LEGACY_DATA_PROTECTION_SETTING_KEYS,
-    validate_legacy_data_protection_settings,
-)
 
 
 REQUIRED_KEYS = [
@@ -42,7 +38,6 @@ REQUIRED_KEYS = [
 
 OPTIONAL_KEYS = [
     *sorted(ACCOUNT_SETTING_KEYS),
-    *sorted(LEGACY_DATA_PROTECTION_SETTING_KEYS),
     "observability_enabled",
     "observability_root",
     "observability_docker_network",
@@ -235,7 +230,6 @@ def validate(values: dict[str, str]) -> list[str]:
             seen_ips[address] = key
 
     errors.extend(validate_account_deploy_settings(values))
-    errors.extend(validate_legacy_data_protection_settings(values))
     return errors
 
 
