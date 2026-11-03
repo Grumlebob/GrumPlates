@@ -132,9 +132,14 @@ try {
         $nodeExitCode = $LASTEXITCODE
         $npmVersion = (& $npmCommand --version 2>$null | Select-Object -First 1)
         $npmExitCode = $LASTEXITCODE
-        $usePinnedNodeToolchain = $nodeExitCode -eq 0 -and $npmExitCode -eq 0 -and $nodeVersion -eq 'v26.12.1' -and $npmVersion -eq '12.2.0'
+        $dockerfileNode = Select-String -Path (Join-Path $repoRoot 'GrumPlates/Dockerfile') -Pattern '^FROM node:([0-9]+\.[0-9]+\.[0-9]+)-bookworm-slim' | Select-Object -First 1
+        if (-not $dockerfileNode) {
+            throw 'GrumPlates/Dockerfile has no node base image.'
+        }
+        $pinnedNodeVersion = $dockerfileNode.Matches[0].Groups[1].Value
+        $usePinnedNodeToolchain = $nodeExitCode -eq 0 -and $npmExitCode -eq 0 -and $nodeVersion -eq "v$pinnedNodeVersion" -and $npmVersion -eq '12.2.0'
         if (-not $usePinnedNodeToolchain) {
-            Write-Host 'Using the package-declared Node 26.12.1 and npm 12.2.0 toolchain.'
+            Write-Host "Using the Dockerfile's Node $pinnedNodeVersion and npm 12.2.0 toolchain."
         }
 
         $npmSteps = @(
@@ -148,7 +153,7 @@ try {
                 & $npmCommand @npmArguments
             }
             else {
-                & $npxCommand --yes --allow-scripts=node@26.12.1 --package=node@26.12.1 --package=npm@12.2.0 -c $npmStep.Command
+                & $npxCommand --yes --allow-scripts=node@$pinnedNodeVersion --package=node@$pinnedNodeVersion --package=npm@12.2.0 -c $npmStep.Command
             }
 
             if ($LASTEXITCODE -ne 0) {

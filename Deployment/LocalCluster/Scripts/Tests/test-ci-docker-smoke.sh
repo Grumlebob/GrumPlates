@@ -5,6 +5,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT="$SCRIPT_DIR/../ci-docker-smoke.sh"
+export SMOKE_DOCKERFILE="$SCRIPT_DIR/../../../../GrumPlates/Dockerfile"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 mkdir -p "$TMP_ROOT/bin" "$TMP_ROOT/state"
@@ -231,8 +232,10 @@ env -u GITHUB_RUN_ID -u GITHUB_RUN_ATTEMPT bash "$SCRIPT" > "$TMP_ROOT/local-two
 python3 - <<'PY'
 import json
 import os
+import re
 from pathlib import Path
 calls = [json.loads(line) for line in Path(os.environ["SMOKE_CALLS"]).read_text().splitlines()]
+node_image = re.search(r"^FROM (node:[0-9]+\.[0-9]+\.[0-9]+-bookworm-slim)", Path(os.environ["SMOKE_DOCKERFILE"]).read_text(), re.M).group(1)
 networks = [args[-1] for args in calls if args[:2] == ["network", "create"] and "local-" in args[-1]]
 assert len(networks) == 2 and len(set(networks)) == 2
 assert all(name.startswith("sample-ci-") for name in networks)
@@ -262,7 +265,7 @@ for args in calls:
                 assert "DataProtection__KeyEncryptionCertificatePath=/run/dp-cert/dp.pfx" in args
                 assert any(value.endswith(":/run/dp-cert:ro") for value in args)
         elif "smtp" in name:
-            assert "node:26.12.1-bookworm-slim" in args
+            assert node_image in args
             assert "--read-only" in args
             assert args[args.index("--network-alias") + 1] == "ci-smtp"
             assert not any(value in ("-p", "--publish") for value in args)

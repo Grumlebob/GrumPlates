@@ -41,7 +41,9 @@ APP_NAME="${APP_NAME:-$(bash "$SCRIPT_DIR/read-deploy-setting.sh" app_name)}"
 # Keep these tags equal to TestContainerImages.cs and the CI preflight pulls.
 POSTGRES_IMAGE="postgres:18.4-alpine3.23"
 REDIS_IMAGE="redis:8.8.0-alpine3.23"
-SMTP_FIXTURE_IMAGE="node:26.12.1-bookworm-slim"
+node_version="$(sed -n -E 's/^FROM node:([0-9]+\.[0-9]+\.[0-9]+)-bookworm-slim.*/\1/p' "$REPO_ROOT/GrumPlates/Dockerfile" | head -n1)"
+[[ -n "$node_version" ]] || { echo "GrumPlates/Dockerfile has no node base image" >&2; exit 1; }
+SMTP_FIXTURE_IMAGE="node:${node_version}-bookworm-slim"
 # Browser tests that prove SSR, hydration and pre-hydration control state.
 BROWSER_SMOKE_FILTER="FullyQualifiedName~RenderModeE2ETests|FullyQualifiedName~PreHydrationControlsE2ETests"
 REACT_ENABLED_BROWSER_FILTER="Category=ReactPackagedEnabled"

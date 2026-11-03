@@ -4,17 +4,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 exec python3 - "$SCRIPT_DIR/.." <<'PY'
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
 from jinja2 import Environment, StrictUndefined
 
 
+NODE_IMAGE = re.search(r'^FROM (node:[0-9]+\.[0-9]+\.[0-9]+-bookworm-slim)', (Path(sys.argv[1]).resolve().parents[1] / 'GrumPlates/Dockerfile').read_text(encoding='utf-8'), re.M).group(1)
+
+
 def assert_runtime_environment(folder, expected):
     verifier = folder / 'verify-env.yml'
     node_script = "console.log(JSON.stringify({username:process.env.Accounts__Email__Username,password:process.env.Accounts__Email__Password}))"
     verifier.write_text(json.dumps({'services': {'verify': {
-        'image': 'node:26.12.1-bookworm-slim',
+        'image': NODE_IMAGE,
         'network_mode': 'none',
         'env_file': [{'path': './.env', 'format': 'raw'}],
         'command': ['node', '-e', node_script],
