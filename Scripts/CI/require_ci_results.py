@@ -11,9 +11,8 @@ class RequiredResultError(ValueError):
     pass
 
 
-def validate_required_results(*, event_name: str, ref: str, validation_selection: str,
-                              validation: str, publication_selection: str, publication: str) -> None:
-    """Validate the required dependency results for a PR, main run, or canary."""
+def validate_required_results(*, event_name: str, ref: str, validation: str, publication: str) -> None:
+    """Validate the required dependency results for a PR, a main run or a branch dispatch."""
     if event_name == "pull_request":
         if not re.fullmatch(r"refs/pull/[1-9][0-9]*/merge", ref):
             raise RequiredResultError("pull request ref is invalid")
@@ -29,16 +28,12 @@ def validate_required_results(*, event_name: str, ref: str, validation_selection
     else:
         raise RequiredResultError("event is outside the CI result-gate contract")
 
-    if validation_selection != "success":
-        raise RequiredResultError("validation runner selection did not succeed")
     if validation != "success":
         raise RequiredResultError("validation did not succeed")
     if requires_publication:
-        if publication_selection != "success":
-            raise RequiredResultError("publication runner selection did not succeed")
         if publication != "success":
             raise RequiredResultError("publication did not succeed")
-    elif publication_selection != "skipped" or publication != "skipped":
+    elif publication != "skipped":
         raise RequiredResultError("publication must remain skipped outside main")
 
 
@@ -47,9 +42,7 @@ def main() -> int:
         validate_required_results(
             event_name=os.environ["CI_EVENT_NAME"],
             ref=os.environ["CI_REF"],
-            validation_selection=os.environ["CI_VALIDATION_SELECTION_RESULT"],
             validation=os.environ["CI_VALIDATION_RESULT"],
-            publication_selection=os.environ["CI_PUBLICATION_SELECTION_RESULT"],
             publication=os.environ["CI_PUBLICATION_RESULT"],
         )
     except (KeyError, RequiredResultError):
