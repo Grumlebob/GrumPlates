@@ -107,7 +107,6 @@ def validate_manifest(
         bundle_dir=bundle_dir,
         expected_bundle_runtime=expected_bundle_runtime,
     )
-    schema_version = manifest["schema_version"]
     if registry_digest(registry_payload, expected_image=expected_image) != image_digest:
         raise ManifestError("registry digest does not match the release manifest")
 
@@ -130,14 +129,9 @@ def validate_manifest(
         ACCEPTANCE_PROFILE_LABEL: expected_acceptance_profile,
         REVISION_LABEL: expected_sha,
     }
-    if schema_version == 2:
-        for key, expected in profile_labels.items():
-            if image_labels.get(key) != expected:
-                raise ManifestError(f"image label {key!r} does not match the release manifest")
-    else:
-        for key, expected in profile_labels.items():
-            if key in image_labels and image_labels[key] != expected:
-                raise ManifestError(f"legacy image label {key!r} conflicts with the Blazor release")
+    for key, expected in profile_labels.items():
+        if image_labels.get(key) != expected:
+            raise ManifestError(f"image label {key!r} does not match the release manifest")
 
     return image_digest
 

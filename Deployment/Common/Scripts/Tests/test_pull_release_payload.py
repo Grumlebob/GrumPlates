@@ -220,10 +220,10 @@ class PullReleasePayloadTests(unittest.TestCase):
                     app_image=self.identity.app_image, bundle_name=self.identity.bundle_filename,
                 )
 
-    def test_legacy_selection_is_not_accepted_by_registry_reader(self) -> None:
+    def test_unsuccessful_selection_is_not_accepted_by_registry_reader(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
-            selection = self.write_selection(directory, outcome="legacy_artifact")
+            selection = self.write_selection(directory, outcome="invalid_provenance")
             with self.assertRaisesRegex(registry_payload.PayloadError, "does not contain"):
                 MODULE.pull_from_selection(
                     selection, directory / "output", repository=self.identity.repository,

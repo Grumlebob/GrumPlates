@@ -25,30 +25,21 @@ def read_release_marker(path: Path) -> dict:
         raise ValueError(f"cannot read deployed release marker: {path}") from exc
     if not isinstance(release, dict):
         raise ValueError("deployed release marker must be a JSON object")
-    schema = release.get("manifest_schema_version", 1)
-    if type(schema) is not int or schema not in (1, 2):
+    schema = release.get("manifest_schema_version")
+    if type(schema) is not int or schema != 2:
         raise ValueError("deployed release marker has an unsupported manifest schema")
     return release
 
 
 def resolve_release_acceptance(path: Path) -> tuple[str, str]:
     release = read_release_marker(path)
-    schema = release.get("manifest_schema_version", 1)
-
     frontend = release.get("frontend_profile")
     acceptance = release.get("acceptance_profile")
-    if schema == 1:
-        if "frontend_profile" not in release and "acceptance_profile" not in release:
-            return "BlazorAuto", "BlazorAutoV1"
-        if frontend == "BlazorAuto" and acceptance == "BlazorAutoV1":
-            return frontend, acceptance
-        raise ValueError("schema-v1 releases are accepted only as BlazorAuto/BlazorAutoV1")
-
     if frontend not in SUPPORTED_PROFILES:
-        raise ValueError("schema-v2 release marker has an unsupported frontend profile")
+        raise ValueError("release marker has an unsupported frontend profile")
     expected = ACCEPTANCE_PROFILE_BY_FRONTEND[frontend]
     if acceptance != expected:
-        raise ValueError("schema-v2 frontend and acceptance profiles do not match")
+        raise ValueError("release marker frontend and acceptance profiles do not match")
     return frontend, acceptance
 
 

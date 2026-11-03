@@ -105,25 +105,14 @@ class ReleaseContractTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ManifestError, "revision"):
             self.validate()
 
-    def test_accepts_legacy_v1_as_blazor_only(self) -> None:
+    def test_rejects_schema_v1(self) -> None:
         self.manifest["schema_version"] = 1
         del self.manifest["frontend_profile"]
         del self.manifest["acceptance_profile"]
         del self.image_labels["com.grumplates.frontend-profile"]
         del self.image_labels["com.grumplates.acceptance-profile"]
-        del self.image_labels["org.opencontainers.image.revision"]
 
-        self.assertEqual(self.validate(), self.digest)
-        with self.assertRaisesRegex(MODULE.ManifestError, "only for verified BlazorAuto"):
-            self.validate("React", "ReactPublicV1")
-
-    def test_rejects_legacy_v1_with_conflicting_baked_profile(self) -> None:
-        self.manifest["schema_version"] = 1
-        del self.manifest["frontend_profile"]
-        del self.manifest["acceptance_profile"]
-        self.image_labels["com.grumplates.frontend-profile"] = "React"
-
-        with self.assertRaisesRegex(MODULE.ManifestError, "conflicts with the Blazor release"):
+        with self.assertRaisesRegex(MODULE.ManifestError, "unsupported release manifest schema"):
             self.validate()
 
     def test_accepts_docker_verbose_list_response(self) -> None:

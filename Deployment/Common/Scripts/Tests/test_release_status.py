@@ -94,29 +94,25 @@ class ReleaseStatusTests(TestCase):
                 with self.assertRaises(ReleaseStatusError):
                     summarize_marker(marker, repository_url=self.repository_url, app_image=self.marker["image"])
 
-    def test_classifies_legacy_artifact_release_and_requires_registry_pin(self):
-        legacy = {
-            key: value for key, value in self.marker.items()
-            if key not in ("frontend_profile", "acceptance_profile", "release_payload_pin_key")
-        }
-        legacy["manifest_schema_version"] = 1
-        legacy["payload_transport"] = "actions-artifact"
-        summary = summarize_marker(legacy, repository_url=self.repository_url, app_image=self.marker["image"])
-        self.assertEqual(summary["frontend_profile"], "BlazorAuto")
-        self.assertEqual(pin_state(summary, set()), "legacy-artifact-only")
-        artifact_pin_key = "legacy-123-" + "e" * 64
-        pinned_legacy = summarize_marker(
-            {**legacy, "release_payload_pin_key": artifact_pin_key},
-            repository_url=self.repository_url,
-            app_image=self.marker["image"],
-        )
-        self.assertEqual(pin_state(pinned_legacy, {artifact_pin_key}), "verified")
-        with self.assertRaises(ReleaseStatusError):
-            pin_state(summarize_marker(self.marker, repository_url=self.repository_url, app_image=self.marker["image"]), set())
+    def test_rejects_schema_one_non_registry_pin_and_untyped_markers(self):
+        untyped = {key: value for key, value in self.marker.items() if key != "payload_transport"}
+        for marker in (
+            {**self.marker, "manifest_schema_version": 1},
+            {**self.marker, "release_payload_pin_key": "legacy-123-" + "e" * 64},
+            untyped,
+        ):
+            with self.subTest(marker=marker):
+                with self.assertRaises(ReleaseStatusError):
+                    summarize_marker(marker, repository_url=self.repository_url, app_image=self.marker["image"])
 
-    def test_summarizes_and_verifies_an_explicit_legacy_local_pin(self):
-        marker = {**self.marker, "payload_transport": "local-pin",
-                  "release_payload_pin_key": "legacy-123-" + "e" * 64}
+    def test_pin_state_requires_a_pin_validated_by_local_inventory(self):
+        summary = summarize_marker(self.marker, repository_url=self.repository_url, app_image=self.marker["image"])
+        self.assertEqual(pin_state(summary, {summary["release_payload_pin_key"]}), "verified")
+        with self.assertRaisesRegex(ReleaseStatusError, "not validated"):
+            pin_state(summary, set())
+
+    def test_summarizes_and_verifies_a_local_pin_release(self):
+        marker = {**self.marker, "payload_transport": "local-pin"}
         summary = summarize_marker(marker, repository_url=self.repository_url, app_image=self.marker["image"])
         self.assertEqual(pin_state(summary, {marker["release_payload_pin_key"]}), "verified")
 
@@ -150,19 +146,6 @@ class ReleaseStatusTests(TestCase):
                 verified_registry_payload_references(
                     {"current": summary}, {"current": summary["release_payload_pin_key"]}, Path("/verified/pins"),
                 )
-
-    def test_inferred_legacy_pin_requires_local_inventory_validation(self):
-        legacy = {
-            key: value for key, value in self.marker.items()
-            if key not in ("frontend_profile", "acceptance_profile", "release_payload_pin_key")
-        }
-        legacy["manifest_schema_version"] = 1
-        legacy["payload_transport"] = "actions-artifact"
-        summary = summarize_marker(legacy, repository_url=self.repository_url, app_image=self.marker["image"])
-        key = "legacy-123-" + "e" * 64
-        self.assertEqual(pin_state(summary, {key}, key), "verified")
-        with self.assertRaisesRegex(ReleaseStatusError, "not validated"):
-            pin_state(summary, set(), key)
 
     def test_offline_pin_restore_uses_no_github_or_registry_credentials_and_checks_restored_bytes(self):
         summary = summarize_marker(self.marker, repository_url=self.repository_url, app_image=self.marker["image"])
@@ -302,66 +285,6 @@ class ReleaseStatusTests(TestCase):
                     payload_image_prefix="private-books-",
                     temp_root=Path(temporary),
                 )
-
-    def test_offline_pin_restore_accepts_an_inventory_validated_legacy_pin(self):
-        legacy = {
-            key: value for key, value in self.marker.items()
-            if key not in ("frontend_profile", "acceptance_profile", "release_payload_pin_key")
-        }
-        legacy["manifest_schema_version"] = 1
-        legacy["payload_transport"] = "actions-artifact"
-        summary = summarize_marker(legacy, repository_url=self.repository_url, app_image=self.marker["image"])
-        pin_key = "legacy-123-" + "e" * 64
-        manifest = b"verified legacy manifest"
-        bundle = b"verified legacy migration bundle"
-        metadata = {
-            "transport": "actions-artifact",
-            "repository": self.repository_url,
-            "target_sha": summary["source_sha"],
-            "run_id": summary["ci_run_id"],
-            "run_attempt": summary["ci_run_attempt"],
-            "profile": summary["frontend_profile"],
-            "acceptance_profile": summary["acceptance_profile"],
-            "runtime": "linux-x64",
-            "app_image": summary["image"],
-            "image_digest": summary["digest"],
-            "manifest_schema_version": summary["manifest_schema_version"],
-            "manifest_sha256": hashlib.sha256(manifest).hexdigest(),
-            "bundle_filename": "books-migrate-linux-x64",
-            "bundle_sha256": hashlib.sha256(bundle).hexdigest(),
-        }
-
-        def restore(pin_dir, output_dir, **kwargs):
-            output_dir.mkdir()
-            (output_dir / "release-manifest.json").write_bytes(manifest)
-            (output_dir / metadata["bundle_filename"]).write_bytes(bundle)
-            self.assertEqual(kwargs["target_sha"], summary["source_sha"])
-            return {"pin_key": pin_dir.name}
-
-        with tempfile.TemporaryDirectory() as temporary, \
-                patch.object(pin_release_payload, "_require_shared_lock"), \
-                patch.object(pin_release_payload, "validate", return_value=metadata), \
-                patch.object(pin_release_payload, "restore", side_effect=restore), \
-                patch.object(release_status, "verify_cached_application_image") as image_inspect:
-            result = verify_offline_pin_restore(
-                summary,
-                Path(temporary) / "pins",
-                repository_url=self.repository_url,
-                runtime="linux-x64",
-                bundle_name=metadata["bundle_filename"],
-                payload_image_prefix="private-books-",
-                temp_root=Path(temporary),
-                validated_pin_key=pin_key,
-            )
-            image_inspect.assert_called_once_with(summary)
-
-        self.assertEqual(result, {
-            "outcome": "verified",
-            "pin_key": pin_key,
-            "transport": "actions-artifact",
-            "file_count": 2,
-            "application_image": "verified-local-digest",
-        })
 
     def test_lists_active_deployment_runs_and_freezes_dispatch_target_sha(self):
         target_sha = "e" * 40

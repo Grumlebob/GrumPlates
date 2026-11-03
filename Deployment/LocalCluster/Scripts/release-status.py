@@ -277,8 +277,8 @@ def snapshot() -> dict:
 
     protected = set(inventory.get("protected", []))
     marker_pins = inventory.get("marker_pins", {})
-    current_pin = pin_state(current, protected, marker_pins.get("current"))
-    recovery_pin = pin_state(recovery, protected, marker_pins.get("recovery"))
+    current_pin = pin_state(current, protected)
+    recovery_pin = pin_state(recovery, protected)
     offline_pin_restore: dict[str, Any] = {"outcome": "not-requested"}
     if os.environ.get("VERIFY_OFFLINE_PINS", "false").casefold() == "true":
         temp_root = Path(os.environ.get("RUNNER_TEMP", ""))

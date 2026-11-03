@@ -110,9 +110,9 @@ class LocalClusterReleaseStatusTests(TestCase):
             with self.assertRaisesRegex(status.ReleaseStatusError, "no pull was attempted"):
                 status.verify_cluster_cached_application_image(release)
 
-    def test_snapshot_restores_inventory_validated_legacy_recovery_pin(self):
+    def test_snapshot_restores_current_and_recovery_pins_offline(self):
         current_pin = "ghcr-" + "a" * 64 + "-" + "b" * 64
-        recovery_pin = "legacy-123-" + "c" * 64
+        recovery_pin = "ghcr-" + "c" * 64 + "-" + "d" * 64
 
         def marker(sha: str, run_id: str, transport: str, pin: str | None = None) -> dict:
             value = {
@@ -133,7 +133,8 @@ class LocalClusterReleaseStatusTests(TestCase):
             return value
 
         current = marker("a" * 40, "12341", "ghcr-container", current_pin)
-        recovery = marker("b" * 40, "12342", "actions-artifact")
+        recovery = marker("b" * 40, "12342", "local-pin", recovery_pin)
+        pins = {current_pin: current, recovery_pin: recovery}
         inventory = {
             "outcome": "consistent",
             "pins": 2,
@@ -154,11 +155,11 @@ class LocalClusterReleaseStatusTests(TestCase):
 
         with tempfile.TemporaryDirectory() as directory, \
                 patch.object(status.pin_release_payload, "_require_shared_lock"), \
-                patch.object(status.pin_release_payload, "validate", return_value={
+                patch.object(status.pin_release_payload, "validate", side_effect=lambda path: {
                     "transport": "ghcr-container",
-                    "target_sha": current["source_sha"],
-                    "run_id": current["ci_run_id"],
-                    "run_attempt": current["ci_run_attempt"],
+                    "target_sha": pins[path.name]["source_sha"],
+                    "run_id": pins[path.name]["ci_run_id"],
+                    "run_attempt": pins[path.name]["ci_run_attempt"],
                     "payload_image": "ghcr.io/grumlebob/private-books-release-payload",
                     "payload_digest": "sha256:" + "e" * 64,
                 }), \
@@ -186,13 +187,10 @@ class LocalClusterReleaseStatusTests(TestCase):
 
         self.assertEqual(result["current_pin"], "verified")
         self.assertEqual(result["recovery_pin"], "verified")
-        self.assertEqual(result["registry_payload_references"], [{
-            "payload_image": "ghcr.io/grumlebob/private-books-release-payload",
-            "payload_digest": "sha256:" + "e" * 64,
-            "ci_run_id": "12341",
-            "ci_run_attempt": "1",
-            "source_sha": "a" * 40,
-        }])
+        self.assertEqual(
+            [(reference["ci_run_id"], reference["source_sha"]) for reference in result["registry_payload_references"]],
+            [("12341", "a" * 40), ("12342", "b" * 40)],
+        )
         self.assertEqual(result["offline_pin_restore"]["recovery"]["pin_key"], recovery_pin)
         self.assertEqual(restore.call_args_list[1].kwargs["validated_pin_key"], recovery_pin)
         self.assertEqual(result["mutation"], "none")

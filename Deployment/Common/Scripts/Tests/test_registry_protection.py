@@ -29,12 +29,16 @@ class RegistryProtectionTests(unittest.TestCase):
             },
             "recovery_release": {
                 "source_sha": "b" * 40, "ci_run_id": "456", "ci_run_attempt": "1",
-                "payload_transport": "actions-artifact", "release_payload_pin_key": None,
+                "payload_transport": "local-pin", "release_payload_pin_key": "ghcr-recovery-key",
             },
             "registry_payload_references": [{
                 "payload_image": "ghcr.io/example/books-release-payload",
                 "payload_digest": "sha256:" + "c" * 64,
                 "ci_run_id": "123", "ci_run_attempt": "2", "source_sha": "a" * 40,
+            }, {
+                "payload_image": "ghcr.io/example/books-release-payload",
+                "payload_digest": "sha256:" + "d" * 64,
+                "ci_run_id": "456", "ci_run_attempt": "1", "source_sha": "b" * 40,
             }],
         }
 
@@ -44,7 +48,10 @@ class RegistryProtectionTests(unittest.TestCase):
             {"run_id": 123, "run_attempt": 2, "target_sha": "a" * 40},
             {"run_id": 456, "run_attempt": 1, "target_sha": "b" * 40},
         ])
-        self.assertEqual(result["registry_payload_references"][0]["digest"], "sha256:" + "c" * 64)
+        self.assertEqual(
+            [reference["digest"] for reference in result["registry_payload_references"]],
+            ["sha256:" + "c" * 64, "sha256:" + "d" * 64],
+        )
         self.assertTrue(result["complete"])
 
     def test_github_output_encodes_only_the_validated_protection_snapshot(self):
@@ -58,11 +65,13 @@ class RegistryProtectionTests(unittest.TestCase):
         self.assertEqual(payload[:2], b"\x1f\x8b")
         self.assertEqual(json.loads(gzip.decompress(payload)), value)
 
-    def test_missing_registry_pin_for_ghcr_current_marker_fails_closed(self):
-        value = self.status()
-        value["registry_payload_references"] = []
-        with self.assertRaises(CLI.ProtectionError):
-            CLI.protection(value, target="localcluster", instance="cluster")
+    def test_missing_registry_pin_for_current_or_recovery_marker_fails_closed(self):
+        for kept in ([], [0], [1]):
+            with self.subTest(kept=kept):
+                value = self.status()
+                value["registry_payload_references"] = [value["registry_payload_references"][i] for i in kept]
+                with self.assertRaises(CLI.ProtectionError):
+                    CLI.protection(value, target="localcluster", instance="cluster")
 
     def test_unverified_live_identity_or_wrong_target_fails_closed(self):
         value = self.status()

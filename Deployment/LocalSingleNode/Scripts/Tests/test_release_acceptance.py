@@ -16,34 +16,14 @@ class ReleaseAcceptanceTests(unittest.TestCase):
             path.write_text(json.dumps(value), encoding="utf-8")
             return resolve_release_acceptance(path)
 
-    def test_schema_one_without_profile_fields_is_legacy_blazor(self):
-        self.assertEqual(("BlazorAuto", "BlazorAutoV1"), self.resolve({"manifest_schema_version": 1}))
-
-    def test_schema_one_with_explicit_blazor_pair_is_accepted(self):
-        self.assertEqual(
-            ("BlazorAuto", "BlazorAutoV1"),
-            self.resolve({
-                "manifest_schema_version": 1,
-                "frontend_profile": "BlazorAuto",
-                "acceptance_profile": "BlazorAutoV1",
-            }),
-        )
-
-    def test_schema_one_cannot_select_react(self):
-        with self.assertRaisesRegex(ValueError, "schema-v1"):
-            self.resolve({
-                "manifest_schema_version": 1,
-                "frontend_profile": "React",
-                "acceptance_profile": "ReactPublicV1",
-            })
-
-    def test_schema_one_null_profile_fields_are_not_treated_as_legacy_absence(self):
-        with self.assertRaisesRegex(ValueError, "schema-v1"):
-            self.resolve({
-                "manifest_schema_version": 1,
-                "frontend_profile": None,
-                "acceptance_profile": None,
-            })
+    def test_schema_one_and_missing_schema_are_rejected(self):
+        for value in (
+            {"manifest_schema_version": 1, "frontend_profile": "BlazorAuto", "acceptance_profile": "BlazorAutoV1"},
+            {"frontend_profile": "BlazorAuto", "acceptance_profile": "BlazorAutoV1"},
+        ):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "unsupported manifest schema"):
+                    self.resolve(value)
 
     def test_schema_two_accepts_both_matching_pairs(self):
         for frontend, acceptance in (

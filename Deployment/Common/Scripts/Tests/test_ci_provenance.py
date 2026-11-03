@@ -296,7 +296,7 @@ class CiSelectionTests(unittest.TestCase):
                 runtime="linux-x64",
                 app_image=app_image,
             )
-            legacy = MODULE.verify_payload_receipt(
+            unprefixed = MODULE.verify_payload_receipt(
                 selection,
                 [job],
                 repository="owner/repo",
@@ -324,13 +324,7 @@ class CiSelectionTests(unittest.TestCase):
             result, run(9, "2026-09-24T11:00:00Z"), "owner/repo", self.target, self.workflow
         )
         self.assertEqual(rechecked["payload_receipt"]["payload_digest"], payload_digest)
-        self.assertEqual(legacy["outcome"], "legacy_artifact")
-        self.assertEqual(legacy["transport"], "actions-artifact")
-        legacy_rechecked = MODULE.verify_current_run(
-            legacy, run(9, "2026-09-24T11:00:00Z"), "owner/repo", self.target, self.workflow
-        )
-        self.assertEqual(legacy_rechecked["outcome"], "legacy_artifact")
-        self.assertEqual(legacy_rechecked["transport"], "actions-artifact")
+        self.assertEqual(unprefixed["outcome"], "invalid_provenance")
         self.assertEqual(wrong_image["outcome"], "invalid_provenance")
         self.assertEqual(fetch_logs.call_count, 3)
         fetch_logs.assert_called_with("owner/repo", 44, "test-token", api_root=MODULE.API_ROOT)
@@ -374,7 +368,7 @@ class CiSelectionTests(unittest.TestCase):
         self.assertEqual(expired["outcome"], "invalid_provenance")
         self.assertIn("HTTP 404", expired["diagnostic"])
 
-    def test_template_legacy_attempt_uses_actions_artifact_transport(self) -> None:
+    def test_publisher_without_payload_receipt_step_fails_closed(self) -> None:
         selection = self.select([run(9, "2026-09-24T11:00:00Z")])
         job = self.publishing_job(id=44, steps=[])
         with patch.object(MODULE, "download_job_logs") as fetch_logs:
@@ -383,13 +377,8 @@ class CiSelectionTests(unittest.TestCase):
                 profile="Template", acceptance_profile=None, runtime="linux-x64",
                 app_image="ghcr.io/grumlebob/template",
             )
-        self.assertEqual(result["outcome"], "legacy_artifact")
-        self.assertEqual(result["transport"], "actions-artifact")
-        rechecked = MODULE.verify_current_run(
-            result, run(9, "2026-09-24T11:00:00Z"), "owner/repo", self.target, self.workflow
-        )
-        self.assertEqual(rechecked["outcome"], "legacy_artifact")
-        self.assertEqual(rechecked["transport"], "actions-artifact")
+        self.assertEqual(result["outcome"], "invalid_provenance")
+        self.assertIn("no immutable payload receipt step", result["diagnostic"])
         fetch_logs.assert_not_called()
 
 

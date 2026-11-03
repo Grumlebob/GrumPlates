@@ -36,10 +36,7 @@ case "${EXPECTED_FRONTEND_PROFILE}:${EXPECTED_ACCEPTANCE_PROFILE}" in
   BlazorAuto:BlazorAutoV1|React:ReactPublicV1) ;;
   *) fail "frontend and acceptance profiles do not match" ;;
 esac
-[[ "$EXPECTED_MANIFEST_SCHEMA" =~ ^[12]$ ]] || fail "manifest schema must be 1 or 2"
-if [[ "$EXPECTED_MANIFEST_SCHEMA" == 1 && "$EXPECTED_FRONTEND_PROFILE:$EXPECTED_ACCEPTANCE_PROFILE" != "BlazorAuto:BlazorAutoV1" ]]; then
-  fail "legacy manifest schema v1 is supported only for BlazorAuto"
-fi
+[[ "$EXPECTED_MANIFEST_SCHEMA" == 2 ]] || fail "manifest schema must be 2"
 [[ -f "$INVENTORY" ]] || fail "missing inventory: $INVENTORY"
 
 identity_root="$(mktemp -d "${RUNNER_TEMP:-/tmp}/release-identities.XXXXXX")"
@@ -65,8 +62,6 @@ expected = f"{app_image}@{expected_digest}"
 expected_repository = source_repo.removeprefix("https://github.com/")
 if frontend not in ("BlazorAuto", "React") or acceptance != {"BlazorAuto": "BlazorAutoV1", "React": "ReactPublicV1"}.get(frontend):
     raise SystemExit("release identity verification failed: frontend/acceptance pair is invalid")
-if schema == "1" and (frontend, acceptance) != ("BlazorAuto", "BlazorAutoV1"):
-    raise SystemExit("release identity verification failed: schema v1 is Blazor-only")
 files = sorted(os.listdir(root))
 if not files:
     raise SystemExit("release identity verification failed: no per-host identity records were written")
@@ -103,10 +98,8 @@ for name in files:
         "com.grumplates.acceptance-profile": acceptance,
     }
     for key, value in profile_labels.items():
-        if schema == "2" and image_labels.get(key) != value:
+        if image_labels.get(key) != value:
             raise SystemExit(f"release identity verification failed: {host} label {key!r} differs")
-        if schema == "1" and key in image_labels and image_labels[key] != value:
-            raise SystemExit(f"release identity verification failed: {host} legacy image conflicts at {key!r}")
     print(f"{host}: {expected} {frontend}/{acceptance}")
 PY
 

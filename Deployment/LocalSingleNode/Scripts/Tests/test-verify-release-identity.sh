@@ -25,7 +25,7 @@ elif args[:2] == ["image", "inspect"]:
         "localcluster.ci.run_id": os.environ["EXPECTED_CI_RUN_ID"],
         "localcluster.ci.run_attempt": os.environ["EXPECTED_CI_RUN_ATTEMPT"],
     }
-    if os.environ.get("FAKE_LEGACY_IMAGE") != "1":
+    if os.environ.get("FAKE_UNLABELLED_IMAGE") != "1":
         labels.update({
             "org.opencontainers.image.revision": os.environ["EXPECTED_SOURCE_SHA"],
             "com.grumplates.frontend-profile": os.environ["EXPECTED_FRONTEND_PROFILE"],
@@ -78,11 +78,13 @@ if FAKE_WRONG_REVISION=1 run_identity >/dev/null 2>&1; then
   exit 1
 fi
 
-EXPECTED_MANIFEST_SCHEMA=1 FAKE_LEGACY_IMAGE=1 run_identity > "$TEST_ROOT/legacy.txt"
-grep -Fq "BlazorAuto/BlazorAutoV1" "$TEST_ROOT/legacy.txt"
 status=0
-EXPECTED_MANIFEST_SCHEMA=1 EXPECTED_FRONTEND_PROFILE=React EXPECTED_ACCEPTANCE_PROFILE=ReactPublicV1 run_identity >/dev/null 2>&1 || status=$?
-[[ "$status" == 1 ]] || { echo "legacy schema v1 accepted React or returned $status" >&2; exit 1; }
+EXPECTED_MANIFEST_SCHEMA=1 run_identity >/dev/null 2>&1 || status=$?
+[[ "$status" == 1 ]] || { echo "manifest schema 1 returned $status" >&2; exit 1; }
+if FAKE_UNLABELLED_IMAGE=1 run_identity >/dev/null 2>&1; then
+  echo "an image without baked profile labels was accepted" >&2
+  exit 1
+fi
 
 status=0
 bash "$script" example.io/owner/app bad-digest "$EXPECTED_FRONTEND_PROFILE" "$EXPECTED_ACCEPTANCE_PROFILE" "$EXPECTED_SOURCE_SHA" 2 "$EXPECTED_CI_RUN_ID" "$EXPECTED_CI_RUN_ATTEMPT" "$EXPECTED_SOURCE_REPO" >/dev/null 2>&1 || status=$?

@@ -132,9 +132,6 @@ required_files = [
     "Deployment/LocalSingleNode/Scripts/lib/acceptance_profile.sh",
     "Deployment/LocalSingleNode/Scripts/lib/read_release_acceptance.py",
     "Deployment/LocalSingleNode/Scripts/Tests/test_release_acceptance.py",
-    "Deployment/LocalSingleNode/Scripts/Tests/test_pin_legacy_release.py",
-    "Deployment/LocalSingleNode/Scripts/pin-legacy-release.py",
-    ".github/workflows/pin-localsinglenode-legacy-release.yml",
     "Scripts/Test-DeployedSite.ps1",
     "Scripts/CI/tests/test_deployed_site_acceptance.py",
     "Scripts/CI/migration_staging_artifact.py",
@@ -155,8 +152,6 @@ required_files = [
     "Deployment/Common/Scripts/prune-actions-artifacts.sh",
     "Deployment/Common/Scripts/Component/lib/find-successful-ci-run.py",
     "Deployment/Common/Scripts/Component/lib/pin_release_payload.py",
-    "Deployment/Common/Scripts/Component/lib/import_legacy_release_payload.py",
-    "Deployment/Common/Scripts/Tests/test_import_legacy_release_payload.py",
     "Deployment/Common/Scripts/Component/lib/prune-actions-artifacts.py",
     "Deployment/Common/Scripts/read-release-setting.sh",
     "Deployment/Common/Scripts/validate-common-release.sh",
@@ -278,19 +273,6 @@ required_files.extend([
 ])
 for file in required_files:
     require_file(file)
-
-legacy_pin_helper = read("Deployment/LocalSingleNode/Scripts/pin-legacy-release.py")
-for needle, why in [
-    ("def _verify_offline_restore(", "recovery pin is exercised through the offline restore path"),
-    ('os.environ.pop("GITHUB_TOKEN", None)', "GitHub artifact credentials are unavailable during the restore drill"),
-    ("pin_release_payload.restore(", "recovery is restored from the owned local pin"),
-    ("sha256_file(restored_file) != digest", "restored recovery payload checksums are verified"),
-    ('"offline_restore": "verified"', "workflow reports the offline restore result"),
-    ('selection.get("outcome") not in {"legacy_artifact", "success"}', "exact successful receipts do not hide still-retained legacy artifacts"),
-    ('"app_image_digest": summary["digest"]', "any successful receipt is bound to the accepted legacy image digest"),
-]:
-    if needle not in legacy_pin_helper:
-        fail(f"Deployment/LocalSingleNode/Scripts/pin-legacy-release.py: missing {why}")
 
 
 removed_files = [
@@ -1268,11 +1250,8 @@ for needle, why in [
     ("pull_release_payload.py", "GHCR payload is pulled and validated by digest"),
     ('--payload-image-prefix "$RELEASE_PAYLOAD_PREFIX"', "GHCR payload pull uses the configured package prefix"),
     ("pin_release_payload.py", "validated GHCR payload is retained as an offline local pin"),
-    ("import_legacy_release_payload.py", "legacy artifact is selected by exact attempt and verified archive digest"),
     ('--root "${DEPLOY_ROOT}/release-payloads/${GITHUB_REPOSITORY//\\//-}"', "local pin root is scoped to the configured deployment and repository"),
-    ('--artifact-name "$MIGRATION_ARTIFACT_NAME"', "legacy artifact fallback uses the configured name"),
     ('RELEASE_PAYLOAD_TRANSPORT="ghcr-container"', "GHCR transport is frozen for new receipts"),
-    ('RELEASE_PAYLOAD_TRANSPORT="actions-artifact"', "legacy transport is explicit for older runs"),
 ]:
     if needle not in selection_download:
         fail(f".github/workflows/cd-localcluster.yml: missing locked artifact selection behavior: {why}")
@@ -1294,12 +1273,11 @@ for needle, why in [
     ("registry-retention.py --assert-clear", "Cloud retrieval requires no unresolved exact deletion reservation"),
     ("pull_release_payload.py", "Cloud migration payload is pulled and validated by digest"),
     ('--payload-image-prefix "$RELEASE_PAYLOAD_PREFIX"', "Cloud payload pull uses the configured package prefix"),
-    ('gh run download "$CI_RUN_ID"', "Cloud legacy fallback uses the exact CI run"),
 ]:
     if needle not in cloud_payload:
         fail(f".github/workflows/cd-cloud.yml: missing immutable migration payload behavior: {why}")
 if "actions/download-artifact@" in cd_cloud:
-    fail(".github/workflows/cd-cloud.yml: legacy artifact fallback must use the exact CI run")
+    fail(".github/workflows/cd-cloud.yml: migration payloads come from GHCR, not Actions artifacts")
 artifact_pruner = read("Deployment/Common/Scripts/Component/lib/prune-actions-artifacts.py")
 for needle, why in [
     ("ACTIVE_STATUSES", "live deployment and producer protection"),
@@ -1552,7 +1530,6 @@ for needle, why in [
         fail(f"Deployment/Common/Scripts/validate_release_manifest.py: missing {why}")
 for needle, why in [
     ("schema_version not in allowed_schema_versions", "only supported release manifest schemas"),
-    ("legacy schema v1 is supported only for verified BlazorAuto releases", "schema-v1 Blazor-only compatibility"),
 ]:
     if needle not in shared_release_validator:
         fail(f"Deployment/Common/Scripts/Component/lib/release_manifest.py: missing {why}")
@@ -1572,7 +1549,6 @@ for needle, why in [
     ("refs/heads/main", "main branch deployment guard"),
     ("bash Deployment/Common/Scripts/read-release-setting.sh app_image", "shared release image setting"),
     ("bash Deployment/Common/Scripts/read-release-setting.sh migration_bundle_name", "shared migration bundle setting"),
-    ("bash Deployment/Common/Scripts/read-release-setting.sh migration_artifact_name", "shared migration artifact setting"),
     ("bash Deployment/LocalCluster/Scripts/read-deploy-setting.sh public_hostname", "public hostname setting"),
     ('TARGET_SHA="${INPUT_TARGET_SHA:-$GITHUB_SHA}"', "target SHA defaults to the dispatched main commit"),
     ('git merge-base --is-ancestor "$TARGET_SHA" "$GITHUB_SHA"', "only commits on main can deploy"),
@@ -1584,9 +1560,7 @@ for needle, why in [
     ("CI_RUN_ATTEMPT=", "CI run attempt export"),
     ("validate_release_manifest.py", "release manifest validation"),
     ("git show \"${TARGET_SHA}:frontend-profile.txt\"", "frontend profile resolved from selected target commit"),
-    ("--legacy-blazor-default", "historical v1 target without a profile file resolves to Blazor"),
-    ("TARGET_PROFILE_FILE_PRESENT=${profile_file_present}", "selected profile file presence is recorded"),
-    ('if [[ "$RELEASE_MANIFEST_SCHEMA_VERSION" == 2 && "$TARGET_PROFILE_FILE_PRESENT" != true ]]', "schema-v2 target requires its tracked profile file"),
+    ("The selected source commit has no frontend-profile.txt.", "a target without its tracked profile file is refused"),
     ('--expected-frontend-profile "$FRONTEND_PROFILE"', "manifest bound to selected frontend profile"),
     ('--expected-acceptance-profile "$ACCEPTANCE_PROFILE"', "manifest bound to selected acceptance profile"),
     ('--image-labels-json "$IMAGE_LABELS_PATH"', "manifest bound to pulled image labels"),
@@ -1598,8 +1572,6 @@ for needle, why in [
     ("verify-release-identity.sh", "running release identity verification"),
     ('"${CI_RUN_ATTEMPT}" "${SOURCE_REPO_URL}"', "post-deploy identity checks source repository labels"),
     ("timeout-minutes: 60", "bounded deploy job"),
-    ("import_legacy_release_payload.py", "exact CI attempt artifact is digest-verified and pinned"),
-    ('--artifact-name "$MIGRATION_ARTIFACT_NAME"', "shared migration artifact download name"),
     ("chmod 0750 \"artifacts/migrations/${MIGRATION_BUNDLE_NAME}\"", "restore migration bundle execute bit"),
     ("bash Deployment/LocalCluster/Scripts/preflight.sh deploy", "deploy preflight"),
     ("with-deploy-lock.sh", "cross-repo deployment lock"),
@@ -2678,7 +2650,7 @@ require_contains(single + "/ansible/templates/compose.env.j2", "DATA_PROTECTION_
 require_contains(single + "/compose/docker-compose.yml", "target: /run/secrets/data-protection.pem", "single-node read-only certificate mount")
 require_contains(single + "/compose/docker-compose.yml", "read_only: true", "single-node read-only certificate mount")
 require_contains(single + "/Scripts/lib/backup.py", "data-protection.pem", "single-node backup preserves app certificate recovery key")
-for needle in ("find-successful-ci-run.py", "--target-sha \"$TARGET_SHA\"", "--read-final-payload-receipt", "validate_release_manifest.py", "release_image_digest", "with-deploy-lock.sh", "git merge-base --is-ancestor", "git show \"${TARGET_SHA}:frontend-profile.txt\"", "--legacy-blazor-default", "TARGET_PROFILE_FILE_PRESENT=${profile_file_present}", 'if [[ "$RELEASE_MANIFEST_SCHEMA_VERSION" == 2 && "$TARGET_PROFILE_FILE_PRESENT" != true ]]', "--expected-frontend-profile \"$FRONTEND_PROFILE\"", "--expected-acceptance-profile \"$ACCEPTANCE_PROFILE\"", "--image-labels-json \"$IMAGE_LABELS_PATH\"", "--expected-ci-run-attempt", "verify-release-identity.sh \"$APP_IMAGE\" \"$RELEASE_IMAGE_DIGEST\" \"$FRONTEND_PROFILE\" \"$ACCEPTANCE_PROFILE\" \"$TARGET_SHA\" \"$RELEASE_MANIFEST_SCHEMA_VERSION\" \"$CI_RUN_ID\" \"$CI_RUN_ATTEMPT\" \"$SOURCE_REPO_URL\"", "LOCALSINGLENODE_HOST", "TARGET: localsinglenode", "release_frontend_profile=$FRONTEND_PROFILE", "release_acceptance_profile=$ACCEPTANCE_PROFILE"):
+for needle in ("find-successful-ci-run.py", "--target-sha \"$TARGET_SHA\"", "--read-final-payload-receipt", "validate_release_manifest.py", "release_image_digest", "with-deploy-lock.sh", "git merge-base --is-ancestor", "git show \"${TARGET_SHA}:frontend-profile.txt\"", "The selected source commit has no frontend-profile.txt.", "--expected-frontend-profile \"$FRONTEND_PROFILE\"", "--expected-acceptance-profile \"$ACCEPTANCE_PROFILE\"", "--image-labels-json \"$IMAGE_LABELS_PATH\"", "--expected-ci-run-attempt", "verify-release-identity.sh \"$APP_IMAGE\" \"$RELEASE_IMAGE_DIGEST\" \"$FRONTEND_PROFILE\" \"$ACCEPTANCE_PROFILE\" \"$TARGET_SHA\" \"$RELEASE_MANIFEST_SCHEMA_VERSION\" \"$CI_RUN_ID\" \"$CI_RUN_ATTEMPT\" \"$SOURCE_REPO_URL\"", "LOCALSINGLENODE_HOST", "TARGET: localsinglenode", "release_frontend_profile=$FRONTEND_PROFILE", "release_acceptance_profile=$ACCEPTANCE_PROFILE"):
     require_contains(".github/workflows/cd-localsinglenode.yml", needle, "strict single-node release contract")
 
 instance_resolver = read(single + "/Scripts/resolve-app-instance.py")
@@ -2714,11 +2686,8 @@ for needle, why in [
     ("pull_release_payload.py", "GHCR payload is pulled and validated by digest"),
     ('--payload-image-prefix "$RELEASE_PAYLOAD_PREFIX"', "GHCR payload pull uses the configured package prefix"),
     ("pin_release_payload.py", "validated GHCR payload is retained as an offline local pin"),
-    ("import_legacy_release_payload.py", "legacy artifact is selected by exact attempt and verified archive digest"),
     ('--root "${DEPLOY_ROOT}/release-payloads/${GITHUB_REPOSITORY//\\//-}"', "local pin root is scoped to the configured deployment and repository"),
-    ('--artifact-name "$MIGRATION_ARTIFACT_NAME"', "legacy artifact fallback uses the configured name"),
     ('RELEASE_PAYLOAD_TRANSPORT="ghcr-container"', "GHCR transport is frozen for new receipts"),
-    ('RELEASE_PAYLOAD_TRANSPORT="actions-artifact"', "legacy transport is explicit for older runs"),
     ("--restore \"$pin_dir\"", "local-pin recovery restores the named immutable pin"),
     ('RELEASE_PAYLOAD_TRANSPORT="local-pin"', "local restore is identified to Ansible"),
     ("without Actions or GHCR payload access", "offline restore is summarized as an offline path"),
@@ -2848,25 +2817,6 @@ for needle, why in [
 single_pruner_tests = read(single + "/Scripts/Tests/test_prune_release_artifacts.py")
 if "test_pruner_protects_current_and_recovery_ci_runs" not in single_pruner_tests:
     fail(f"{single}/Scripts/Tests/test_prune_release_artifacts.py: missing current/recovery artifact protection regression test")
-artifact_pruner = read("Deployment/Common/Scripts/Component/lib/prune-actions-artifacts.py")
-for needle, why in [
-    ("workflow_dispatch_input_names(", "legacy deployment recovery accepts only understood dispatch inputs"),
-    ("workflow_job_step(", "legacy deployment SHA proof is scoped to the deploy job's named steps"),
-    ("legacy_dispatch_head_sha(", "fixed-title deployments require their own workflow source to prove GITHUB_SHA targeting"),
-    ("head_repository.get(\"full_name\") != repo", "legacy workflow content must come from the deployment repository"),
-    ("input_names.issubset({\"run_migrations\"})", "legacy fallback rejects alternate target inputs"),
-]:
-    if needle not in artifact_pruner:
-        fail(f"Deployment/Common/Scripts/Component/lib/prune-actions-artifacts.py: missing {why}")
-artifact_pruner_tests = read("Deployment/Common/Scripts/Tests/test_prune_actions_artifacts.py")
-for needle, why in [
-    ("test_legacy_fixed_title_uses_head_sha_only_when_historical_workflow_binds_it", "historical target resolution regression test"),
-    ("test_legacy_fixed_title_with_target_sha_input_fails_closed", "target override rejection regression test"),
-    ("test_legacy_fixed_title_without_head_binding_fails_closed", "missing binding rejection regression test"),
-    ("test_legacy_fixed_title_ignores_matching_lines_outside_deploy_job", "other-job source lines rejection regression test"),
-]:
-    if needle not in artifact_pruner_tests:
-        fail(f"Deployment/Common/Scripts/Tests/test_prune_actions_artifacts.py: missing {why}")
 for role in ("single_node_stack", "single_node_public"):
     require_contains(single + f"/ansible/roles/{role}/tasks/main.yml", "LOCALSINGLENODE_SETTINGS_FILE: \"{{ instance_settings_file | default('') }}\"", "collision check uses selected instance settings through privilege elevation")
 require_contains(single + "/Scripts/lib/ls_settings.py", 'os.environ.get("LOCALSINGLENODE_SETTINGS_FILE")', "selected instance settings shared by runtime verification and acceptance")
@@ -2914,7 +2864,7 @@ for needle, why in [
     ("com.grumplates.frontend-profile", "running frontend profile identity"),
     ("com.grumplates.acceptance-profile", "running acceptance profile identity"),
     ("org.opencontainers.image.revision", "running source revision identity"),
-    ("schema v1 is supported only for BlazorAuto", "legacy Blazor-only identity rule"),
+    ("if schema != '2'", "only manifest schema 2 is accepted"),
 ]:
     if needle not in single_release_identity:
         fail(f"{single}/Scripts/verify-release-identity.sh: missing {why}")

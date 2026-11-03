@@ -91,12 +91,11 @@ class LocalSingleNodeReleaseStatusTests(TestCase):
 
     def test_snapshot_can_restore_current_and_recovery_pins_without_mutating_release_state(self):
         pin_current = "ghcr-" + "a" * 64 + "-" + "b" * 64
-        pin_recovery = "legacy-123-" + "d" * 64
+        pin_recovery = "ghcr-" + "c" * 64 + "-" + "d" * 64
         config = {"app_name": "books"}
         current = self.marker(sha="1" * 40, pin=pin_current, run_id="12341")
         recovery = self.marker(sha="2" * 40, pin=pin_recovery, run_id="12342")
-        recovery["payload_transport"] = "actions-artifact"
-        recovery.pop("release_payload_pin_key")
+        pins = {pin_current: current, pin_recovery: recovery}
         with TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "release.json").write_text(json.dumps(current), encoding="utf-8")
@@ -109,11 +108,11 @@ class LocalSingleNodeReleaseStatusTests(TestCase):
                 "blocked_reason": None, "dry_run": True,
             }
             with patch.object(status.pin_release_payload, "_require_shared_lock"), \
-                    patch.object(status.pin_release_payload, "validate", return_value={
+                    patch.object(status.pin_release_payload, "validate", side_effect=lambda path: {
                         "transport": "ghcr-container",
-                        "target_sha": current["source_sha"],
-                        "run_id": current["ci_run_id"],
-                        "run_attempt": current["ci_run_attempt"],
+                        "target_sha": pins[path.name]["source_sha"],
+                        "run_id": pins[path.name]["ci_run_id"],
+                        "run_attempt": pins[path.name]["ci_run_attempt"],
                         "payload_image": "ghcr.io/grumlebob/private-books-release-payload",
                         "payload_digest": "sha256:" + "e" * 64,
                     }), \

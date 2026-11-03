@@ -145,11 +145,7 @@ def content_checksum(files: dict[str, str]) -> str:
 
 
 def _allowed_manifest_schema_versions(identity: ReleasePayloadIdentity) -> tuple[int, ...]:
-    if identity.bundle_filename is None:
-        return (3,)
-    if identity.acceptance_profile is None:
-        return (1,)
-    return (1, 2)
+    return (3,) if identity.bundle_filename is None else (2,)
 
 
 def payload_tag(run_id: str, run_attempt: str, profile: str, *, kind: str = PAYLOAD_KIND) -> str:

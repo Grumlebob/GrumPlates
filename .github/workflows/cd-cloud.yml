@@ -84,7 +84,6 @@ jobs:
           APP_IMAGE="$(bash Deployment/Common/Scripts/read-release-setting.sh app_image)"
           PUBLIC_HOSTNAME="$(bash Deployment/Cloud/Scripts/read-cloud-setting.sh public_hostname)"
           MIGRATION_BUNDLE_NAME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_bundle_name)"
-          MIGRATION_ARTIFACT_NAME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_artifact_name)"
           MIGRATION_RUNTIME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_runtime)"
           RELEASE_PAYLOAD_PREFIX="$(bash Deployment/Common/Scripts/read-release-setting.sh release_payload_prefix)"
           FRONTEND_PROFILE="$(python3 Scripts/Frontend/resolve_frontend_profile.py)"
@@ -94,7 +93,6 @@ jobs:
             echo "APP_IMAGE=${APP_IMAGE}"
             echo "PUBLIC_HOSTNAME=${PUBLIC_HOSTNAME}"
             echo "MIGRATION_BUNDLE_NAME=${MIGRATION_BUNDLE_NAME}"
-            echo "MIGRATION_ARTIFACT_NAME=${MIGRATION_ARTIFACT_NAME}"
             echo "MIGRATION_RUNTIME=${MIGRATION_RUNTIME}"
             echo "RELEASE_PAYLOAD_PREFIX=${RELEASE_PAYLOAD_PREFIX}"
             echo "FRONTEND_PROFILE=${FRONTEND_PROFILE}"
@@ -165,11 +163,6 @@ jobs:
                 --app-image "$APP_IMAGE" --payload-image-prefix "$RELEASE_PAYLOAD_PREFIX" \
                 --bundle-name "$MIGRATION_BUNDLE_NAME"
               echo "Retrieved migration bundle from immutable GHCR payload." >> "$GITHUB_STEP_SUMMARY"
-              ;;
-            legacy_artifact)
-              mkdir -p artifacts/migrations
-              gh run download "$CI_RUN_ID" --name "$MIGRATION_ARTIFACT_NAME" --dir artifacts/migrations
-              echo "Selected a legacy Actions artifact for this pre-receipt CI run." >> "$GITHUB_STEP_SUMMARY"
               ;;
             *) echo "Unsupported CI payload outcome: ${outcome}" >&2; exit 1 ;;
           esac

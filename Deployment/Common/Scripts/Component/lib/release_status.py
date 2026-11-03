@@ -20,8 +20,7 @@ from release_manifest import sha256_file
 SHA256 = re.compile(r"sha256:[0-9a-f]{64}\Z")
 SOURCE_SHA = re.compile(r"[0-9a-f]{40}\Z")
 POSITIVE_INTEGER = re.compile(r"[1-9][0-9]*\Z")
-PIN_KEY = re.compile(r"(?:ghcr-[0-9a-f]{64}-[0-9a-f]{64}|legacy-[1-9][0-9]{0,19}-[0-9a-f]{64})\Z")
-LEGACY_PIN_KEY = re.compile(r"legacy-[1-9][0-9]{0,19}-[0-9a-f]{64}\Z")
+PIN_KEY = re.compile(r"ghcr-[0-9a-f]{64}-[0-9a-f]{64}\Z")
 ACTIVE_STATUSES = ("queued", "in_progress", "waiting", "requested", "pending")
 CD_WORKFLOWS = ("cd-localcluster.yml", "cd-localsinglenode.yml")
 PROFILE_ACCEPTANCE = {"BlazorAuto": "BlazorAutoV1", "React": "ReactPublicV1"}
@@ -51,16 +50,11 @@ def summarize_marker(
         raise ReleaseStatusError("release marker source identity is invalid")
 
     schema = marker.get("manifest_schema_version")
-    if type(schema) is not int or schema not in (1, 2):
+    if type(schema) is not int or schema != 2:
         raise ReleaseStatusError("release marker manifest schema is unsupported")
     frontend = marker.get("frontend_profile")
     acceptance = marker.get("acceptance_profile")
-    if schema == 1:
-        if frontend is None and acceptance is None:
-            frontend, acceptance = "BlazorAuto", "BlazorAutoV1"
-        if (frontend, acceptance) != ("BlazorAuto", "BlazorAutoV1"):
-            raise ReleaseStatusError("legacy release marker does not match the Blazor profile")
-    elif frontend not in PROFILE_ACCEPTANCE or PROFILE_ACCEPTANCE[frontend] != acceptance:
+    if frontend not in PROFILE_ACCEPTANCE or PROFILE_ACCEPTANCE[frontend] != acceptance:
         raise ReleaseStatusError("release marker frontend and acceptance profiles do not match")
 
     digest = marker.get("digest")
@@ -73,16 +67,14 @@ def summarize_marker(
             or not isinstance(attempt, str) or not POSITIVE_INTEGER.fullmatch(attempt)):
         raise ReleaseStatusError("release marker image or CI run identity is invalid")
 
-    transport = marker.get("payload_transport", "actions-artifact")
+    transport = marker.get("payload_transport")
     pin_key = marker.get("release_payload_pin_key", "") or ""
-    if transport not in ("actions-artifact", "ghcr-container", "local-pin"):
+    if transport not in ("ghcr-container", "local-pin"):
         raise ReleaseStatusError("release marker payload transport is unsupported")
     if not isinstance(pin_key, str) or (pin_key and not PIN_KEY.fullmatch(pin_key)):
         raise ReleaseStatusError("release marker local pin key is malformed")
-    if transport in ("ghcr-container", "local-pin") and not pin_key:
+    if not pin_key:
         raise ReleaseStatusError("registry release marker has no immutable local pin key")
-    if transport == "actions-artifact" and pin_key and not LEGACY_PIN_KEY.fullmatch(pin_key):
-        raise ReleaseStatusError("legacy release marker local pin key is not an Actions-artifact pin")
 
     return {
         "source_sha": source_sha,
@@ -98,27 +90,12 @@ def summarize_marker(
     }
 
 
-def pin_state(
-    release: dict[str, Any] | None,
-    protected_pins: set[str],
-    inferred_pin_key: str | None = None,
-) -> str:
+def pin_state(release: dict[str, Any] | None, protected_pins: set[str]) -> str:
     if release is None:
         return "no-release"
-    key = release["release_payload_pin_key"]
-    if key:
-        if key not in protected_pins:
-            raise ReleaseStatusError("release marker pin was not validated by local pin inspection")
-        return "verified"
-    if release["payload_transport"] == "actions-artifact":
-        if inferred_pin_key == "ambiguous":
-            return "ambiguous-local-pins"
-        if inferred_pin_key is not None:
-            if inferred_pin_key not in protected_pins:
-                raise ReleaseStatusError("inferred legacy release pin was not validated by local pin inspection")
-            return "verified"
-        return "legacy-artifact-only"
-    raise ReleaseStatusError("registry release has no durable local pin")
+    if release["release_payload_pin_key"] not in protected_pins:
+        raise ReleaseStatusError("release marker pin was not validated by local pin inspection")
+    return "verified"
 
 
 def verified_registry_payload_references(
@@ -133,12 +110,7 @@ def verified_registry_payload_references(
         if release is None:
             continue
         pin_key = marker_pins.get(slot)
-        is_registry = (release.get("payload_transport") == "ghcr-container"
-                       or (release.get("payload_transport") == "local-pin"
-                           and str(release.get("release_payload_pin_key") or "").startswith("ghcr-")))
-        if not is_registry:
-            continue
-        if not isinstance(pin_key, str) or not pin_key.startswith("ghcr-") or pin_key == "ambiguous":
+        if not isinstance(pin_key, str) or not pin_key.startswith("ghcr-"):
             raise ReleaseStatusError(f"{slot} GHCR marker has no verified local pin")
         try:
             pin = pin_release_payload.validate(pin_root / pin_key)

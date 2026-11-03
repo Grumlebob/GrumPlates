@@ -206,19 +206,13 @@ def verify_current_run(result: dict[str, object], current: dict[str, object], re
                        target_sha: str, workflow_file: str) -> dict[str, object]:
     """A list response never substitutes for the exact run's current attempt."""
     selected = result.get("selected")
-    if result.get("outcome") not in {"success", "legacy_artifact"} or not isinstance(selected, dict):
+    if result.get("outcome") != "success" or not isinstance(selected, dict):
         return result
     payload_receipt = result.get("payload_receipt")
-    legacy_artifact = result.get("outcome") == "legacy_artifact"
-    legacy_diagnostic = result.get("diagnostic")
     direct = select_ci_run([current], target_sha, workflow_file, str(selected["id"]),
                            str(selected["run_attempt"]), repository)
     if direct["outcome"] == "no_eligible_run":
         return {"schema_version": 1, "outcome": "invalid_provenance", "diagnostic": "Exact CI run metadata is not trusted main provenance."}
-    if direct["outcome"] == "success" and legacy_artifact:
-        direct["outcome"] = "legacy_artifact"
-        direct["transport"] = "actions-artifact"
-        direct["diagnostic"] = legacy_diagnostic
     if direct["outcome"] == "success" and isinstance(payload_receipt, dict):
         direct["payload_receipt"] = payload_receipt
     return direct
@@ -307,18 +301,11 @@ def verify_payload_receipt(
     if not isinstance(steps, list) or any(not isinstance(step, dict) for step in steps):
         return {"schema_version": 1, "outcome": "invalid_provenance", "diagnostic": "Publisher-job step metadata is malformed."}
     if not any(step.get("name") == PAYLOAD_RECEIPT_STEP for step in steps):
-        if publisher_name == "publish-main":
-            return {
-                "schema_version": 1,
-                "outcome": "invalid_provenance",
-                "selected": selected,
-                "diagnostic": "Selected publish-main job has no immutable payload receipt step.",
-            }
         return {
-            **result,
-            "outcome": "legacy_artifact",
-            "transport": "actions-artifact",
-            "diagnostic": "The selected successful CI attempt predates immutable payload receipts.",
+            "schema_version": 1,
+            "outcome": "invalid_provenance",
+            "selected": selected,
+            "diagnostic": f"Selected {publisher_name} job has no immutable payload receipt step.",
         }
     job_id = job.get("id", job.get("databaseId"))
     try:
@@ -353,32 +340,9 @@ def verify_payload_receipt(
             record for record in records
             if all(record.get(field) == value for field, value in expected.items())
         ]
-        if len(expected_matches) == 1:
-            receipt = select_receipt(records, expected)
-        elif expected_matches:
+        if len(expected_matches) > 1:
             raise ReceiptError("duplicate final payload receipts match the selected payload identity")
-        elif payload_image_prefix:
-            legacy_expected = expected_final_identity(**identity_arguments)
-            legacy_matches = [
-                record for record in records
-                if all(record.get(field) == value for field, value in legacy_expected.items())
-            ]
-            if len(legacy_matches) != 1:
-                raise ReceiptError("expected exactly one receipt matching the selected payload identity")
-            legacy_receipt = select_receipt(records, legacy_expected)
-            if legacy_receipt.get("app_image") != app_image:
-                raise ReceiptError("legacy payload receipt application image does not match the selected release")
-            return {
-                **result,
-                "outcome": "legacy_artifact",
-                "transport": "actions-artifact",
-                "diagnostic": (
-                    "The exact receipt uses the pre-prefix payload package; pin the verified Actions artifact "
-                    "under the current package policy."
-                ),
-            }
-        else:
-            receipt = select_receipt(records, expected)
+        receipt = select_receipt(records, expected)
     except (KeyError, TypeError, ValueError, ReceiptError) as error:
         return {
             "schema_version": 1,
@@ -529,18 +493,18 @@ def main() -> int:
                 payload_image_prefix=args.payload_app_image_prefix,
             )
         # A rerun beginning during job or receipt verification invalidates frozen evidence.
-        if result["outcome"] in {"success", "legacy_artifact"} and args.runs_json_file is None:
+        if result["outcome"] == "success" and args.runs_json_file is None:
             current = github_get(f"/repos/{repo}/actions/runs/{result['selected']['id']}", token)
             result = verify_current_run(result, current, repo, sha, workflow_file)
     if args.json:
         print(json.dumps(result, sort_keys=True, separators=(",", ":")))
-    elif result["outcome"] in {"success", "legacy_artifact"}:
+    elif result["outcome"] == "success":
         selected = result["selected"]
         print(selected["id"])
         return 0
     else:
         fail(str(result.get("diagnostic", result["outcome"])))
-    if result["outcome"] in {"success", "legacy_artifact"}:
+    if result["outcome"] == "success":
         return 0
     if result["outcome"] in ("waiting", "no_eligible_run", "selected_run_changed", "selected_attempt_changed"):
         return 75

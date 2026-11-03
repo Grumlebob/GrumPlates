@@ -31,7 +31,7 @@ acceptance = os.environ["EXPECTED_ACCEPTANCE_PROFILE"]
 source_sha = os.environ["EXPECTED_SOURCE_SHA"]
 run_id = os.environ["EXPECTED_CI_RUN_ID"]
 run_attempt = os.environ["EXPECTED_CI_RUN_ATTEMPT"]
-legacy = os.environ.get("FAKE_LEGACY_IMAGE") == "1"
+unlabelled = os.environ.get("FAKE_UNLABELLED_IMAGE") == "1"
 for host in ("node-app1", "node-app2"):
     selected = "sha256:" + "f" * 64 if host == wrong_host else digest
     selected_profile = "React" if host == wrong_profile_host else frontend
@@ -43,7 +43,7 @@ for host in ("node-app1", "node-app2"):
         "localcluster.ci.run_id": run_id,
         "localcluster.ci.run_attempt": run_attempt,
     }
-    if not legacy:
+    if not unlabelled:
         labels.update({
             "org.opencontainers.image.revision": selected_revision,
             "com.grumplates.frontend-profile": selected_profile,
@@ -103,11 +103,13 @@ if FAKE_WRONG_REVISION_HOST=node-app2 run_identity >/dev/null 2>&1; then
   echo "a node with another baked source SHA was accepted" >&2
   exit 1
 fi
-EXPECTED_MANIFEST_SCHEMA=1 FAKE_LEGACY_IMAGE=1 run_identity > "$TEST_ROOT/legacy.txt"
-grep -Fq "BlazorAuto/BlazorAutoV1" "$TEST_ROOT/legacy.txt"
 status=0
-EXPECTED_MANIFEST_SCHEMA=1 EXPECTED_FRONTEND_PROFILE=React EXPECTED_ACCEPTANCE_PROFILE=ReactPublicV1 run_identity >/dev/null 2>&1 || status=$?
-[[ "$status" == 1 ]] || { echo "legacy schema v1 accepted React or returned $status" >&2; exit 1; }
+EXPECTED_MANIFEST_SCHEMA=1 run_identity >/dev/null 2>&1 || status=$?
+[[ "$status" == 1 ]] || { echo "manifest schema 1 returned $status" >&2; exit 1; }
+if FAKE_UNLABELLED_IMAGE=1 run_identity >/dev/null 2>&1; then
+  echo "an image without baked profile labels was accepted" >&2
+  exit 1
+fi
 status=0
 bash "$script" example.io/owner/app not-a-digest "$EXPECTED_FRONTEND_PROFILE" "$EXPECTED_ACCEPTANCE_PROFILE" "$EXPECTED_SOURCE_SHA" "$EXPECTED_MANIFEST_SCHEMA" "$EXPECTED_CI_RUN_ID" "$EXPECTED_CI_RUN_ATTEMPT" "$EXPECTED_SOURCE_REPO" >/dev/null 2>&1 || status=$?
 [[ "$status" == 1 ]] || { echo "malformed digest returned $status" >&2; exit 1; }
