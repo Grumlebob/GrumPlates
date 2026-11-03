@@ -19,10 +19,8 @@ if not re.fullmatch(r'sha256:[0-9a-f]{64}', digest):
     raise SystemExit('Release digest is malformed')
 if frontend not in ('BlazorAuto', 'React') or acceptance != {'BlazorAuto': 'BlazorAutoV1', 'React': 'ReactPublicV1'}.get(frontend):
     raise SystemExit('Frontend and acceptance profiles do not match')
-if schema not in ('1', '2') or not re.fullmatch(r'[0-9a-f]{40}', source_sha):
+if schema != '2' or not re.fullmatch(r'[0-9a-f]{40}', source_sha):
     raise SystemExit('Release source or manifest schema is malformed')
-if schema == '1' and (frontend, acceptance) != ('BlazorAuto', 'BlazorAutoV1'):
-    raise SystemExit('Legacy schema v1 is supported only for BlazorAuto')
 if not run_id.isdigit() or not run_attempt.isdigit() or int(run_attempt) < 1:
     raise SystemExit('Release CI run metadata is malformed')
 if not re.fullmatch(r'https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', source_repo):
@@ -55,13 +53,8 @@ profile_labels = {
     'com.grumplates.frontend-profile': frontend,
     'com.grumplates.acceptance-profile': acceptance,
 }
-if schema == '2':
-    for key, expected in profile_labels.items():
-        if labels.get(key) != expected:
-            raise SystemExit('Running web image does not match verified release label ' + key)
-else:
-    for key, expected in profile_labels.items():
-        if key in labels and labels[key] != expected:
-            raise SystemExit('Legacy image conflicts with verified Blazor release label ' + key)
+for key, expected in profile_labels.items():
+    if labels.get(key) != expected:
+        raise SystemExit('Running web image does not match verified release label ' + key)
 print('Running release identity verified: ' + digest + ' ' + frontend + '/' + acceptance)
 PY

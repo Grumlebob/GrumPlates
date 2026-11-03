@@ -61,18 +61,10 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="emit the trusted acceptance profile paired with the resolved frontend profile",
     )
-    parser.add_argument(
-        "--legacy-blazor-default",
-        action="store_true",
-        help="use BlazorAuto only when the selected profile file is missing for a legacy release",
-    )
     args = parser.parse_args(argv)
 
     try:
-        if args.legacy_blazor_default and args.override is None and not args.profile_file.exists():
-            profile = "BlazorAuto"
-        else:
-            profile = resolve_frontend_profile(args.profile_file, args.override)
+        profile = resolve_frontend_profile(args.profile_file, args.override)
     except ValueError as exc:
         print(f"Frontend profile error: {exc}", file=sys.stderr)
         return 2

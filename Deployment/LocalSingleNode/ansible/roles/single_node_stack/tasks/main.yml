@@ -18,10 +18,9 @@
       - release_image_digest is match('^sha256:[0-9a-f]{64}$')
       - source_repo_url is match('^https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$')
       - release_source_sha == app_version
-      - release_manifest_schema_version | string in ['1', '2']
+      - release_manifest_schema_version | string == '2'
       - release_frontend_profile in ['BlazorAuto', 'React']
       - (release_frontend_profile == 'BlazorAuto' and release_acceptance_profile == 'BlazorAutoV1') or (release_frontend_profile == 'React' and release_acceptance_profile == 'ReactPublicV1')
-      - (release_manifest_schema_version | string != '1') or (release_frontend_profile == 'BlazorAuto' and release_acceptance_profile == 'BlazorAutoV1')
       - release_ci_run_id | string is match('^[0-9]+$')
       - release_ci_run_attempt | string is match('^[1-9][0-9]*$')
       - not (run_migrations | default(false) | bool) or migration_bundle_local_path | default('') | length > 0
@@ -184,18 +183,9 @@
       - staged_image_labels.get('localcluster.ci.repository') == (source_repo_url | regex_replace('^https://github.com/', ''))
       - staged_image_labels.get('localcluster.ci.run_id') == (release_ci_run_id | string)
       - staged_image_labels.get('localcluster.ci.run_attempt') == (release_ci_run_attempt | string)
-      - >-
-        (release_manifest_schema_version | string == '1'
-        and release_frontend_profile == 'BlazorAuto'
-        and release_acceptance_profile == 'BlazorAutoV1'
-        and staged_image_labels.get('org.opencontainers.image.revision', release_source_sha) == release_source_sha
-        and staged_image_labels.get('com.grumplates.frontend-profile', 'BlazorAuto') == 'BlazorAuto'
-        and staged_image_labels.get('com.grumplates.acceptance-profile', 'BlazorAutoV1') == 'BlazorAutoV1')
-        or
-        (release_manifest_schema_version | string == '2'
-        and staged_image_labels.get('org.opencontainers.image.revision') == release_source_sha
-        and staged_image_labels.get('com.grumplates.frontend-profile') == release_frontend_profile
-        and staged_image_labels.get('com.grumplates.acceptance-profile') == release_acceptance_profile)
+      - staged_image_labels.get('org.opencontainers.image.revision') == release_source_sha
+      - staged_image_labels.get('com.grumplates.frontend-profile') == release_frontend_profile
+      - staged_image_labels.get('com.grumplates.acceptance-profile') == release_acceptance_profile
     fail_msg: "The staged image identity does not match the source SHA and frontend/acceptance contract."
 - name: Render protected app environment
   ansible.builtin.template:
@@ -336,11 +326,8 @@
 - name: Require recoverable payload pin identity when using GHCR
   ansible.builtin.assert:
     that:
-      - (release_payload_transport | default('actions-artifact')) in ['actions-artifact', 'ghcr-container', 'local-pin']
-      - (release_payload_pin_key | default('')) is match('^$|^ghcr-[0-9a-f]{64}-[0-9a-f]{64}$|^legacy-[1-9][0-9]{0,19}-[0-9a-f]{64}$')
-      - (release_payload_transport | default('actions-artifact')) != 'ghcr-container' or (release_payload_pin_key | default('')) is match('^ghcr-[0-9a-f]{64}-[0-9a-f]{64}$')
-      - (release_payload_transport | default('actions-artifact')) != 'local-pin' or (release_payload_pin_key | default('')) is match('^(ghcr-[0-9a-f]{64}-[0-9a-f]{64}|legacy-[1-9][0-9]{0,19}-[0-9a-f]{64})$')
-      - (release_payload_transport | default('actions-artifact')) != 'actions-artifact' or (release_payload_pin_key | default('')) == '' or (release_payload_pin_key | default('')) is match('^legacy-[1-9][0-9]{0,19}-[0-9a-f]{64}$')
+      - (release_payload_transport | default('')) in ['ghcr-container', 'local-pin']
+      - (release_payload_pin_key | default('')) is match('^ghcr-[0-9a-f]{64}-[0-9a-f]{64}$')
     fail_msg: "Release transport and local pin key do not match."
 - name: Ensure release recovery marker directory exists
   ansible.builtin.file:
@@ -385,7 +372,7 @@
   when: current_release_marker.stat.exists | default(false)
 - name: Publish released identity for maintenance
   ansible.builtin.copy:
-    content: "{{ {'sha': app_version, 'source_sha': release_source_sha, 'image': app_image, 'digest': release_image_digest, 'frontend_profile': release_frontend_profile, 'acceptance_profile': release_acceptance_profile, 'manifest_schema_version': release_manifest_schema_version | int, 'ci_run_id': release_ci_run_id | string, 'ci_run_attempt': release_ci_run_attempt | string, 'source_repo_url': source_repo_url, 'payload_transport': release_payload_transport | default('actions-artifact'), 'release_payload_pin_key': release_payload_pin_key | default('')} | to_nice_json }}"
+    content: "{{ {'sha': app_version, 'source_sha': release_source_sha, 'image': app_image, 'digest': release_image_digest, 'frontend_profile': release_frontend_profile, 'acceptance_profile': release_acceptance_profile, 'manifest_schema_version': release_manifest_schema_version | int, 'ci_run_id': release_ci_run_id | string, 'ci_run_attempt': release_ci_run_attempt | string, 'source_repo_url': source_repo_url, 'payload_transport': release_payload_transport, 'release_payload_pin_key': release_payload_pin_key | default('')} | to_nice_json }}"
     dest: "{{ deploy_root }}/release.json"
     owner: deploy
     group: deploy

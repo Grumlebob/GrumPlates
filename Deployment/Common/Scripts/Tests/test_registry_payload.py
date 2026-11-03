@@ -267,58 +267,6 @@ class RegistryPayloadTests(unittest.TestCase):
         self.assertEqual(set(extracted), {"manifest"})
         self.assertEqual(extracted["manifest"].read_bytes(), manifest_bytes)
 
-    def test_publishes_legacy_bundle_manifest_without_profile_metadata(self) -> None:
-        app_image = "ghcr.io/grumlebob/sample-app"
-        bundle = self.root / "sample-app-migrate"
-        bundle.write_bytes(b"legacy ImprovedDb migration bundle")
-        bundle_sha = hashlib.sha256(bundle.read_bytes()).hexdigest()
-        legacy_manifest = {
-            "schema_version": 1,
-            "repository": "https://github.com/grumlebob/ImprovedDb",
-            "commit_sha": "3" * 40,
-            "ci_run_id": 789,
-            "attempt": 3,
-            "image_ref": f"{app_image}:" + "3" * 40,
-            "image_digest": self.app_digest,
-            "bundle": {"file": bundle.name, "sha256": bundle_sha},
-        }
-        manifest_bytes = (json.dumps(legacy_manifest, sort_keys=True) + "\n").encode()
-        self.manifest_path.write_bytes(manifest_bytes)
-        identity = MODULE.ReleasePayloadIdentity(
-            repository=legacy_manifest["repository"],
-            commit_sha=legacy_manifest["commit_sha"],
-            run_id="789",
-            run_attempt="3",
-            profile="ImprovedDb",
-            acceptance_profile=None,
-            runtime="linux-x64",
-            app_image=app_image,
-            app_image_digest=self.app_digest,
-            bundle_filename=bundle.name,
-            manifest_sha256=hashlib.sha256(manifest_bytes).hexdigest(),
-            bundle_sha256=bundle_sha,
-        )
-        digest = "sha256:" + "8" * 64
-        self.identity = identity
-        self.payload_digest = digest
-
-        def docker(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
-            if args[0] == "build" or args[0] == "push":
-                stdout = f"digest: {digest} size: 128\n" if args[0] == "push" else ""
-                return subprocess.CompletedProcess(args, 0, stdout, "")
-            if args[:2] == ["image", "inspect"]:
-                return self._inspect_result()
-            self.fail(f"unexpected docker command: {args}")
-
-        with patch.object(MODULE, "_docker", side_effect=docker):
-            published = MODULE.publish_release_payload(identity, self.manifest_path, bundle)
-
-        self.assertEqual(published["payload_digest"], digest)
-        self.assertEqual(published["bundle_filename"], bundle.name)
-        receipt = RECEIPTS.final_receipt(identity, published)
-        self.assertNotIn("acceptance_profile", receipt)
-        self.assertEqual(receipt["bundle_sha256"], bundle_sha)
-
     def test_extracts_only_two_expected_regular_files(self) -> None:
         archive = self.root / "payload.tar"
         output = self.root / "extracted"

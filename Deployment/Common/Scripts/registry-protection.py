@@ -65,13 +65,10 @@ def protection(status: object, *, target: str, instance: str) -> dict:
         (marker["ci_run_id"], marker["ci_run_attempt"])
         for slot in ("current_release", "recovery_release")
         if isinstance((marker := status.get(slot)), dict)
-        and (marker.get("payload_transport") == "ghcr-container"
-             or (marker.get("payload_transport") == "local-pin"
-                 and str(marker.get("release_payload_pin_key", "")).startswith("ghcr-")))
     }
     actual_refs = {(str(item["run_id"]), str(item["run_attempt"])) for item in normalized}
     if not required_refs.issubset(actual_refs):
-        raise ProtectionError("a GHCR-backed current or recovery marker has no verified immutable payload reference")
+        raise ProtectionError("a current or recovery marker has no verified immutable payload reference")
     consumer_sources = {(str(item["run_id"]), str(item["run_attempt"])): item["target_sha"] for item in consumers}
     if any(consumer_sources.get((str(item["run_id"]), str(item["run_attempt"]))) != item["source_sha"]
            for item in normalized):

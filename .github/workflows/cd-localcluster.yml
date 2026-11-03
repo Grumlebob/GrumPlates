@@ -61,12 +61,12 @@ on:
         default: ""
         type: string
       artifact_id:
-        description: Exact Actions artifact ID when the transport is an Actions artifact.
+        description: Must be empty. Kept because the shared LocalCluster coordinator always sends it.
         required: false
         default: ""
         type: string
       artifact_digest:
-        description: Exact Actions artifact digest when the transport is an Actions artifact.
+        description: Must be empty. Kept because the shared LocalCluster coordinator always sends it.
         required: false
         default: ""
         type: string
@@ -260,21 +260,10 @@ jobs:
             exit 1
           }
 
-          case "$INPUT_PAYLOAD_TRANSPORT" in
-            actions-artifact)
-              [[ "$INPUT_ARTIFACT_ID" =~ ^[1-9][0-9]{0,19}$ ]] || { echo "artifact_id is malformed" >&2; exit 1; }
-              [[ "$INPUT_ARTIFACT_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "artifact_digest is malformed" >&2; exit 1; }
-              [[ -z "$INPUT_PAYLOAD_IMAGE$INPUT_PAYLOAD_DIGEST" ]] || { echo "Actions artifact dispatch must not include GHCR payload identity." >&2; exit 1; }
-              ;;
-            ghcr-container)
-              [[ "$INPUT_PAYLOAD_IMAGE" =~ ^ghcr\.io/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$ ]] || { echo "payload_image is malformed" >&2; exit 1; }
-              [[ "$INPUT_PAYLOAD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "payload_digest is malformed" >&2; exit 1; }
-              ;;
-            *)
-              echo "payload_transport is unsupported: ${INPUT_PAYLOAD_TRANSPORT}" >&2
-              exit 1
-              ;;
-          esac
+          [[ "$INPUT_PAYLOAD_TRANSPORT" == ghcr-container ]] || { echo "payload_transport is unsupported: ${INPUT_PAYLOAD_TRANSPORT}" >&2; exit 1; }
+          [[ -z "$INPUT_ARTIFACT_ID$INPUT_ARTIFACT_DIGEST" ]] || { echo "Actions artifact releases are no longer supported." >&2; exit 1; }
+          [[ "$INPUT_PAYLOAD_IMAGE" =~ ^ghcr\.io/[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$ ]] || { echo "payload_image is malformed" >&2; exit 1; }
+          [[ "$INPUT_PAYLOAD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "payload_digest is malformed" >&2; exit 1; }
 
           {
             echo "Coordinator operation: ${INPUT_OPERATION_ID}"
@@ -286,18 +275,15 @@ jobs:
         run: |
           set -euo pipefail
           target_profile_file="${RUNNER_TEMP}/frontend-profile-${TARGET_SHA}.txt"
-          if git cat-file -e "${TARGET_SHA}:frontend-profile.txt" 2>/dev/null; then
-            git show "${TARGET_SHA}:frontend-profile.txt" > "$target_profile_file"
-            profile_file_present=true
-          else
-            profile_file_present=false
-          fi
-          frontend_profile="$(python3 Scripts/Frontend/resolve_frontend_profile.py --profile-file "$target_profile_file" --legacy-blazor-default)"
-          acceptance_profile="$(python3 Scripts/Frontend/resolve_frontend_profile.py --profile-file "$target_profile_file" --acceptance-profile --legacy-blazor-default)"
+          git show "${TARGET_SHA}:frontend-profile.txt" > "$target_profile_file" || {
+            echo "The selected source commit has no frontend-profile.txt." >&2
+            exit 1
+          }
+          frontend_profile="$(python3 Scripts/Frontend/resolve_frontend_profile.py --profile-file "$target_profile_file")"
+          acceptance_profile="$(python3 Scripts/Frontend/resolve_frontend_profile.py --profile-file "$target_profile_file" --acceptance-profile)"
           {
             echo "FRONTEND_PROFILE=${frontend_profile}"
             echo "ACCEPTANCE_PROFILE=${acceptance_profile}"
-            echo "TARGET_PROFILE_FILE_PRESENT=${profile_file_present}"
           } >> "$GITHUB_ENV"
 
       - name: Common release settings validation
@@ -310,7 +296,6 @@ jobs:
           APP_IMAGE="$(bash Deployment/Common/Scripts/read-release-setting.sh app_image)"
           PUBLIC_HOSTNAME="$(bash Deployment/LocalCluster/Scripts/read-deploy-setting.sh public_hostname)"
           MIGRATION_BUNDLE_NAME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_bundle_name)"
-          MIGRATION_ARTIFACT_NAME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_artifact_name)"
           RELEASE_PAYLOAD_PREFIX="$(bash Deployment/Common/Scripts/read-release-setting.sh release_payload_prefix)"
           MIGRATION_RUNTIME="$(bash Deployment/Common/Scripts/read-release-setting.sh migration_runtime)"
           RUNNER_LABEL="$(bash Deployment/LocalCluster/Scripts/read-deploy-setting.sh runner_label)"
@@ -320,7 +305,6 @@ jobs:
             echo "APP_IMAGE=${APP_IMAGE}"
             echo "PUBLIC_HOSTNAME=${PUBLIC_HOSTNAME}"
             echo "MIGRATION_BUNDLE_NAME=${MIGRATION_BUNDLE_NAME}"
-            echo "MIGRATION_ARTIFACT_NAME=${MIGRATION_ARTIFACT_NAME}"
             echo "RELEASE_PAYLOAD_PREFIX=${RELEASE_PAYLOAD_PREFIX}"
             echo "MIGRATION_RUNTIME=${MIGRATION_RUNTIME}"
             echo "RUNNER_LABEL=${RUNNER_LABEL}"
@@ -346,7 +330,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Receipt selection, immutable pull and legacy download share the lock
+      # Receipt selection and the immutable pull share the lock
       # used by release retention.
       - name: Select and retrieve the release payload under the shared lock
         env:
@@ -359,8 +343,6 @@ jobs:
           INPUT_PAYLOAD_TRANSPORT: ${{ inputs.payload_transport }}
           INPUT_PAYLOAD_IMAGE: ${{ inputs.payload_image }}
           INPUT_PAYLOAD_DIGEST: ${{ inputs.payload_digest }}
-          INPUT_ARTIFACT_ID: ${{ inputs.artifact_id }}
-          INPUT_ARTIFACT_DIGEST: ${{ inputs.artifact_digest }}
           INPUT_MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
           INPUT_IMAGE_DIGEST: ${{ inputs.image_digest }}
         run: |
@@ -369,7 +351,7 @@ jobs:
             bash Deployment/LocalCluster/Scripts/prepare-release-pin-root.sh "$DEPLOY_ROOT"
             RELEASE_PAYLOAD_PIN_KEY=""
             if [[ -n "$LOCAL_PAYLOAD_PIN_KEY" ]]; then
-              [[ "$LOCAL_PAYLOAD_PIN_KEY" =~ ^(ghcr-[0-9a-f]{64}-[0-9a-f]{64}|legacy-[1-9][0-9]{0,19}-[0-9a-f]{64})$ ]] || { echo "local_payload_pin_key is malformed" >&2; exit 1; }
+              [[ "$LOCAL_PAYLOAD_PIN_KEY" =~ ^ghcr-[0-9a-f]{64}-[0-9a-f]{64}$ ]] || { echo "local_payload_pin_key is malformed" >&2; exit 1; }
               pin_dir="${DEPLOY_ROOT}/release-payloads/${GITHUB_REPOSITORY//\//-}/${LOCAL_PAYLOAD_PIN_KEY}"
               pin_result="$(python3 Deployment/Common/Scripts/Component/lib/pin_release_payload.py \
                 --restore "$pin_dir" --output-dir artifacts/migrations \
@@ -424,30 +406,6 @@ jobs:
                 RELEASE_PAYLOAD_TRANSPORT="ghcr-container"
                 echo "Using immutable GHCR payload selected from the successful CI receipt." >> "$GITHUB_STEP_SUMMARY"
                 ;;
-              legacy_artifact)
-                pin_result="$(python3 Deployment/Common/Scripts/Component/lib/import_legacy_release_payload.py \
-                  --selection-file "$selection_file" \
-                  --root "${DEPLOY_ROOT}/release-payloads/${GITHUB_REPOSITORY//\//-}" \
-                  --repository "$GITHUB_REPOSITORY" --repository-url "$SOURCE_REPO_URL" \
-                  --artifact-name "$MIGRATION_ARTIFACT_NAME" \
-                  --profile "$FRONTEND_PROFILE" --acceptance-profile "$ACCEPTANCE_PROFILE" \
-                  --runtime "$MIGRATION_RUNTIME" --app-image "$APP_IMAGE" \
-                  --bundle-name "$MIGRATION_BUNDLE_NAME")"
-                printf "%s" "$pin_result" > "${RUNNER_TEMP}/pinned-legacy-release-payload.json"
-                pin_key="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["pin_key"])' "$pin_result")"
-                restored_result="$(python3 Deployment/Common/Scripts/Component/lib/pin_release_payload.py \
-                  --restore "${DEPLOY_ROOT}/release-payloads/${GITHUB_REPOSITORY//\//-}/${pin_key}" \
-                  --output-dir artifacts/migrations --repository "$SOURCE_REPO_URL" \
-                  --target-sha "$TARGET_SHA" --profile "$FRONTEND_PROFILE" \
-                  --acceptance-profile "$ACCEPTANCE_PROFILE" --runtime "$MIGRATION_RUNTIME" \
-                  --app-image "$APP_IMAGE" --payload-image-prefix "$RELEASE_PAYLOAD_PREFIX" \
-                  --bundle-name "$MIGRATION_BUNDLE_NAME")"
-                RELEASE_PAYLOAD_PIN_KEY="$pin_key"
-                RELEASE_IMAGE_DIGEST="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["image_digest"])' "$restored_result")"
-                RELEASE_MANIFEST_SCHEMA_VERSION="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["manifest_schema_version"])' "$restored_result")"
-                RELEASE_PAYLOAD_TRANSPORT="actions-artifact"
-                echo "Pinned exact legacy artifact ${pin_key} and restored its verified payload; application image will use its normal registry pull." >> "$GITHUB_STEP_SUMMARY"
-                ;;
               *)
                 echo "CI selector returned unsupported outcome: ${outcome}" >&2
                 exit 1
@@ -469,16 +427,10 @@ jobs:
               "manifest_sha256": os.environ["INPUT_MANIFEST_SHA256"],
               "image_digest": os.environ["INPUT_IMAGE_DIGEST"],
           }
-          if os.environ["INPUT_PAYLOAD_TRANSPORT"] == "actions-artifact":
-              expected.update({
-                  "artifact_id": os.environ["INPUT_ARTIFACT_ID"],
-                  "artifact_digest": os.environ["INPUT_ARTIFACT_DIGEST"],
-              })
-          else:
-              expected.update({
-                  "payload_image": os.environ["INPUT_PAYLOAD_IMAGE"],
-                  "payload_digest": os.environ["INPUT_PAYLOAD_DIGEST"],
-              })
+          expected.update({
+              "payload_image": os.environ["INPUT_PAYLOAD_IMAGE"],
+              "payload_digest": os.environ["INPUT_PAYLOAD_DIGEST"],
+          })
           for key, value in expected.items():
               if str(payload.get(key, "")) != value:
                   raise SystemExit(f"Selected release payload {key} differs from frozen coordinator provenance.")
@@ -489,7 +441,7 @@ jobs:
               echo "CI_RUN_ATTEMPT=${CI_RUN_ATTEMPT}"
               echo "RELEASE_PAYLOAD_TRANSPORT=${RELEASE_PAYLOAD_TRANSPORT}"
               echo "RELEASE_PAYLOAD_PIN_KEY=${RELEASE_PAYLOAD_PIN_KEY}"
-              if [[ "$RELEASE_PAYLOAD_TRANSPORT" == local-pin || "$RELEASE_PAYLOAD_TRANSPORT" == actions-artifact ]]; then
+              if [[ "$RELEASE_PAYLOAD_TRANSPORT" == local-pin ]]; then
                 echo "RELEASE_IMAGE_DIGEST=${RELEASE_IMAGE_DIGEST}"
                 echo "RELEASE_MANIFEST_SCHEMA_VERSION=${RELEASE_MANIFEST_SCHEMA_VERSION}"
               fi
@@ -518,10 +470,6 @@ jobs:
             echo "Exact offline local pin validated for ${TARGET_SHA}, CI ${CI_RUN_ID}/${CI_RUN_ATTEMPT}, digest ${RELEASE_IMAGE_DIGEST}." >> "$GITHUB_STEP_SUMMARY"
           else
           RELEASE_MANIFEST_SCHEMA_VERSION="$(python3 -c 'import json; print(json.load(open("artifacts/migrations/release-manifest.json", encoding="utf-8"))["schema_version"])')"
-          if [[ "$RELEASE_MANIFEST_SCHEMA_VERSION" == 2 && "$TARGET_PROFILE_FILE_PRESENT" != true ]]; then
-            echo "Schema-v2 releases require frontend-profile.txt in the selected source commit." >&2
-            exit 1
-          fi
           RELEASE_IMAGE_DIGEST="$(python3 Deployment/Common/Scripts/validate_release_manifest.py \
             --manifest artifacts/migrations/release-manifest.json \
             --registry-json "$REGISTRY_MANIFEST_PATH" \
@@ -539,9 +487,6 @@ jobs:
           echo "RELEASE_MANIFEST_SCHEMA_VERSION=${RELEASE_MANIFEST_SCHEMA_VERSION}" >> "$GITHUB_ENV"
           chmod 0750 "artifacts/migrations/${MIGRATION_BUNDLE_NAME}"
           echo "Release manifest verified: ${APP_IMAGE}:${TARGET_SHA} ${RELEASE_IMAGE_DIGEST} ${FRONTEND_PROFILE}/${ACCEPTANCE_PROFILE}" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$RELEASE_MANIFEST_SCHEMA_VERSION" == 1 ]]; then
-            echo "Legacy release manifest v1 is explicitly treated as BlazorAuto/BlazorAutoV1." >> "$GITHUB_STEP_SUMMARY"
-          fi
           fi
 
       # Check only: CI/CD jobs never run apt. Provision on the control machine with

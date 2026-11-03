@@ -99,27 +99,17 @@ class FrontendProfileResolverTests(unittest.TestCase):
         self.assertEqual(result.stdout, "ReactPublicV1\n")
         self.assertEqual(result.stderr, "")
 
-    def test_legacy_default_applies_only_when_selected_profile_file_is_missing(self) -> None:
+    def test_missing_selected_profile_file_fails(self) -> None:
         self.profile_file.unlink(missing_ok=True)
         result = subprocess.run(
-            [sys.executable, str(RESOLVER_PATH), "--profile-file", str(self.profile_file), "--legacy-blazor-default"],
+            [sys.executable, str(RESOLVER_PATH), "--profile-file", str(self.profile_file)],
             check=False,
             capture_output=True,
             text=True,
         )
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout, "BlazorAuto\n")
-
-        self.profile_file.write_text("invalid\n", encoding="utf-8")
-        invalid_result = subprocess.run(
-            [sys.executable, str(RESOLVER_PATH), "--profile-file", str(self.profile_file), "--legacy-blazor-default"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(invalid_result.returncode, 2)
-
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("cannot read frontend profile file", result.stderr)
 
 class MsBuildFrontendProfileTests(unittest.TestCase):
     def run_profile_target(

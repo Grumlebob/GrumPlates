@@ -39,7 +39,7 @@ def validate_manifest_payload(
     expected_bundle_runtime: str | None = None,
     require_migration_metadata: bool = True,
     require_bundle_runtime: bool = True,
-    allowed_schema_versions: tuple[int, ...] = (1, 2),
+    allowed_schema_versions: tuple[int, ...] = (2,),
 ) -> str:
     """Validate common release identity plus the configured bundle or file-only schema."""
     if not isinstance(manifest, dict):
@@ -88,25 +88,16 @@ def validate_manifest_payload(
 
     if (expected_frontend_profile is None) != (expected_acceptance_profile is None):
         raise ManifestError("expected frontend and acceptance profiles must be supplied together")
-    if schema_version == 1:
-        if expected_frontend_profile is not None and (expected_frontend_profile, expected_acceptance_profile) != (
-            "BlazorAuto",
-            "BlazorAutoV1",
-        ):
-            raise ManifestError("legacy schema v1 is supported only for verified BlazorAuto releases")
-        if "frontend_profile" in manifest or "acceptance_profile" in manifest:
-            raise ManifestError("schema v1 cannot contain frontend/acceptance metadata; use schema v2")
-    elif schema_version in (2, 3):
-        if expected_frontend_profile is None:
-            raise ManifestError("profile-aware release schema requires expected frontend and acceptance profiles")
-        required_profiles = {"frontend_profile", "acceptance_profile"}
-        missing_profiles = sorted(required_profiles.difference(manifest))
-        if missing_profiles:
-            raise ManifestError(f"release manifest is missing profile fields: {missing_profiles}")
-        if manifest["frontend_profile"] != expected_frontend_profile:
-            raise ManifestError("release manifest frontend_profile does not match the target source selection")
-        if manifest["acceptance_profile"] != expected_acceptance_profile:
-            raise ManifestError("release manifest acceptance_profile does not match the frontend contract")
+    if expected_frontend_profile is None:
+        raise ManifestError("release manifests require expected frontend and acceptance profiles")
+    required_profiles = {"frontend_profile", "acceptance_profile"}
+    missing_profiles = sorted(required_profiles.difference(manifest))
+    if missing_profiles:
+        raise ManifestError(f"release manifest is missing profile fields: {missing_profiles}")
+    if manifest["frontend_profile"] != expected_frontend_profile:
+        raise ManifestError("release manifest frontend_profile does not match the target source selection")
+    if manifest["acceptance_profile"] != expected_acceptance_profile:
+        raise ManifestError("release manifest acceptance_profile does not match the frontend contract")
 
     if expected_bundle_name is None:
         if schema_version != 3:
