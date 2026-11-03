@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using GrumPlates.Core.Features.Accounts.Contracts;
 using GrumPlates.Test.TestSupport.Integration;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -11,11 +10,10 @@ namespace GrumPlates.Test.TestSupport.Accounts;
 
 internal sealed class RealCookieAccountFixture : IAsyncDisposable
 {
-    private readonly DirectoryInfo _keys = Directory.CreateTempSubdirectory("GrumPlates-account-keys-");
-    private const string KeyCertificatePassword = "account-fixture-key-password";
-    public string KeyEncryptionCertificatePath { get; }
+    public string KeyEncryptionCertificatePath => _keyEncryptionCertificatePath ?? Factory.KeyEncryptionCertificatePath;
     public AccountTestClock Clock { get; }
     public WebAppFactory Factory { get; }
+    private readonly string? _keyEncryptionCertificatePath;
 
     public RealCookieAccountFixture(
         IReadOnlyDictionary<string, string?>? configurationOverrides = null,
@@ -28,30 +26,21 @@ internal sealed class RealCookieAccountFixture : IAsyncDisposable
         string? keyEncryptionCertificatePath = null)
     {
         Clock = clock ?? new AccountTestClock();
-        var certificatePath = keyEncryptionCertificatePath ?? Path.Combine(_keys.FullName, "data-protection.pfx");
-        if (keyEncryptionCertificatePath is null)
-        {
-            using var rsa = RSA.Create(2048);
-            using var certificate = new CertificateRequest(
-                    $"CN=GrumPlates account fixture {Guid.NewGuid():N}",
-                    rsa,
-                    HashAlgorithmName.SHA256,
-                    RSASignaturePadding.Pkcs1)
-                .CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-1), DateTimeOffset.UtcNow.AddYears(5));
-            File.WriteAllBytes(certificatePath, certificate.Export(X509ContentType.Pfx, KeyCertificatePassword));
-        }
-        KeyEncryptionCertificatePath = certificatePath;
+        _keyEncryptionCertificatePath = keyEncryptionCertificatePath;
 
         var accountConfiguration = new Dictionary<string, string?>
         {
-            ["Accounts:Enabled"] = "true",
             ["Accounts:RegistrationEnabled"] = "false",
             ["Accounts:AdminSeed:Enabled"] = "false",
-            ["Accounts:Email:Host"] = "",
-            ["DataProtection:KeyStoragePath"] = _keys.FullName,
-            ["DataProtection:KeyEncryptionCertificatePath"] = certificatePath,
-            ["DataProtection:KeyEncryptionCertificatePassword"] = KeyCertificatePassword
+            ["Accounts:Email:Host"] = ""
         };
+        if (keyEncryptionCertificatePath is not null)
+        {
+            // A caller-supplied certificate reuses another fixture's key ring; the caller
+            // overrides the password when its certificate uses a different one.
+            accountConfiguration["DataProtection:KeyEncryptionCertificatePath"] = keyEncryptionCertificatePath;
+            accountConfiguration["DataProtection:KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password;
+        }
         if (configurationOverrides is not null)
         {
             foreach (var (key, value) in configurationOverrides)
@@ -116,12 +105,7 @@ internal sealed class RealCookieAccountFixture : IAsyncDisposable
         return await client.SendAsync(request);
     }
 
-    public async ValueTask DisposeAsync()
-    {
-        await Factory.DisposeAsync();
-        // This exact directory was created by this fixture and never shared.
-        _keys.Delete(recursive: true);
-    }
+    public async ValueTask DisposeAsync() => await Factory.DisposeAsync();
 }
 
 internal sealed class AccountTestClock : TimeProvider

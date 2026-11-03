@@ -163,12 +163,12 @@ public sealed class LocalLoginAccountLockTests(WebAppFactory factory)
         var defaultEmail = $"seed-default-{suffix}@example.test";
         var changedEmail = $"seed-changed-{suffix}@example.test";
         var missingEmail = $"seed-missing-{suffix}@example.test";
-        const string publishedPassword = "Published-123";
+        const string publishedPassword = "Published-default-pass-123";
 
         try
         {
             var defaultUser = await CreateUserAsync(userManager, defaultEmail, publishedPassword);
-            var changedUser = await CreateUserAsync(userManager, changedEmail, "Changed-Pass-456");
+            var changedUser = await CreateUserAsync(userManager, changedEmail, "Changed-unique-pass-456");
             Assert.True((await userManager.SetLockoutEnabledAsync(defaultUser, true)).Succeeded);
             Assert.True((await userManager.SetLockoutEndDateAsync(defaultUser, DateTimeOffset.UtcNow.AddMinutes(5))).Succeeded);
             var stampBefore = await userManager.GetSecurityStampAsync(defaultUser);
@@ -190,7 +190,7 @@ public sealed class LocalLoginAccountLockTests(WebAppFactory factory)
             Assert.Equal(stampAfterLock, await userManager.GetSecurityStampAsync(defaultUser));
             changedUser = (await userManager.FindByEmailAsync(changedEmail))!;
             Assert.False(await userManager.IsLockedOutAsync(changedUser));
-            Assert.True(await userManager.CheckPasswordAsync(changedUser, "Changed-Pass-456"));
+            Assert.True(await userManager.CheckPasswordAsync(changedUser, "Changed-unique-pass-456"));
         }
         finally
         {

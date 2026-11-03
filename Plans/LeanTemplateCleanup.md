@@ -814,7 +814,7 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P00 | Complete | 2026-11-02: base `origin/main` `7ee5192a43ddf1276edca21bbf4439cd98d4c80b`. Open PRs #405, #406, #407 as in 4.1. New branch `quality/test-cleanup-20261102` (`a74fc18d`, own worktree, another session's work, not in this plan): left alone. |
 | P01-A | Complete | 2026-11-02/03: `coord/node-inventory-handoff` deleted locally and on GitHub (`c6a59ba3afe8afe4a041400cd088ae9c43dbf4ba`). Client override (Q5) in https://github.com/Grumlebob/GrumPlates/pull/414, head `8adde66b`, full local gate PASS, build-test-push green; merged `5c0fe476`, main CI run 41526721424 success. Dependabot #407 rebased and auto-merged (`a2089a1f`, main CI 41538904179 success). #405 was closed by Dependabot ("updatable in another way"); no replacement PR yet, main keeps StackExchange.Redis 3.4.20. |
 | P01-B | Complete | Run 41465965668 (target `d28a6c7b`) failed before the app stopped: the stop play rendered `compose.env.j2` before `data_protection_certificate_gid` was set (bug since #320); app untouched, lock released. Fix https://github.com/Grumlebob/GrumPlates/pull/415 (head `68d79308`, full local gate PASS) merged `54871c53`, main CI 41551063010 success. CD run 41604062400 (`run_migrations=true`, target `54871c539f55d79550aedfcff9c2288a8886420c`) success: pre-migration backup `predeploy-20261103T083555Z.sql.gz`, migration bundle ran on node-db, acceptance ok. `__EFMigrationsHistory`: `20260525172002_InitialTemplateSchema`, `20260526083400_UserOwnedBooks`, `20260528104203_NormalizeBooksForAuthorBooks`, `20261015183858_AccountOutboxAndDataProtectionKeys`. |
-| P02 | Pending | |
+| P02 | Complete | https://github.com/Grumlebob/GrumPlates/pull/417 (head `b2b222aa`, full local gate PASS; the BlazorAuto and React account suites were also run alone: 164/164 and 150/150) merged `56264f53`, main CI 41672909266 success. |
 | P03-A | Pending | |
 | P03-B | Pending | |
 | P03-C | Pending | |
@@ -832,10 +832,10 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P13 | Pending | |
 | P14 | Pending (authorised by the goal) | |
 | D01 Portfolio minimatch + Lighthouse | Complete | https://github.com/Grumlebob/Portfolio/pull/204 (head `455eb7d8`, full local gate PASS, adds the Dockerfile audit rule) merged `507ca71`, main CI 41605501343 success. Dependabot #198, #200, #201 (after one rerun of a React E2E timeout) and #202 merged; #199 awaits its rebase. |
-| D02 Lighthouse override (ImprovedDb, CarbonCalculator) | Pending | |
-| D03 ImprovedDb SHA test | Pending | |
+| D02 Lighthouse override (ImprovedDb, CarbonCalculator) | Complete | CarbonCalculator https://github.com/Grumlebob/CarbonCalculator/pull/446 (head `0b9d7de6`, full `Validate.ps1 -Mode full` passed; CI rerun 41631672955 green after packaged E2E timeouts under memory pressure) merged `950eda88`, main CI 41646559922 success on attempt 2 (same memory timeout on attempt 1). ImprovedDb https://github.com/Grumlebob/ImprovedDb/pull/434 (head `145404ef`, ImprovedDb's applicable local checks: npm ci, npm audit, css build and a Lighthouse 13.6.0 install proof) merged `9fb48265`, main CI 41656363765 success. ImprovedDb Dependabot #426 (Lighthouse 13.6.0) green on head `dd6a0ec7` and merged `8146f512`. |
+| D03 ImprovedDb SHA test | Complete | https://github.com/Grumlebob/ImprovedDb/pull/435 (head `d694fc25`, the workflow unittest suite passed) merged `2384f1e2`, main CI 41656385578 success. `@dependabot rebase` posted on #329; it is merged once green on its rebased head. |
 | D04 CarbonCalculator #341 | Complete | https://github.com/Grumlebob/CarbonCalculator/pull/341 merged `96cc443fa5dc13fd95f68e5c16c75c290f661316` (head `ac01ce0d`, run 40234018777 green); main CI 41470049728 success. |
-| D05 Portfolio Node 24 single source | Pending | |
+| D05 Portfolio Node 24 single source | Complete | https://github.com/Grumlebob/Portfolio/pull/205 (head `fad89b9`, full local gate PASS) merged `0d01594`, main CI 41653178519 success. Portfolio #197 closed. The Dependabot ignore keeps Node 24: #206 (node 24.22.1 -> 24.22.2, a patch) passed on head `76f275ae` and merged `e25c820b`. repo-gate's react step now takes the Node version from the lower bound of an engines range (user tooling `~/bin/repo-gate.sh`, backup `.bak-20261103`). |
 | D06 CarbonCalculator Node single source | Pending | |
 | D07 Settings tidy downstream | Pending | |
 | D08 CarbonCalculator key import | Pending | |

@@ -1,9 +1,11 @@
 using System.Runtime.ExceptionServices;
 using GrumPlates.Features.Books.Caching;
+using GrumPlates.Test.TestSupport.Accounts;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Mvc.Testing.Handlers;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -55,9 +57,11 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     private string _redisConnectionString = "CHANGE_ME";
     private Respawner? _respawner;
     private EnvironmentVariableScope? _environmentOverrides;
+    private readonly TestKeyEncryptionCertificate _keyCertificate = new();
     private int _disposed;
     public HttpClient HttpClient { get; private set; } = default!;
     internal string ConnectionString => _connectionString;
+    internal string KeyEncryptionCertificatePath => _keyCertificate.Path;
 
     public WebAppFactory()
         : this(new WebAppFactoryOptions())
@@ -67,6 +71,8 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     internal WebAppFactory(WebAppFactoryOptions options)
     {
         _options = options;
+        // Account antiforgery cookies are Secure-only, as behind the deployed HTTPS proxy.
+        ClientOptions.BaseAddress = new Uri("https://localhost");
         if (string.IsNullOrWhiteSpace(options.PostgresConnectionString))
         {
             _dbContainer = TestContainerImages.CreatePostgreSqlFixture()
@@ -95,6 +101,9 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Database:RunMigrationsAtStartup"] = _options.RunMigrationsAtStartup.ToString(),
                 ["AuthorBooks:SeedAtStartup"] = _options.AuthorBooksSeedAtStartup.ToString(),
                 ["LocalAccounts:Enabled"] = "false",
+                ["Accounts:Enabled"] = "true",
+                ["DataProtection:KeyEncryptionCertificatePath"] = _keyCertificate.Path,
+                ["DataProtection:KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 ["ForwardedHeaders:KnownNetworks:0"] = "0.0.0.0/0",
                 ["ForwardedHeaders:KnownNetworks:1"] = "::/0",
                 ["RateLimiting:Global:PermitLimit"] = (_options.GlobalRateLimitPermitLimit ?? DefaultGlobalPermitLimit).ToString(),
@@ -181,7 +190,11 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
             throw new InvalidOperationException("Real-cookie fixtures must sign in through Identity; fake principal headers are disabled.");
         }
 
-        var client = CreateClient();
+        var client = CreateDefaultClient(
+            ClientOptions.BaseAddress,
+            new RedirectHandler(ClientOptions.MaxAutomaticRedirections),
+            new TestAccountHeadersHandler(),
+            new CookieContainerHandler());
         client.Timeout = TimeSpan.FromMinutes(MaxWaitTimeMinutes);
         client.DefaultRequestHeaders.Add(TestAuthenticationHandler.UserHeader, userName);
         return client;
@@ -223,6 +236,9 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 [StartupMigrationsEnvironmentVariable] = _options.RunMigrationsAtStartup.ToString(),
                 [AuthorBooksSeedAtStartupEnvironmentVariable] = _options.AuthorBooksSeedAtStartup.ToString(),
                 [LocalAccountsEnabledEnvironmentVariable] = "false",
+                ["Accounts__Enabled"] = "true",
+                ["DataProtection__KeyEncryptionCertificatePath"] = _keyCertificate.Path,
+                ["DataProtection__KeyEncryptionCertificatePassword"] = TestKeyEncryptionCertificate.Password,
                 [ForwardedHeaderKnownNetworkV4EnvironmentVariable] = "0.0.0.0/0",
                 [ForwardedHeaderKnownNetworkV6EnvironmentVariable] = "::/0",
                 [GlobalRateLimitEnvironmentVariable] = (_options.GlobalRateLimitPermitLimit ?? DefaultGlobalPermitLimit).ToString(),
@@ -305,6 +321,7 @@ public class WebAppFactory : WebApplicationFactory<Program>, IAsyncLifetime
             }
 
             _environmentOverrides = null;
+            _keyCertificate.Dispose();
         }
 
         if (failures.Count == 1)
