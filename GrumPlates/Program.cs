@@ -20,33 +20,9 @@ if (OpenApiMetadataHosting.IsOpenApiGenerationProcess())
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Configuration.AddAppConfiguration(builder.Environment);
 builder.AddAppObservability();
 builder.Services.AddAppOptions(builder.Configuration);
-builder.Services.AddProblemDetails(options =>
-{
-    options.CustomizeProblemDetails = context =>
-    {
-        if (!context.HttpContext.Request.Path.StartsWithSegments("/api/auth", StringComparison.OrdinalIgnoreCase)
-            || context.ProblemDetails.Extensions.ContainsKey("code"))
-        {
-            return;
-        }
-
-        context.ProblemDetails.Extensions["code"] = context.ProblemDetails.Status switch
-        {
-            StatusCodes.Status400BadRequest => "RequestInvalid",
-            StatusCodes.Status401Unauthorized => "AuthenticationRequired",
-            StatusCodes.Status403Forbidden => "CapabilityDisabled",
-            StatusCodes.Status409Conflict => "AccountConflict",
-            StatusCodes.Status413PayloadTooLarge => "RequestTooLarge",
-            StatusCodes.Status415UnsupportedMediaType => "UnsupportedMediaType",
-            StatusCodes.Status429TooManyRequests => "RateLimited",
-            StatusCodes.Status503ServiceUnavailable => "AccountServiceUnavailable",
-            _ => "AccountRequestFailed"
-        };
-    };
-});
+builder.Services.AddAccountProblemDetails();
 builder.Services.AddAppApiJson();
 builder.Services.AddValidation();
 
