@@ -1,6 +1,6 @@
 namespace GrumPlates.Client.Features.Books.Shared;
 
-internal static class BookCoverTextLayout
+public static class BookCoverTextLayout
 {
     private const int MaxTitleLineLength = 12;
     private const int MaxTitleLines = 3;
