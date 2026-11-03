@@ -167,6 +167,10 @@ redis_ready() {
 }
 
 docker network create "${owned_label_args[@]}" "$network"
+# Host requests reach the app from this network's gateway. Trust only that
+# address for X-Forwarded-Proto, as production trusts its TLS proxy.
+network_gateway="$(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$network")"
+[[ "$network_gateway" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { echo "smoke network has no IPv4 gateway" >&2; exit 1; }
 # Loopback-only random host port: the browser tests clean up the users they
 # register directly in this disposable database.
 postgres_password="$(python3 -c 'import secrets; print(secrets.token_hex(24))')"
@@ -206,6 +210,7 @@ docker run -d --name "$web" --network "$network" "${owned_label_args[@]}" \
   -e "DataProtection__KeyEncryptionCertificatePassword=${dp_cert_password}" \
   -e ASPNETCORE_ENVIRONMENT=Docker \
   -e ASPNETCORE_HTTP_PORTS=8080 \
+  -e "ForwardedHeaders__KnownProxies__0=${network_gateway}" \
   -e "APP_VERSION=${APP_VERSION}" \
   -e "ConnectionStrings__DefaultConnection=Host=ci-postgres;Port=5432;Database=app;Username=postgres;Password=${postgres_password};GSS Encryption Mode=Disable" \
   -e "Redis__Configuration=ci-redis:6379,abortConnect=false" \
