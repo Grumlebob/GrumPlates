@@ -1,10 +1,10 @@
-Complete Plans/LeanTemplateCleanup.md: the GrumPlates template packets P00-P20 and the downstream packets D01-D11. The plan is the runbook; read it fully. Each repository's AGENTS.md and docs/Test.md win on conflict. Always pass -R Grumlebob/<Repo> to gh.
+Complete Plans/LeanTemplateCleanup.md: the GrumPlates template packets P00-P21 and the downstream packets D01-D13. The plan is the runbook; read it fully. Each repository's AGENTS.md and docs/Test.md win on conflict. Always pass -R Grumlebob/<Repo> to gh.
 
 Outcome:
 - GrumPlates is lean: no legacy-state code; accounts always on with one hardened seed; GHCR-only releases; one squashed migration; no runner routing; no Markdown-reading audit rules; one Node version source; tidy config, plans, branches and PRs.
 - Its three live targets are deployed and verified. Blazor and React both stay fully supported.
 - CarbonCalculator, ImprovedDb and Portfolio get only the small fixes in section 7, and their failing Dependabot PRs are unblocked. JobHunt gets branch hygiene only.
-- The template's own disk use is bounded: old app images and build cache are removed by its own maintenance, and its rename-era leftovers are gone (P16-P20). The owner gets a report on the space other projects use.
+- Every node cleans up automatically: each repository's own scheduled maintenance removes its old images, CI residue and build cache, journald is capped, and the rename-era leftovers are gone (P16-P21, D11-D13). The owner gets a report on what remains.
 
 Decisions OD-1 to OD-18 are final. For a new choice, take the leaner safe option, record it as Q5+ in the plan, and continue. Ask only if every option risks live data, security or a supported feature.
 
@@ -21,16 +21,16 @@ Authorisation (granted by starting this goal), limited to the plan's steps:
   - no Cloud or downstream deploys;
   - no prune, volume deletion or database drops, except the repository's own maintenance scripts run by the workflows above;
   - no locks you did not take;
-  - never touch CarbonCalculator, ImprovedDb or Portfolio host resources.
-- Disk packets (P16-P20, D11):
-  - Dispatch the GrumPlates maintenance workflows (`localsinglenode-maintenance.yml` primary and additional, `localcluster-docker-maintenance.yml`) to verify P16, P17 and P19.
-  - Do P18's one-time removal of the listed books-owned rename-era containers and images on node-main and node-demo.
-  - Read-only disk measurement on every node.
-  - Under the P16-P18 rules: no forced removal, no hand-typed prune, no volumes; current, recovery and pinned releases are kept.
+  - outside the disk packets, never touch CarbonCalculator, ImprovedDb or Portfolio host resources.
+- Disk packets (P16-P21, D11-D13). The owner granted full authority on 2026-11-04 and asked for thorough, automatic cleanup:
+  - dispatch maintenance workflows in GrumPlates, CarbonCalculator, Portfolio and ImprovedDb, each under its own lock and in its scoped mode;
+  - do P18's one-time removal and apply P21's journald drop-in on all six nodes;
+  - merge downstream disk PRs when green and run their scoped scripts with `--dry-run` on the nodes;
+  - keep each repository's AGENTS.md rules: no hand-typed prune, no volumes, no forced removal; current, recovery and pinned releases and application data (LocalData, databases, backups) are kept; other projects' resources change only through their own code and workflows.
 - Never deploy with run_migrations=true between P07's merge and P14 step 3. If a backup, schema diff or guard fails, stop that target and report.
 
 Done when:
-- every ledger row, D01-D11 and P16-P20 included, is Complete with evidence;
+- every ledger row, D01-D13 and P16-P21 included, is Complete with evidence;
 - node-main passes the LocalCluster capacity check, and P20 records the margin and writes the owner report;
 - GrumPlates main CI is green and each target passed acceptance and release status on the final SHA;
 - the plan's open-PR and branch checks pass in all five repositories;

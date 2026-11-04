@@ -1,6 +1,6 @@
 # Lean template cleanup
 
-Status: **P00–P15 and D01–D10 complete; disk packets P16–P20 and D11 open** (added 2026-11-04). P00–P15 and D01–D10 are merged and verified, and all three live targets run `9bb714ee`. The disk packets (section 4.12 facts, packets after P15) fix the template's image and cache retention and remove its rename-era leftovers once. Running them needs the disk authorisation in [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md).
+Status: **P00–P15 and D01–D10 complete; disk packets P16–P21 and D11–D13 open** (added 2026-11-04). P00–P15 and D01–D10 are merged and verified, and all three live targets run `9bb714ee`. The disk packets (section 4.12 facts, packets after P15) fix the template's image and cache retention and remove its rename-era leftovers once. On 2026-11-04 the owner granted full authority for them and asked for thorough, automatic cleanup (see [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md)).
 
 This is an execution runbook for an agent that has no memory of the conversation that produced it. Do one packet at a time, in the order in section 5. Record evidence as section 3 describes. If a packet's checks fail, stop that packet and fix it or report. Do not skip ahead.
 
@@ -259,7 +259,7 @@ Causes the template owns:
 3. **LocalCluster host cleanup only runs by hand.** In `localcluster-docker-maintenance.yml` the `prune` job runs only on `workflow_dispatch`, and only the artifact job is scheduled. The scoped helpers (`prune-actions-runner-residue.sh`, `prune-ci-residue.py`, `prune-docker-residue.sh` in its default owned-only mode) therefore never run on their own. ImprovedDb and Portfolio carry the same manual-only switch.
 4. **The BuildKit budget is not met.** The daily `localsinglenode-maintenance` step `build_cache.py --keep-gb 20` reports, for example, "before 45.70 GB (27.83 GB reclaimable); after 38.28 GB" (run 41707505177). The cache stays about twice its budget, and node-demo's `daemon.json` `builder.gc` limit (30 GB) does not hold it either. The cache is shared with CarbonCalculator's CI on the same daemon.
 
-Host-wide or downstream items (owner's choice; no packet changes them): unlimited journald on every node (0.6–2.4 GB); per-user NuGet caches shared by two runners on node-main; ImprovedDb's data, archives and images on node-main; portfolio-node's 41 GB build cache (1300 entries) and 108 portfolio images.
+Other items: unlimited journald on every node (0.6–2.4 GB, P21); ImprovedDb's images, archives and staged operations on node-main (D13); portfolio-node's 41 GB build cache (1300 entries) and 108 portfolio images, and manual-only Portfolio maintenance (D12); per-user NuGet caches shared by two runners on node-main (reported only).
 
 ## 5. Order and dependencies
 
@@ -291,10 +291,13 @@ Host-wide or downstream items (owner's choice; no packet changes them): unlimite
 | P17 | LocalCluster scoped cleanup runs daily | P15 | code |
 | P18 | One-time removal of rename-era leftovers | P16 merged and verified | hosts (needs the goal's disk authorisation) |
 | P19 | Keep the BuildKit cache within its budget | P16 | code |
+| P21 | Bound system logs on every node | P15 | code + hosts |
 | D11 | Port P16 to CarbonCalculator and Portfolio | P16 | downstream code |
-| P20 | Disk closeout and owner report | P16–P19, D11 | hosts read-only / docs |
+| D12 | Automatic cleanup downstream | P17, P19 | downstream code |
+| D13 | ImprovedDb node-main retention fixes | P16, P17 | downstream code + its own maintenance runs |
+| P20 | Disk closeout and owner report | P16–P19, P21, D11–D13 | hosts read-only / docs |
 
-Execute in this exact order: P00, P01-A, P01-B, D01, D02, D03, D04, D05, D10, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, D06, D07, D08, D09, P13, P14, P15, then the disk packets P16, P17, P18, P19, D11, P20. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
+Execute in this exact order: P00, P01-A, P01-B, D01, D02, D03, D04, D05, D10, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, D06, D07, D08, D09, P13, P14, P15, then the disk packets P16, P17, P18, P19, P21, D11, D12, D13, P20. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
 
 **Main is never deployable between P07 and P14 without the history rewrite.** Do not dispatch any CD run with `run_migrations=true` after P07 merges until P14 step 3 has rewritten that target's history.
 
@@ -746,7 +749,7 @@ Run only while no GrumPlates CD or maintenance run is in progress or queued (`gh
 
 1. Repeat the section 4.12 measurement on all six nodes and put a before/after table in the ledger.
 2. Confirm that `cd-localcluster.yml`'s capacity check would pass (`df -m /opt` against 20480 MiB; no deploy needed) and record the margin. If the margin is under 2 GB, the owner report names the ImprovedDb items on node-main that would free it, because books alone uses about 3 GB there.
-3. Write the owner report for what this plan does not change:
+3. Write the owner report for what this plan does not change, and for what remains after D12 and D13:
    - ImprovedDb on node-main: data, archives, staged operations, images, manual-only host cleanup;
    - Portfolio's build cache and images;
    - CarbonCalculator's images on node-demo;
@@ -754,11 +757,35 @@ Run only while no GrumPlates CD or maintenance run is in progress or queued (`gh
    - NuGet caches.
 
    Give each a size, a safe owner action and its risk. Put it in the PR description and the final report.
-4. Mark P16–P20 and D11 Complete, then set the status line.
+4. Mark P16–P21 and D11–D13 Complete, then set the status line.
+
+#### P21 — Bound system logs on every node
+
+1. The template's node setup sets a journald drop-in `/etc/systemd/journald.conf.d/50-grumplates-size.conf` with `SystemMaxUse=1G` and `SystemKeepFree=5G`. Use the Common role every setup playbook already applies, for both LocalSingleNode and LocalCluster nodes. Changing the setting needs a `systemctl restart systemd-journald` handler; nothing else restarts.
+2. Tests: the rendered templates and playbook syntax checks cover the new file. Note it in the setup docs.
+3. Focused tests, full local gate, PR, merge, main CI green.
+4. Apply it once on all six nodes with the same file and handler (owner grant of 2026-11-04). Record `journalctl --disk-usage` before and after. Journald then trims old entries itself.
 
 #### D11 — Port P16 downstream (CarbonCalculator, Portfolio)
 
-After P16 merges, port its guard change and tests to `Deployment/LocalSingleNode/Scripts/lib/maintenance.py` in CarbonCalculator and Portfolio. Use one PR each, run each repository's full gate (CarbonCalculator: `Validate.ps1 -Mode full`), and merge when `build-test-push` is green. Nothing is dispatched. The fix first runs on each repository's own next scheduled or manual maintenance. Do not port P17 or P19; their downstream equivalents go into the P20 owner report.
+After P16 merges, port its guard change and tests to `Deployment/LocalSingleNode/Scripts/lib/maintenance.py` in CarbonCalculator and Portfolio. Use one PR each and run each repository's full gate (CarbonCalculator: `Validate.ps1 -Mode full`). Merge when `build-test-push` is green.
+
+#### D12 — Automatic cleanup downstream (Portfolio, ImprovedDb, CarbonCalculator)
+
+Each repository cleans up after itself through its own scoped code, the way P17 and P19 make the template do:
+
+1. Portfolio: its `localsinglenode-maintenance.yml` `maintenance` job runs only on dispatch. Schedule it daily, matching the template's schedule pattern and keeping its scoped mode.
+2. ImprovedDb: its `localcluster-docker-maintenance.yml` `prune` job runs only on dispatch. Schedule it daily, in its owned-only mode (its AGENTS.md: scoped cleanup scripts only; preserve Books, LocalData, backups, production and unowned resources; never prune volumes).
+3. CarbonCalculator and Portfolio: port the P19 build-cache fix wherever they carry the same `build_cache.py` or schedule.
+4. Use one PR per repository, run each repository's full gate, and merge when green. Verify each repository's first scheduled or dispatched run, and record the node's free space before and after.
+
+#### D13 — ImprovedDb on node-main: find and fix what keeps its images and files
+
+node-main keeps 78 ImprovedDb app images, 100 release-payload images, 16 GB of `maintenance-volume-archives`, 4.7 GB of `staged-operations` and 76 stopped unlabelled test containers.
+
+1. Read ImprovedDb's retention code (`prune-docker-residue.sh`, `prune-release-residue.py`, `prune-ci-residue.py`, `protected-release-images.sh`, and the archive and staged-operation writers). Then dry-run its scoped scripts (`--dry-run`) on node-main to see what each would remove and what it skips, and why. Look for the P16 tag-count cause, ownership labels that no longer match, and missing age limits.
+2. Fix each cause in ImprovedDb's code with tests (one PR per cause, full gate, green `build-test-push`). Add bounded retention, with an age and count floor, for archives and staged operations only where the code proves they are finished and not needed for recovery. Never touch `LocalData` or backups.
+3. Run ImprovedDb's maintenance workflow under its own lock to apply the fixes. Record free space before and after. ImprovedDb Dependabot #329 fails on node-main disk pressure, so rerun it afterwards and merge it once green.
 
 ## 7. Downstream repositories (packets D01-D10)
 
@@ -876,8 +903,8 @@ Runner-routing removal (CarbonCalculator uses routing; ImprovedDb has its own). 
 - The owner's live infrastructure files that the template uses to deploy its own demo (`Deployment/LocalCluster/inventory/prod/vault.yml`, `hosts.yml`, the tracked `group_vars`). Forks replace them per `docs/HowToForkThisRepo.md`.
 - `Plans/CloudflaredConnectorFollowUps.md` work (connector pin bump etc.). It is a separate open plan.
 - Q-002 (Caddy MD5 check), Q-003, Q-004 in `Plans/CodeQualityImprovements.md`.
-- Downstream work beyond packets D01-D11 (OD-18, section 7.3).
-- Host-wide and downstream disk use: journald limits, NuGet caches, `daemon.json`, and ImprovedDb, Portfolio and CarbonCalculator data, images and caches. P20 reports them to the owner with sizes and safe actions.
+- Downstream work beyond packets D01-D13 (OD-18, section 7.3).
+- Application data (`/opt/improveddb/LocalData`, databases, volumes, backups) and `daemon.json`. P20 reports them to the owner with sizes and safe actions. NuGet and npm caches stay, because CI reuses them; P20 reports their size.
 
 ## 9. Risks and how to handle them
 
@@ -973,7 +1000,10 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P17 | Pending | |
 | P18 | Pending (needs the goal's disk authorisation) | |
 | P19 | Pending | |
+| P21 | Pending | |
 | D11 Port P16 downstream | Pending | |
+| D12 Automatic cleanup downstream | Pending | |
+| D13 ImprovedDb node-main retention | Pending | |
 | P20 | Pending | |
 
 P15 step 5 residue search (2026-11-04, on origin/main): every hit has a keep reason.
