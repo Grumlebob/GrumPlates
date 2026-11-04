@@ -380,7 +380,10 @@ try {
         $capabilitySession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
         Get-ReactCapability $capabilitySession $uri
         Write-Check 'React-client-config' $true 'Client configuration is versioned, no-store and cookie-free'
-        Invoke-ReactAccountSessionAcceptance $uri
+        # The session's antiforgery cookie is Secure, so plain LAN HTTP cannot receive it (Q12, Q18).
+        if ($uri.Scheme -eq 'https' -or $script:forwardedProto -eq 'https') {
+            Invoke-ReactAccountSessionAcceptance $uri
+        }
 
         $anonymous = New-Object Microsoft.PowerShell.Commands.WebRequestSession
         Invoke-CommonAcceptance $anonymous $FrontendProfile
