@@ -169,7 +169,7 @@ Set the `artifact_only` dispatch input to run retention without host or Docker m
 .github/workflows/localcluster-docker-maintenance.yml before changing their
 schedules.
 
-The host cleanup is scoped to this repository's runner files, CI residue, and app image tags. It keeps active runner versions, workspaces in use, running/deployed images, persistent mounts, and volumes. It also reports volume use without deleting volumes. Artifact retention preserves exact live release IDs, the two newest distinct successful target SHAs per deployment workflow, and two additional unprotected artifacts; unknown identities or protected bytes over 512 MiB stop deletion.
+The host cleanup is scoped to this repository's runner files, CI residue, app image tags, and its release payload images older than 24 hours (a deployment needs a payload image only while it extracts it). It keeps active runner versions, workspaces in use, running/deployed images, persistent mounts, and volumes. It also reports volume use without deleting volumes. Artifact retention preserves exact live release IDs, the two newest distinct successful target SHAs per deployment workflow, and two additional unprotected artifacts; unknown identities or protected bytes over 512 MiB stop deletion.
 
 Low-disk recovery on node-main:
 

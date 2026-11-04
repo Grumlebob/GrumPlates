@@ -1098,6 +1098,7 @@ for needle, why in [
     ("prune-actions-runner-residue.sh", "runner residue stage"),
     ("prune-ci-residue.py", "finished-CI residue stage"),
     ("prune-docker-residue.sh", "node-main Docker stage"),
+    ('stage payload-images 300 python3 "$SCRIPT_DIR/prune-payload-images.py" --apply', "release payload image retention stage"),
     ("prune-cluster-docker-residue.sh", "cluster Docker stage"),
     ("check-node-main-capacity.sh", "final capacity check"),
 ]:
@@ -1108,6 +1109,7 @@ for path in (
     "Deployment/Common/Scripts/prune-actions-runner-residue.sh",
     "Deployment/LocalCluster/Scripts/prune-cluster-docker-residue.sh",
     "Deployment/LocalCluster/Scripts/prune-ci-residue.py",
+    "Deployment/LocalCluster/Scripts/prune-payload-images.py",
 ):
     text = read(path)
     if "docker volume prune" in text or "system prune" in text or "volume rm" in text:
