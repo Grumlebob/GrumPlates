@@ -62,8 +62,8 @@ class FakeDocker:
         raise AssertionError(args)
 
 
-def run(docker, apply=True, protected=()):
-    return module.prune(docker, REPO, APP, NOW, timedelta(hours=24), set(protected), apply)
+def run(docker, apply=True):
+    return module.prune(docker, REPO, APP, NOW, apply)
 
 
 class PayloadImageTests(unittest.TestCase):
@@ -72,21 +72,20 @@ class PayloadImageTests(unittest.TestCase):
         self.assertEqual("ghcr.io/fixture-owner/catalog-release-payload",
                          module.payload_repository("ghcr.io/fixture-owner/catalog", ""))
 
-    def test_only_old_owned_unused_unprotected_payloads_are_removed(self):
+    def test_only_old_owned_unused_payloads_are_removed(self):
         digest = "@sha256:" + "a" * 64
         docker = FakeDocker([
             payload("pulled", REPO + digest),
             payload("tagged", REPO + ":run-1-attempt-1", REPO + digest.replace("a", "b")),
             payload("recent", REPO + ":run-2", created=(NOW - timedelta(hours=23)).isoformat()),
             payload("in-use", REPO + ":run-3"),
-            payload("protected", REPO + ":run-4"),
             payload("foreign-label", REPO + ":run-5", app="ghcr.io/other/app"),
             payload("other-app", "ghcr.io/fixture-owner/private-books-react-release-payload:run-6"),
             payload("mixed", REPO + ":run-7", APP + ":sha"),
             payload("app-image", APP + ":old"),
             payload("untagged", created=OLD),
         ], containers=["in-use"])
-        counts = run(docker, protected={REPO + ":run-4"})
+        counts = run(docker)
         self.assertEqual(["pulled", "tagged"], docker.removed)
         self.assertEqual({"candidates": 2, "removed": 2, "refused": 0}, {k: counts[k] for k in ("candidates", "removed", "refused")})
 
@@ -104,16 +103,14 @@ class PayloadImageTests(unittest.TestCase):
         self.assertEqual(1, counts["refused"])
 
     def test_apply_requires_the_deployment_lock(self):
-        def refuse_lock():
-            raise RuntimeError("run under with-deploy-lock.sh; the deployment lock is not held")
-        with patch.object(module, "_load_lock_check", return_value=refuse_lock):
-            with self.assertRaisesRegex(RuntimeError, "deployment lock"):
+        with patch.dict("os.environ", {"LOCALCLUSTER_DEPLOY_LOCK_DIR": "", "LOCALCLUSTER_DEPLOY_LOCK_TOKEN": ""}):
+            with self.assertRaisesRegex(ValueError, "shared deployment lock"):
                 module.main(["--apply"], docker=FakeDocker([]))
 
     def test_dry_run_exit_code_and_refusal_exit_code(self):
         with patch.object(module, "release_setting", side_effect=lambda key: {"app_image": APP, "release_payload_prefix": "private-"}[key]):
             self.assertEqual(0, module.main([], docker=FakeDocker([payload("p", REPO + ":run-1")]), now=NOW))
-            with patch.object(module, "_load_lock_check", return_value=lambda: None):
+            with patch.object(module, "require_shared_lock"):
                 self.assertEqual(75, module.main(["--apply"], docker=FakeDocker([payload("p", REPO + ":run-1")], refuse={"p"}), now=NOW))
 
 
