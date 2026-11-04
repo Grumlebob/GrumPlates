@@ -1,7 +1,9 @@
 """Delete only proven, old repository images; preserve every container image and all volumes.
 
 App images older than APP_IMAGE_MAX_AGE are removed unless a container, the current release, the verified
-current or recovery pin or an active deployment still references them. Release payload images are only
+current or recovery pin or an active deployment still references them. An untagged image (a rebuild
+moved its tag away) is removed under the same rule when its labels prove it is this repository's.
+Release payload images are only
 needed while a deployment extracts them (they are pulled by digest and copied into file pins), so this
 app's own payload images older than PAYLOAD_IMAGE_MAX_AGE are removed too. Everything runs under the
 shared deployment lock, so no deployment extracts a payload meanwhile.
@@ -96,7 +98,9 @@ def candidates(images, containers, release, now, protected_refs=()):
         source_proven = labels.get("org.opencontainers.image.source", "").rstrip('/').casefold() == source.casefold()
         ci_proven = labels.get("localcluster.ci.repository", "").casefold() == repository.casefold() and labels.get("localcluster.ci.owner") == "ci-build"
         references_proven = bool(refs) and all(ref.split('@')[0].rsplit(':', 1)[0] == release["image"] or ref.split('@')[0] == release["image"] for ref in refs)
-        belongs = (source_proven or ci_proven) and references_proven
+        # An untagged image has no reference to check; its labels alone prove it is ours. It cannot be a
+        # current, recovery or deploying release: those are pulled by digest or tagged with their SHA.
+        belongs = (source_proven or ci_proven) and (references_proven or not refs)
         # Removing an ID with multiple tags requires force. Preserve it for inspection.
         # Docker 29's containerd store also lists the pulled digest (name@sha256:...) in RepoTags;
         # that names the same image, so only real tags count.
@@ -106,7 +110,7 @@ def candidates(images, containers, release, now, protected_refs=()):
         created = datetime.fromisoformat(image["Created"].replace('Z', '+00:00'))
         if belongs and now - created > APP_IMAGE_MAX_AGE:
             result.append(image["Id"])
-        elif not refs:
+        elif not refs and not (source_proven or ci_proven):
             print("Report only: unreferenced image lacks repository ownership proof " + image["Id"])
     return result
 

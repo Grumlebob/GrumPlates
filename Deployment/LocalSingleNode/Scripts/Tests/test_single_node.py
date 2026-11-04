@@ -486,6 +486,28 @@ class MaintenanceTests(unittest.TestCase):
                   {**base, 'Id': 'used', 'RepoTags': [release['image'] + ':used', digest_ref]}]
         self.assertEqual(['tag-and-digest'], maintenance.candidates(images, [{'Image': 'used'}], release, now, (release['image'] + ':keep',)))
 
+    def test_old_untagged_image_is_removed_only_with_ownership_labels(self):
+        # A rebuild moves the tag to the new image and leaves the old one untagged (seen on node-demo, 2026-11-04).
+        now = datetime.now(timezone.utc)
+        release = dict(image='ghcr.io/fixture-owner/books', digest='sha256:' + 'a' * 64, source_repo_url='https://github.com/fixture-owner/fixture-repo')
+        old = (now - timedelta(hours=49)).isoformat()
+        ours = {'org.opencontainers.image.source': release['source_repo_url']}
+        ci_ours = {'localcluster.ci.repository': 'fixture-owner/fixture-repo', 'localcluster.ci.owner': 'ci-build'}
+        images = [dict(Id='untagged-ours', Created=old, RepoTags=[], RepoDigests=[], Config=dict(Labels=ours)),
+                  dict(Id='untagged-ci-ours', Created=old, RepoTags=[], RepoDigests=[], Config=dict(Labels=ci_ours)),
+                  dict(Id='untagged-recent', Created=(now - timedelta(hours=47)).isoformat(), RepoTags=[], RepoDigests=[], Config=dict(Labels=ours)),
+                  dict(Id='untagged-used', Created=old, RepoTags=[], RepoDigests=[], Config=dict(Labels=ours)),
+                  dict(Id='untagged-foreign', Created=old, RepoTags=[], RepoDigests=[],
+                       Config=dict(Labels={'org.opencontainers.image.source': 'https://github.com/fixture-owner/other-repo'})),
+                  dict(Id='untagged-unlabelled', Created=old, RepoTags=[], RepoDigests=[], Config=dict(Labels=None))]
+        with patch('builtins.print') as printed:
+            result = maintenance.candidates(images, [{'Image': 'untagged-used'}], release, now)
+        self.assertEqual(['untagged-ours', 'untagged-ci-ours'], result)
+        reported = ' '.join(str(call.args[0]) for call in printed.call_args_list)
+        self.assertIn('untagged-foreign', reported)
+        self.assertIn('untagged-unlabelled', reported)
+        self.assertNotIn('untagged-ours', reported)
+
     def test_historical_ci_proof_and_foreign_reference_preservation(self):
         now = datetime.now(timezone.utc)
         release = dict(image='ghcr.io/fixture-owner/books', digest='sha256:' + 'a' * 64, source_repo_url='https://github.com/fixture-owner/fixture-repo')
