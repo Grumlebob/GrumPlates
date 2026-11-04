@@ -91,7 +91,7 @@ case "\${1:-}" in
         target="\${5:-}"
         if [[ "\$*" == *"{{.Created}}"* ]]; then
           date -u -d '1 hour ago' '+%Y-%m-%dT%H:%M:%SZ'
-        elif [[ "\$target" == "${TEST_IMAGE}:old" ]]; then
+        elif [[ "\$target" == "${TEST_IMAGE}:old" || "\$target" == "${TEST_IMAGE}@sha256:\$old_id" ]]; then
           echo "sha256:\$old_id"
         else
           echo "sha256:\$protected_id"
@@ -104,6 +104,13 @@ case "\${1:-}" in
             owned|foreign|payload) echo sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc ;;
             protected) echo "sha256:\$protected_id" ;;
           esac
+          exit 0
+        fi
+        if [[ "\${IMAGE_LIST_FIXTURE:-}" == digest ]]; then
+          # Docker 29 lists an image pulled by digest with tag <none> and its digest.
+          printf 'sha256:%s\t${TEST_IMAGE}\t<none>\tsha256:%s\n' "\$old_id" "\$old_id" "\$protected_id" "\$protected_id"
+          printf 'sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\t${TEST_IMAGE}\t<none>\t<none>\n'
+          printf 'sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\tghcr.io/foreign-owner/other\t<none>\tsha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\n'
           exit 0
         fi
         printf '%s\t${TEST_IMAGE}\told\n' "\${old_id:0:12}"
@@ -223,6 +230,18 @@ PATH="$FAKE_BIN:$PATH" bash "$SCRIPT" --force --min-free-mb 0 --defer-if-skipped
   --localcluster-image-until 0h --remove-image "${TEST_IMAGE}:old" > "$TMP_ROOT/no-protection.log" 2>&1 || status=$?
 [[ "$status" == 75 ]] || fail "missing release protection did not defer"
 if grep -Eq 'image (rm|prune)' "$COMMAND_LOG"; then fail "image mutation without release protection"; fi
+
+# App servers pull by digest: old untagged images of the app repository are removed by digest
+# reference; the in-use one, digest-less rows and other repositories are kept.
+: > "$COMMAND_LOG"
+PATH="$FAKE_BIN:$PATH" IMAGE_LIST_FIXTURE=digest bash "$SCRIPT" --release-protection-verified \
+  --force --min-free-mb 0 --localcluster-image-until 0h > "$TMP_ROOT/digest-only.log" 2>&1 \
+  || { cat "$TMP_ROOT/digest-only.log" >&2; fail "digest-only fixture failed"; }
+grep -Fxq "image rm ${TEST_IMAGE}@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" "$COMMAND_LOG" \
+  || fail "old digest-only app image was not removed"
+grep -Fq "skip protected image: ${TEST_IMAGE}@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" "$TMP_ROOT/digest-only.log" \
+  || fail "in-use digest-only image was not protected"
+[[ "$(grep -c '^image rm ' "$COMMAND_LOG")" == 1 ]] || fail "digest-only fixture removed more than the old app image"
 
 # Recovery references protect the same image ID even through another old tag.
 : > "$COMMAND_LOG"
