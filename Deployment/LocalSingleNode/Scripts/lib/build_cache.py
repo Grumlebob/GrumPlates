@@ -3,6 +3,11 @@
 Only build cache is trimmed, least recently used first. BuildKit can rebuild every entry, so the
 trim never touches images, containers, volumes or networks that apps on this node depend on.
 Cache records in use by a running build are kept by BuildKit itself.
+
+The budget applies to the cache's own bytes: the Build Cache row's Reclaimable value, which equals
+`docker buildx du`'s Private total. The row's Size also counts records shared with image layers.
+Pruning cannot free those while the images exist; they go when image retention removes the images.
+On node-demo on 2026-11-04 the Size was 43.37 GB, of which 21.79 GB was the cache's own.
 """
 import argparse
 import json
@@ -83,12 +88,14 @@ def main(argv=None, runner=run):
     if args.dry_run:
         print("Dry run; would run: " + " ".join(command))
         return 0
-    if size <= args.keep_gb * 1000 ** 3:
-        print("BuildKit cache is within its budget; nothing to trim.")
+    if reclaimable <= args.keep_gb * 1000 ** 3:
+        print("BuildKit cache's own bytes are within the budget; nothing to trim."
+              f" {gigabytes(max(size - reclaimable, 0))} is shared with image layers.")
         return 0
     runner(*command, timeout=1800)
-    after, _ = measure(runner)
-    print(f"BuildKit cache after: {gigabytes(after)}; trimmed {gigabytes(max(size - after, 0))}")
+    after, after_reclaimable = measure(runner)
+    print(f"BuildKit cache after: {gigabytes(after)} ({gigabytes(after_reclaimable)} its own);"
+          f" trimmed {gigabytes(max(size - after, 0))}")
     return 0
 
 

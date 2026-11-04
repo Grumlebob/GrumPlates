@@ -59,7 +59,7 @@ class BuildCacheTests(TestCase):
         self.assertEqual("--max-used-space", build_cache.keep_flag(docker_29))
 
     def test_trim_prunes_only_build_cache_down_to_the_budget(self):
-        after = DF_OUTPUT.replace('"Size":"82GB"', '"Size":"20GB"')
+        after = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"19GB","Size":"52GB"')
         docker = FakeDocker([DF_OUTPUT, after])
         self.assertEqual(0, build_cache.main(["--keep-gb", "20"], runner=docker))
         self.assertEqual([("docker", "builder", "prune", "--force", "--keep-storage", "20GB")], docker.prunes())
@@ -69,10 +69,22 @@ class BuildCacheTests(TestCase):
             self.assertNotIn("image", call)
 
     def test_cache_within_budget_is_left_alone(self):
-        small = DF_OUTPUT.replace('"Size":"82GB"', '"Size":"12GB"')
+        small = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"12GB","Size":"12GB"')
         docker = FakeDocker([small])
         self.assertEqual(0, build_cache.main(["--keep-gb", "20"], runner=docker))
         self.assertEqual([], docker.prunes())
+
+    def test_bytes_shared_with_images_do_not_count_against_the_budget(self):
+        # node-demo, 2026-11-04: 43.37 GB in total, 21.79 GB the cache's own (buildx du Private).
+        shared = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"19.5GB","Size":"43.37GB"')
+        docker = FakeDocker([shared])
+        self.assertEqual(0, build_cache.main(["--keep-gb", "20"], runner=docker))
+        self.assertEqual([], docker.prunes())
+        over = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"21.79GB","Size":"43.37GB"')
+        after = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"20GB","Size":"41.58GB"')
+        docker = FakeDocker([over, after])
+        self.assertEqual(0, build_cache.main(["--keep-gb", "20"], runner=docker))
+        self.assertEqual(1, len(docker.prunes()))
 
     def test_dry_run_never_prunes(self):
         docker = FakeDocker([DF_OUTPUT])
