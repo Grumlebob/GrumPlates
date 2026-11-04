@@ -58,11 +58,17 @@ class BuildCacheTests(TestCase):
                      "      --reserved-space bytes   Amount of disk space always allowed to\n")
         self.assertEqual("--max-used-space", build_cache.keep_flag(docker_29))
 
+    def test_budget_is_passed_in_the_decimal_bytes_that_df_reports(self):
+        # Docker reads "20GB" as 20 GiB; on node-demo that left 21.26 GB (df units) after a 20 GB trim.
+        command = build_cache.prune_command(20, "--max-used-space")
+        self.assertEqual(["docker", "builder", "prune", "--force", "--max-used-space", "20000000000"], command)
+        self.assertEqual(20 * 1000 ** 3, build_cache.parse_size("20GB"))
+
     def test_trim_prunes_only_build_cache_down_to_the_budget(self):
         after = DF_OUTPUT.replace('"Reclaimable":"48.85GB","Size":"82GB"', '"Reclaimable":"19GB","Size":"52GB"')
         docker = FakeDocker([DF_OUTPUT, after])
         self.assertEqual(0, build_cache.main(["--keep-gb", "20"], runner=docker))
-        self.assertEqual([("docker", "builder", "prune", "--force", "--keep-storage", "20GB")], docker.prunes())
+        self.assertEqual([("docker", "builder", "prune", "--force", "--keep-storage", "20000000000")], docker.prunes())
         for call in docker.calls:
             self.assertNotIn("system prune", " ".join(call))
             self.assertNotIn("volume", call)

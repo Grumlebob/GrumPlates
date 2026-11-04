@@ -8,6 +8,9 @@ The budget applies to the cache's own bytes: the Build Cache row's Reclaimable v
 `docker buildx du`'s Private total. The row's Size also counts records shared with image layers.
 Pruning cannot free those while the images exist; they go when image retention removes the images.
 On node-demo on 2026-11-04 the Size was 43.37 GB, of which 21.79 GB was the cache's own.
+
+The budget goes to Docker in bytes. `docker system df` prints decimal units (1 GB = 10^9 bytes),
+but the prune flags read "20GB" as 20 GiB (about 21.47 GB), so a trim stopped above the budget.
 """
 import argparse
 import json
@@ -62,7 +65,8 @@ def keep_flag(prune_help):
 
 
 def prune_command(keep_gb, flag):
-    return ["docker", "builder", "prune", "--force", flag, f"{keep_gb}GB"]
+    # Plain bytes: Docker reads a "GB" suffix as GiB, which df does not use.
+    return ["docker", "builder", "prune", "--force", flag, str(keep_gb * 1000 ** 3)]
 
 
 def gigabytes(value):
