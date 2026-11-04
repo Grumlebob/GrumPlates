@@ -101,6 +101,33 @@
   loop: "{{ groups['all'] }}"
   when: inventory_hostname in groups.get('load_balancer', [])
 
+- name: Ensure the journald drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/systemd/journald.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Bound the system journal so logs cannot fill the disk; journald trims the oldest entries itself.
+- name: Bound the system journal
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/50-grumplates-size.conf
+    content: |
+      [Journal]
+      SystemMaxUse=1G
+      SystemKeepFree=5G
+    owner: root
+    group: root
+    mode: "0644"
+  register: mint_base_journal_limit
+
+- name: Apply the journal bound
+  ansible.builtin.systemd:
+    name: systemd-journald
+    state: restarted
+  when: mint_base_journal_limit.changed
+
 - name: Disable sleep and suspend targets
   ansible.builtin.systemd:
     name: "{{ item }}"

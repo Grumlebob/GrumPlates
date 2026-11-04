@@ -161,7 +161,7 @@ This checks bootstrap status, preflight, and Ansible ping through bootstrap-host
 bash ./Deployment/LocalCluster/Scripts/prepare-fresh-linux-machines.sh
 ```
 
-The script creates the deploy user, installs key-based SSH, hardens SSH, installs Docker, configures host and published-port firewalls, and creates runtime directories.
+The script creates the deploy user, installs key-based SSH, hardens SSH, installs Docker, configures host and published-port firewalls, limits the system journal to 1 GB, and creates runtime directories.
 
 **Checkpoint:** every node responds to Ansible, Docker, and Docker Compose checks. Later deployment uses the deploy user and ~/.ssh/<app_name>_deploy.
 
