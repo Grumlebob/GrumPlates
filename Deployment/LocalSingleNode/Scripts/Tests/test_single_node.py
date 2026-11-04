@@ -486,6 +486,38 @@ class MaintenanceTests(unittest.TestCase):
                   {**base, 'Id': 'used', 'RepoTags': [release['image'] + ':used', digest_ref]}]
         self.assertEqual(['tag-and-digest'], maintenance.candidates(images, [{'Image': 'used'}], release, now, (release['image'] + ':keep',)))
 
+    def test_payload_reference_gone_because_an_earlier_untag_deleted_the_image_is_not_a_refusal(self):
+        # Docker 29 lists the pulled digest in RepoTags. Removing the tag deletes the image, so a second
+        # removal by the digest failed with "No such image" and was reported as a refusal (2026-11-04).
+        now = datetime.now(timezone.utc)
+        release = {"image": "ghcr.io/fixture-owner/books", "digest": "sha256:" + "a" * 64, "source_repo_url": "https://github.com/fixture-owner/fixture-repo"}
+        repository = "ghcr.io/fixture-owner/books-release-payload"
+        image = {"Config": {"Labels": {"org.opencontainers.image.source": release["source_repo_url"]}}, "Id": "payload",
+                 "Created": (now - timedelta(hours=25)).isoformat(),
+                 "RepoTags": [repository + ":run-1", repository + "@sha256:" + "c" * 64],
+                 "RepoDigests": [repository + "@sha256:" + "c" * 64]}
+        state = {"present": True}
+        calls = []
+
+        def docker(*args):
+            calls.append(args)
+            if args[:2] == ("image", "inspect"):
+                return state["present"], json.dumps([image])
+            if args[0] == "ps":
+                return True, ""
+            if args[:2] == ("image", "rm"):
+                if not state["present"]:
+                    return False, "Error response from daemon: No such image: " + args[2]
+                state["present"] = False
+                return True, ""
+            raise AssertionError(args)
+
+        with patch("builtins.print"):
+            refused = maintenance.remove_payload_images([image], [], release, now, (), docker, lambda: ())
+        self.assertEqual([], refused)
+        self.assertFalse(state["present"])
+        self.assertFalse(any("--force" in call or "-f" in call for call in calls))
+
     def test_old_untagged_image_is_removed_only_with_ownership_labels(self):
         # A rebuild moves the tag to the new image and leaves the old one untagged (seen on node-demo, 2026-11-04).
         now = datetime.now(timezone.utc)
