@@ -1,6 +1,6 @@
 # Lean template cleanup
 
-Status: **complete** (2026-11-04). Every packet is merged, main CI is green, and all three live targets (LocalSingleNode primary and additional, LocalCluster) run `9bb714ee` with green acceptance and release status. The ledger below holds the evidence.
+Status: **P00–P15 and D01–D10 complete; disk packets P16–P21 and D11–D13 open** (added 2026-11-04). P00–P15 and D01–D10 are merged and verified, and all three live targets run `9bb714ee`. The disk packets (section 4.12 facts, packets after P15) fix the template's image and cache retention and remove its rename-era leftovers once. On 2026-11-04 the owner granted full authority for them and asked for thorough, automatic cleanup (see [LeanTemplateCleanupGoal.md](LeanTemplateCleanupGoal.md)).
 
 This is an execution runbook for an agent that has no memory of the conversation that produced it. Do one packet at a time, in the order in section 5. Record evidence as section 3 describes. If a packet's checks fail, stop that packet and fix it or report. Do not skip ahead.
 
@@ -235,6 +235,32 @@ Places that start the app without a key-encryption certificate today, and so bre
 
 Keep: `Plans/README.md`, this file, `Plans/LeanTemplateCleanupGoal.md`, `Plans/CodeQualityImprovements.md` (open Q-002, Q-003, Q-004) and `Plans/CloudflaredConnectorFollowUps.md` (open steps 1-5). Every other file under `Plans/` is complete, superseded, or a stale copy of a downstream plan: **delete it** in P12.
 
+### 4.12 Facts: node disk usage (2026-11-04, read-only)
+
+Measured after P14 with `df`, `du`, `docker system df` and `docker buildx du`. Every node has one 234 GB root disk; Docker's image store is containerd (`/var/lib/containerd`).
+
+| Node | Used | Free | Images (reclaimable) | Build cache (reclaimable) | Largest other use |
+| --- | --- | --- | --- | --- | --- |
+| node-main | 90% | 23 GB | 47 GB (38 GB) | 26 GB (18 GB) | `/opt/improveddb` 88 GB (`LocalData` 66 GB, `maintenance-volume-archives` 16 GB, `staged-operations` 4.7 GB); `/home/deploy` 11 GB (`.nuget` 7.1 GB); journals 2.4 GB |
+| node-demo | 45% | 124 GB | 26 GB (21 GB) | 43 GB (43 GB) | `/home/deploy` 14 GB; journals 1.8 GB |
+| portfolio-node | 30% | 157 GB | 4.8 GB (3.3 GB) | 41 GB (38 GB) | `/home/deploy` 8.1 GB |
+| node-app1, node-app2 | 16% | 188 GB | 6.0 GB (1.5 GB) | 0 | `/opt/improveddb` 15 GB; journals 1.7 GB |
+| node-db | 10% | 201 GB | 2.3 GB (1.0 GB) | 0 | — |
+
+Only node-main is short of space. The LocalCluster CD requires 20480 MiB free on `/opt` (`check-node-main-capacity.sh`), and on 2026-11-04 it stopped there (Q19). Most of node-main belongs to ImprovedDb (its data, 78 app images and 100 release-payload images). Books uses about 3 GB there.
+
+Causes the template owns:
+
+1. **Old app images are never removed when Docker lists a digest as a tag.** `Deployment/LocalSingleNode/Scripts/lib/maintenance.py` `candidates()` reports any image with more than one `RepoTags` entry and never removes it ("Report only: image has multiple tags"). Docker 29 with the containerd store lists the pulled digest (`ghcr.io/grumlebob/books@sha256:…`) in `RepoTags` next to the tag. On node-demo, 21 of 65 books and books-react images look like this, so the daily maintenance keeps them forever. node-demo holds 34 `books` and 31 `books-react` images; the live and recovery releases need four. CarbonCalculator and Portfolio copied the same line.
+2. **Rename-era leftovers have no owner.** Images and CI containers built before the rename carry `Grumlebob/BlazorAutoAppTemplate` in `org.opencontainers.image.source` or `localcluster.ci.repository`. The maintenance code proves ownership with the current repository name, so it skips them. They include:
+   - on node-demo, 16 books and books-react images from 2–3 weeks ago;
+   - on node-main, the CI smoke stack of cancelled run 38004425567 (`books-ci-web`, `books-ci-redis`, `books-ci-postgres` `-38004425567-1`), still running after three weeks, and its image `books:a5bd0287…-38004425567-1`;
+   - on node-main, 30 stopped Testcontainers containers (`localcluster.ci.owner=tests`).
+3. **LocalCluster host cleanup only runs by hand.** In `localcluster-docker-maintenance.yml` the `prune` job runs only on `workflow_dispatch`, and only the artifact job is scheduled. The scoped helpers (`prune-actions-runner-residue.sh`, `prune-ci-residue.py`, `prune-docker-residue.sh` in its default owned-only mode) therefore never run on their own. ImprovedDb and Portfolio carry the same manual-only switch.
+4. **The BuildKit budget is not met.** The daily `localsinglenode-maintenance` step `build_cache.py --keep-gb 20` reports, for example, "before 45.70 GB (27.83 GB reclaimable); after 38.28 GB" (run 41707505177). The cache stays about twice its budget, and node-demo's `daemon.json` `builder.gc` limit (30 GB) does not hold it either. The cache is shared with CarbonCalculator's CI on the same daemon.
+
+Other items: unlimited journald on every node (0.6–2.4 GB, P21); ImprovedDb's images, archives and staged operations on node-main (D13); portfolio-node's 41 GB build cache (1300 entries) and 108 portfolio images, and manual-only Portfolio maintenance (D12); per-user NuGet caches shared by two runners on node-main (reported only).
+
 ## 5. Order and dependencies
 
 | Packet | Content | Depends on | Change type |
@@ -261,8 +287,17 @@ Keep: `Plans/README.md`, this file, `Plans/LeanTemplateCleanupGoal.md`, `Plans/C
 | D08 | CarbonCalculator legacy key-import removal | P02 | downstream code |
 | D09 | CarbonCalculator and Portfolio legacy release-path removal | P04 | downstream code |
 | P15 | Closeout | everything | GitHub/local |
+| P16 | Old app images: count real tags only | P15 | code |
+| P17 | LocalCluster scoped cleanup runs daily | P15 | code |
+| P18 | One-time removal of rename-era leftovers | P16 merged and verified | hosts (needs the goal's disk authorisation) |
+| P19 | Keep the BuildKit cache within its budget | P16 | code |
+| P21 | Bound system logs on every node | P15 | code + hosts |
+| D11 | Port P16 to CarbonCalculator and Portfolio | P16 | downstream code |
+| D12 | Automatic cleanup downstream | P17, P19 | downstream code |
+| D13 | ImprovedDb node-main retention fixes | P16, P17 | downstream code + its own maintenance runs |
+| P20 | Disk closeout and owner report | P16–P19, P21, D11–D13 | hosts read-only / docs |
 
-Execute in this exact order: P00, P01-A, P01-B, D01, D02, D03, D04, D05, D10, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, D06, D07, D08, D09, P13, P14, P15. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
+Execute in this exact order: P00, P01-A, P01-B, D01, D02, D03, D04, D05, D10, P02, P03-A … P03-E, P04, P05, P06, P07, P08, P09, P10, P11, P12, D06, D07, D08, D09, P13, P14, P15, then the disk packets P16, P17, P18, P19, P21, D11, D12, D13, P20. Merge each PR before branching the next from fresh `main`. P04 and P05 both edit `ci.yml` and the audit; P05 rebases on P04's removals.
 
 **Main is never deployable between P07 and P14 without the history rewrite.** Do not dispatch any CD run with `run_migrations=true` after P07 merges until P14 step 3 has rewritten that target's history.
 
@@ -650,6 +685,108 @@ Expected effects, which are not failures: accounts are now on everywhere. Data P
 8. Downstream closeout: `gh pr list -R Grumlebob/<Repo> --state open` for CarbonCalculator, ImprovedDb, Portfolio and JobHunt shows no PR that D01-D05 should have unblocked (only newer Dependabot PRs, handled the normal way). Every D-packet worktree is removed. Report the kept downstream branches from D10 with their one-line summaries.
 9. Final report to the owner: what changed in each repository, PR numbers, deploy run IDs, backup paths, kept branches, and that D09's CD changes get their first live use on the owner's next normal deploy of CarbonCalculator and Portfolio.
 
+### Disk packets P16–P20 (added 2026-11-04)
+
+These packets make the template's own retention work, remove the template's rename-era leftovers once, and report the rest to the owner. Facts and causes are in section 4.12. Rules:
+
+- Only books-owned resources are changed: names, labels or image repositories starting with `books`, `private-books` or this repository's CI labels. Never touch CarbonCalculator, ImprovedDb or Portfolio host resources.
+- No `docker system|image|builder|container|volume prune` typed by hand, no `--volumes`, no `-v` on `docker rm`, and no `--force` on `docker image rm`. Volumes are never removed. The repository's own scripts may prune build cache as they already do (P19).
+- Recheck immediately before each removal that nothing running or stopped uses the image, and that it is not the current or recovery release or a pinned digest.
+- Record `df -m /opt` before and after every host step.
+- Fixes stay current-state only (no legacy-name code, as in P06). Old-name leftovers go through the one-time P18 instead.
+
+#### P16 — Old app images: count real tags only
+
+1. In `Deployment/LocalSingleNode/Scripts/lib/maintenance.py`, the multiple-tag guard in `candidates()` counts only `RepoTags` entries without `@`. A digest entry names the same image, so removing by ID needs no force. Two real tags still mean report only. Check the other `RepoTags` uses in the file (the current-release lookup) and in `Deployment/LocalCluster/Scripts/prune-docker-residue.sh` and `protected-release-images.sh` for the same assumption.
+2. Tests in `Deployment/LocalSingleNode/Scripts/Tests/`, using Docker 29's shape (`RepoTags: [tag, name@sha256:…]`):
+   - a candidate whose digest is in `RepoTags` is removed;
+   - an image with two real tags stays report-only;
+   - a container reference or a protected digest still keeps the image.
+3. Prove on node-demo, read-only, that `docker image rm <id>` without force removes an image that has one tag plus its digest. Use a `docker image rm --help` check, plus a throwaway image you tag yourself (`busybox` pulled by tag and digest, then removed). Never test on an app image.
+4. Focused tests, full local gate, PR, merge, main CI green.
+5. Verify. Dispatch `localsinglenode-maintenance.yml` with `app_instance=primary`, then with `additional`. The logs must show "Removed proven old app image" for books and books-react images older than 48 hours, and no refusals. Record the image counts and the node-demo free space before and after.
+
+#### P17 — LocalCluster scoped cleanup runs daily
+
+1. In `.github/workflows/localcluster-docker-maintenance.yml`, let the `prune` job also run on the existing `17 3 * * *` schedule. Keep its default mode:
+   - only resources this repository owns;
+   - no `--include-unlabelled-host-residue`;
+   - no `--allow-shared-builder-prune`;
+   - volumes only reported.
+
+   Keep `artifact_only` for dispatches. Both jobs already share the deployment lock and a concurrency group.
+2. Update `Deployment/LocalCluster/Operations.md` ("Host and Docker cleanup are manual") and any workflow-policy test or audit rule that pins the manual-only trigger. Change the rule's expectation; never delete the rule.
+3. When `check-node-main-capacity.sh` fails, its message names the maintenance workflow and the Operations section to run first.
+4. Focused tests, full local gate, PR, merge, main CI green.
+5. Verify by dispatching the workflow once (`artifact_only=false`). The `prune` job must succeed and list only books-owned removals. Then confirm the next scheduled run, record node-main free space, and check that ImprovedDb's resources are unchanged (its image and container counts before and after).
+
+#### P18 — One-time removal of rename-era leftovers (hosts, no code)
+
+Run only while no GrumPlates CD or maintenance run is in progress or queued (`gh run list -R Grumlebob/GrumPlates --status in_progress` and `--status queued`). List the candidates first, then remove them one by one under the rules above.
+
+1. node-main, CI session `38004425567-1`:
+   - stop and remove the containers `books-ci-web-38004425567-1`, `books-ci-redis-38004425567-1` and `books-ci-postgres-38004425567-1` (no `-v`);
+   - remove their Compose network if nothing else uses it;
+   - then remove `ghcr.io/grumlebob/books:a5bd0287e4694ad7f3fe60fdff018ee0648244e7-38004425567-1`;
+   - report any volumes left behind; do not delete them.
+2. node-main: remove the stopped containers labelled `localcluster.ci.repository=Grumlebob/BlazorAutoAppTemplate` (owner `tests` or `ci-smoke`) without `-v`. Unlabelled stopped containers are not ours; list their count only.
+3. node-demo: remove the `ghcr.io/grumlebob/books` and `books-react` images whose `org.opencontainers.image.source` is `https://github.com/Grumlebob/BlazorAutoAppTemplate`. Skip any that are in use, current, recovery or pinned under `/opt/books*/release-payloads`. Also remove the untagged `private-books*-release-payload` images with that source, if any.
+4. Record every removed ID, all volumes left, and free space before and after in the ledger.
+
+#### P19 — Keep the BuildKit cache within its budget
+
+1. Read-only first. Compare `docker buildx du --verbose` on node-demo with the `build_cache.py` logs of the last runs. Find why the cache stays near 40 GB against a 20 GB budget. Likely causes:
+   - the Docker 29 `--max-used-space` / `--reserved-space` flags trim reclaimable records only;
+   - shared or in-use records are not counted;
+   - `builder.gc` in `daemon.json` never triggers.
+
+   Write the finding into the PR.
+2. Fix `Deployment/LocalSingleNode/Scripts/lib/build_cache.py` (and its tests) so that one run brings the cache to the budget, or explain in Q20 why the budget cannot be met and set a realistic value in `BUILD_CACHE_KEEP_GB`'s documented default. Do not change `daemon.json` (applying it restarts Docker for every app on the node). If a daemon change is the only fix, record it as an owner action.
+3. Focused tests, full local gate, PR, merge, main CI green.
+4. Verify on the next `localsinglenode-maintenance` run: "after" is at or under the budget. Record before and after.
+
+#### P20 — Disk closeout
+
+1. Repeat the section 4.12 measurement on all six nodes and put a before/after table in the ledger.
+2. Confirm that `cd-localcluster.yml`'s capacity check would pass (`df -m /opt` against 20480 MiB; no deploy needed) and record the margin. If the margin is under 2 GB, the owner report names the ImprovedDb items on node-main that would free it, because books alone uses about 3 GB there.
+3. Write the owner report for what this plan does not change, and for what remains after D12 and D13:
+   - ImprovedDb on node-main: data, archives, staged operations, images, manual-only host cleanup;
+   - Portfolio's build cache and images;
+   - CarbonCalculator's images on node-demo;
+   - journald caps;
+   - NuGet caches.
+
+   Give each a size, a safe owner action and its risk. Put it in the PR description and the final report.
+4. Mark P16–P21 and D11–D13 Complete, then set the status line.
+
+#### P21 — Bound system logs on every node
+
+1. The template's node setup sets a journald drop-in `/etc/systemd/journald.conf.d/50-grumplates-size.conf` with `SystemMaxUse=1G` and `SystemKeepFree=5G`. Use the Common role every setup playbook already applies, for both LocalSingleNode and LocalCluster nodes. Changing the setting needs a `systemctl restart systemd-journald` handler; nothing else restarts.
+2. Tests: the rendered templates and playbook syntax checks cover the new file. Note it in the setup docs.
+3. Focused tests, full local gate, PR, merge, main CI green.
+4. Apply it once on all six nodes with the same file and handler (owner grant of 2026-11-04). Record `journalctl --disk-usage` before and after. Journald then trims old entries itself.
+
+#### D11 — Port P16 downstream (CarbonCalculator, Portfolio)
+
+After P16 merges, port its guard change and tests to `Deployment/LocalSingleNode/Scripts/lib/maintenance.py` in CarbonCalculator and Portfolio. Use one PR each and run each repository's full gate (CarbonCalculator: `Validate.ps1 -Mode full`). Merge when `build-test-push` is green.
+
+#### D12 — Automatic cleanup downstream (Portfolio, ImprovedDb, CarbonCalculator)
+
+Each repository cleans up after itself through its own scoped code, the way P17 and P19 make the template do:
+
+1. Portfolio: its `localsinglenode-maintenance.yml` `maintenance` job runs only on dispatch. Schedule it daily, matching the template's schedule pattern and keeping its scoped mode.
+2. ImprovedDb: its `localcluster-docker-maintenance.yml` `prune` job runs only on dispatch. Schedule it daily, in its owned-only mode (its AGENTS.md: scoped cleanup scripts only; preserve Books, LocalData, backups, production and unowned resources; never prune volumes).
+3. CarbonCalculator and Portfolio: port the P19 build-cache fix wherever they carry the same `build_cache.py` or schedule.
+4. Use one PR per repository, run each repository's full gate, and merge when green. Verify each repository's first scheduled or dispatched run, and record the node's free space before and after.
+
+#### D13 — ImprovedDb on node-main: find and fix what keeps its images and files
+
+node-main keeps 78 ImprovedDb app images, 100 release-payload images, 16 GB of `maintenance-volume-archives`, 4.7 GB of `staged-operations` and 76 stopped unlabelled test containers.
+
+1. Read ImprovedDb's retention code (`prune-docker-residue.sh`, `prune-release-residue.py`, `prune-ci-residue.py`, `protected-release-images.sh`, and the archive and staged-operation writers). Then dry-run its scoped scripts (`--dry-run`) on node-main to see what each would remove and what it skips, and why. Look for the P16 tag-count cause, ownership labels that no longer match, and missing age limits.
+2. Fix each cause in ImprovedDb's code with tests (one PR per cause, full gate, green `build-test-push`). Add bounded retention, with an age and count floor, for archives and staged operations only where the code proves they are finished and not needed for recovery. Never touch `LocalData` or backups.
+3. Run ImprovedDb's maintenance workflow under its own lock to apply the fixes. Record free space before and after. ImprovedDb Dependabot #329 fails on node-main disk pressure, so rerun it afterwards and merge it once green.
+
 ## 7. Downstream repositories (packets D01-D10)
 
 These repositories were created from this template (except JobHunt) and have since diverged. Port only the small, proven fixes below (OD-16). Do not refactor them otherwise.
@@ -766,7 +903,8 @@ Runner-routing removal (CarbonCalculator uses routing; ImprovedDb has its own). 
 - The owner's live infrastructure files that the template uses to deploy its own demo (`Deployment/LocalCluster/inventory/prod/vault.yml`, `hosts.yml`, the tracked `group_vars`). Forks replace them per `docs/HowToForkThisRepo.md`.
 - `Plans/CloudflaredConnectorFollowUps.md` work (connector pin bump etc.). It is a separate open plan.
 - Q-002 (Caddy MD5 check), Q-003, Q-004 in `Plans/CodeQualityImprovements.md`.
-- Downstream work beyond packets D01-D10 (OD-18, section 7.3).
+- Downstream work beyond packets D01-D13 (OD-18, section 7.3).
+- Application data (`/opt/improveddb/LocalData`, databases, volumes, backups) and `daemon.json`. P20 reports them to the owner with sizes and safe actions. NuGet and npm caches stay, because CI reuses them; P20 reports their size.
 
 ## 9. Risks and how to handle them
 
@@ -784,6 +922,8 @@ Runner-routing removal (CarbonCalculator uses routing; ImprovedDb has its own). 
 | Seeded passwords leak | They are generated into the ignored `.env`, never printed, never logged, and never stored in tracked files. Deployments do not get a User seed. |
 | Developers and CI without a key-encryption certificate | Docker local setup creates `docker/https/aspnetapp.pfx`; Windows Development uses DPAPI; Linux/macOS Development falls back to unencrypted keys with a warning (OD-10); `ci-docker-smoke.sh` generates a certificate (P03-B step 10); deployments mount one from the vault. |
 | Existing developer `.env` files lack seeded accounts | `setup-local.ps1` fills unconfigured seeds in place (OD-12). |
+| Disk cleanup removes something another app or a rollback needs | Only books-owned resources (P16–P18 rules). No forced removal, no hand-typed prunes, no volumes. Current, recovery and pinned images are skipped and rechecked right before each removal. Removed images can be pulled again from GHCR. |
+| Daily LocalCluster cleanup (P17) disturbs ImprovedDb on node-main | The scheduled mode is the existing owned-only mode under the shared deployment lock. P17 step 5 compares ImprovedDb's container and image counts before and after. |
 
 ## 10. Manual blockers (owner)
 
@@ -856,6 +996,15 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | D09 Legacy release path downstream | Complete | CarbonCalculator https://github.com/Grumlebob/CarbonCalculator/pull/453 (head `1acbdf6a`, CI 41713877145, full gate report 41812e4e) merged `68dc6ae7`, main CI 41731118170. Portfolio https://github.com/Grumlebob/Portfolio/pull/210 (head `6bd566ff`, CI 41713826033, full gate PASS) merged `47abba45`, main CI 41732625687. Step 1: only `ghcr-` pins on node-demo (6) and node-portfolio (5); latest CD runs 41698966671 and 41092492054 used ghcr-container. Not deployed; first live use is the owner's next deploy. |
 | D10 Downstream branches | Complete | Deleted (integrated): JobHunt `codex/portfolio-aware-applications` `6a59bef66f301e17b399f53bda0d424cb853919f` (cherry all `-`, PR #1 merged at that head); CarbonCalculator `task/test-feedback-review-20261027` `8d5f534e3cf46f51b84a081a8210f6272efffd05` on GitHub (merge tree equals main; the local branch is kept because another task's worktree has it checked out). Kept (unique content): `backup/codex/p18-ac26-upload-constraints` `782a007b` (ProjectDocumentUploadLimitTests and P18 docs); `backup/codex/template-trx-run-summary` `de698685` (CI/CD workflow and TRX validation work, 38 files); `backup/codex/third-consumption-conflict-review-20261022` `05255b99` (one review doc); `backup/codex/third-five-consumption-boundaries-20261022` `5c36ce38` (ConsumptionBoundaryAcceptanceTests). |
 | P15 | Complete | 2026-11-04 on `origin/main` `9bb714ee` (main CI 41780329967 green). Open GrumPlates PRs: only this closeout PR. `git branch -a`: only `main`, `origin/main`, `origin/HEAD` and the `improveddb/*` remote branches. Task worktrees removed; the primary checkout's `main` was fast-forwarded. Agent memory: `grumplates-rename-plan.md` no longer points to the deleted plan; `docs-skip-ci-can-break-audit.md` kept and narrowed to downstream repos (Q17). Downstream: no open PRs in CarbonCalculator, Portfolio or JobHunt. ImprovedDb has one open PR, Dependabot #329 (GitHub Actions bumps, opened 2026-10-15). D03 asked for a rebase, but its CI still fails on `node-main-improveddb`, with different People storage-pressure tests failing on each attempt (`PeopleStoragePressureException`, bytes below reserve; attempt 3 of run 41745167430). This is the same node-main disk shortage as Q19, so it stays open for the owner. D10 kept branches are listed in the D10 row. Residue search and deleted branches follow. |
+| P16 | Pending | |
+| P17 | Pending | |
+| P18 | Pending (needs the goal's disk authorisation) | |
+| P19 | Pending | |
+| P21 | Pending | |
+| D11 Port P16 downstream | Pending | |
+| D12 Automatic cleanup downstream | Pending | |
+| D13 ImprovedDb node-main retention | Pending | |
+| P20 | Pending | |
 
 P15 step 5 residue search (2026-11-04, on origin/main): every hit has a keep reason.
 - `find-successful-ci-run.py` publisher fallback, `test_ci_provenance` legacy publisher test: kept (P06; historical CI runs still use the `build-test-push` publisher name).
