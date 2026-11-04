@@ -64,9 +64,13 @@ def keep_flag(prune_help):
     return "--keep-storage"
 
 
+def budget_bytes(keep_gb):
+    # Decimal, like `docker system df`. Docker reads a "GB" suffix as GiB, so pass plain bytes.
+    return keep_gb * 1000 ** 3
+
+
 def prune_command(keep_gb, flag):
-    # Plain bytes: Docker reads a "GB" suffix as GiB, which df does not use.
-    return ["docker", "builder", "prune", "--force", flag, str(keep_gb * 1000 ** 3)]
+    return ["docker", "builder", "prune", "--force", flag, str(budget_bytes(keep_gb))]
 
 
 def gigabytes(value):
@@ -92,7 +96,7 @@ def main(argv=None, runner=run):
     if args.dry_run:
         print("Dry run; would run: " + " ".join(command))
         return 0
-    if reclaimable <= args.keep_gb * 1000 ** 3:
+    if reclaimable <= budget_bytes(args.keep_gb):
         print("BuildKit cache's own bytes are within the budget; nothing to trim."
               f" {gigabytes(max(size - reclaimable, 0))} is shared with image layers.")
         return 0

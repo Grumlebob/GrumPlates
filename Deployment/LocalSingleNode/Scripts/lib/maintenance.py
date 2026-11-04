@@ -3,10 +3,9 @@
 App images older than APP_IMAGE_MAX_AGE are removed unless a container, the current release, the verified
 current or recovery pin or an active deployment still references them. An untagged image (a rebuild
 moved its tag away) is removed under the same rule when its labels prove it is this repository's.
-Release payload images are only
-needed while a deployment extracts them (they are pulled by digest and copied into file pins), so this
-app's own payload images older than PAYLOAD_IMAGE_MAX_AGE are removed too. Everything runs under the
-shared deployment lock, so no deployment extracts a payload meanwhile.
+Release payload images are only needed while a deployment extracts them (they are pulled by digest and
+copied into file pins), so this app's own payload images older than PAYLOAD_IMAGE_MAX_AGE are removed
+too. Everything runs under the shared deployment lock, so no deployment extracts a payload meanwhile.
 """
 from datetime import datetime, timedelta, timezone
 import json
@@ -18,6 +17,7 @@ import sys
 from ls_settings import ROOT, command, runner_app, settings
 
 sys.path.insert(0, str(ROOT / "Deployment/Common/Scripts/Component/lib"))
+from image_reference import repository_of
 import pin_release_payload
 from release_status import protected_application_image_references
 
@@ -34,15 +34,6 @@ def protected_references():
 
 APP_IMAGE_MAX_AGE = timedelta(hours=48)
 PAYLOAD_IMAGE_MAX_AGE = timedelta(hours=24)
-
-
-def repository_of(reference):
-    """Return the repository part of an image reference such as repo:tag or repo@sha256:digest."""
-    name = reference.split("@", 1)[0]
-    last = name.rsplit("/", 1)[-1]
-    if ":" in last:
-        name = name[: len(name) - len(last)] + last.split(":", 1)[0]
-    return name
 
 
 def is_payload_reference(reference, app_image):
@@ -97,7 +88,7 @@ def candidates(images, containers, release, now, protected_refs=()):
         repository = source.removeprefix("https://github.com/")
         source_proven = labels.get("org.opencontainers.image.source", "").rstrip('/').casefold() == source.casefold()
         ci_proven = labels.get("localcluster.ci.repository", "").casefold() == repository.casefold() and labels.get("localcluster.ci.owner") == "ci-build"
-        references_proven = bool(refs) and all(ref.split('@')[0].rsplit(':', 1)[0] == release["image"] or ref.split('@')[0] == release["image"] for ref in refs)
+        references_proven = bool(refs) and all(repository_of(ref) == release["image"] for ref in refs)
         # An untagged image has no reference to check; its labels alone prove it is ours. It cannot be a
         # current, recovery or deploying release: those are pulled by digest or tagged with their SHA.
         belongs = (source_proven or ci_proven) and (references_proven or not refs)
@@ -165,23 +156,20 @@ def remove_payload_images(images, containers, release, now, protected_refs, dock
         if used:
             print("Payload image acquired a container reference; leaving it: " + image)
             continue
-        # Untag each owned payload tag without force; remove a digest-only image by its ID.
+        # Untag each owned payload tag without force, then remove a digest-only image by its ID.
         # With the containerd image store, removing one reference can delete the whole image, so a
-        # later reference answers "No such image"; that image is removed, not refused.
+        # later reference answers "No such image"; an image that is gone counts as removed.
         failures = []
         for tag in current[0].get("RepoTags") or []:
             ok, text = docker("image", "rm", tag)
             if not ok:
                 failures.append(f"{tag}: {text}")
-        if failures and not docker("image", "inspect", image)[0]:
-            failures = []
-        if failures:
-            refused.append(f"release payload {image}: " + "; ".join(failures))
-            continue
         if docker("image", "inspect", image)[0]:
-            ok, text = docker("image", "rm", image)
-            if not ok:
-                refused.append(f"release payload {image}: {text}")
+            if not failures:
+                ok, text = docker("image", "rm", image)
+                failures = [] if ok else [text]
+            if failures:
+                refused.append(f"release payload {image}: " + "; ".join(failures))
                 continue
         print("Removed proven old release payload image " + image)
     return refused

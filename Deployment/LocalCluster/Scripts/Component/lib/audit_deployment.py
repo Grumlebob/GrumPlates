@@ -1012,8 +1012,8 @@ for needle, why in dispatch_expectations:
         fail(f".github/workflows/localcluster-docker-maintenance.yml: missing {why}")
 if "if: (github.event_name == 'workflow_dispatch' && inputs.artifact_only != true) || github.event.schedule == '47 3 * * *'" not in host_maintenance_job:
     fail(".github/workflows/localcluster-docker-maintenance.yml: host and Docker cleanup must run daily at 03:47 and on dispatches that are not artifact-only, never on the artifact schedule")
-if "--include-unlabelled-host-residue" in read("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh") \
-        or "--allow-shared-builder-prune" in read("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh"):
+scheduled_runner = read("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh")
+if "--include-unlabelled-host-residue" in scheduled_runner or "--allow-shared-builder-prune" in scheduled_runner:
     fail("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh: scheduled cleanup must stay owned-only (no host-wide or shared-builder prunes)")
 if "if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 3 * * *'" not in artifact_retention_job:
     fail(".github/workflows/localcluster-docker-maintenance.yml: manual and daily runs must run artifact retention")
