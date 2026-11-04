@@ -466,15 +466,22 @@ prune_old_unprotected_localcluster_images() {
   # Process substitution would discard the inventory command's exit status,
   # including a daemon failure after it emitted a partial list.
   local inventory
-  inventory="$(docker image ls --no-trunc --format '{{.ID}}\t{{.Repository}}\t{{.Tag}}')" \
+  inventory="$(docker image ls --no-trunc --digests --format '{{.ID}}\t{{.Repository}}\t{{.Tag}}\t{{.Digest}}')" \
     || fail "could not inventory Docker images; refusing retention cleanup"
-  local id repository tag image_ref created created_epoch current_id
-  while IFS=$'\t' read -r id repository tag; do
+  local id repository tag digest image_ref created created_epoch current_id
+  while IFS=$'\t' read -r id repository tag digest; do
     [[ -n "$id" && -n "$repository" && -n "$tag" ]] || continue
-    [[ "$repository" != "<none>" && "$tag" != "<none>" ]] || continue
+    [[ "$repository" != "<none>" ]] || continue
     repository_is_candidate "$repository" || continue
 
-    image_ref="${repository}:${tag}"
+    if [[ "$tag" != "<none>" ]]; then
+      image_ref="${repository}:${tag}"
+    elif [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+      # App servers pull releases by digest, so their old images have no tag, only this reference.
+      image_ref="${repository}@${digest}"
+    else
+      continue
+    fi
     if is_protected_image "$image_ref" "$id"; then
       echo "skip protected image: $image_ref"
       continue
