@@ -160,9 +160,11 @@ The dry run lists old unused LocalCluster image tags. The helper removes only re
 ### Runner And Docker Storage Maintenance
 
 The LocalCluster Docker Maintenance workflow runs on node-main. Host and Docker
-cleanup are manual and use the shared deployment lock. A separate artifact
-retention job runs daily at 03:17 UTC and on manual dispatch; it uses the same
-lock as release selection and deletion. Manual dispatch previews GitHub artifact
+cleanup runs daily at 03:47 UTC and on manual dispatch, under the shared
+deployment lock. It removes only this repository's runner residue, finished CI
+resources and unused app images; it never runs host-wide prunes and never
+removes volumes. A separate artifact retention job runs daily at 03:17 UTC and
+on manual dispatch; it uses the same lock as release selection and deletion. Manual dispatch previews GitHub artifact
 retention by default. Set `apply_artifacts=true` to allow deletion; the repository
 variable `ACTIONS_ARTIFACT_RETENTION_ENABLED` must also be exactly `true`.
 Set the `artifact_only` dispatch input to run retention without host or Docker maintenance. Review both jobs in

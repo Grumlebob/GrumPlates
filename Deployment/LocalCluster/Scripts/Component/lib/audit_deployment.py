@@ -978,8 +978,8 @@ manifest_pos = ci.find("Resolve pushed image digest and write release manifest")
 receipt_pos = ci.find("Emit immutable release payload receipt")
 if push_pos < 0 or manifest_pos < push_pos or receipt_pos < manifest_pos:
     fail(".github/workflows/ci.yml: GHCR payload receipt must follow the pushed image and verified manifest")
-# Artifact retention runs daily on the maintenance runner, while host and
-# Docker cleanup remain manual. Both selection/download and cleanup use the
+# Artifact retention (03:17 UTC) and scoped host and Docker cleanup (03:47 UTC)
+# run daily on the maintenance runner. Both selection/download and cleanup use the
 # shared deployment lock and retain live, successful, and active release IDs.
 maintenance = read(".github/workflows/localcluster-docker-maintenance.yml")
 for needle, why in [
@@ -988,6 +988,7 @@ for needle, why in [
     ("default: false", "artifact-only dispatch preserves existing manual behavior by default"),
     ("schedule:", "daily artifact retention schedule"),
     ('cron: "17 3 * * *"', "daily artifact retention cron"),
+    ('cron: "47 3 * * *"', "daily host and Docker cleanup cron"),
     ("localcluster-books", "app-specific self-hosted runner label fallback"),
     ("bash Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh", "locked maintenance runner"),
     ("install-ansible.sh --check", "check-only Ansible activation"),
@@ -1009,8 +1010,11 @@ dispatch_expectations = [
 for needle, why in dispatch_expectations:
     if needle not in dispatch_configuration:
         fail(f".github/workflows/localcluster-docker-maintenance.yml: missing {why}")
-if "if: github.event_name == 'workflow_dispatch' && inputs.artifact_only != true" not in host_maintenance_job:
-    fail(".github/workflows/localcluster-docker-maintenance.yml: host or Docker cleanup must be skipped for artifact-only dispatches and schedules")
+if "if: (github.event_name == 'workflow_dispatch' && inputs.artifact_only != true) || github.event.schedule == '47 3 * * *'" not in host_maintenance_job:
+    fail(".github/workflows/localcluster-docker-maintenance.yml: host and Docker cleanup must run daily at 03:47 and on dispatches that are not artifact-only, never on the artifact schedule")
+if "--include-unlabelled-host-residue" in read("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh") \
+        or "--allow-shared-builder-prune" in read("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh"):
+    fail("Deployment/LocalCluster/Scripts/run-localcluster-maintenance.sh: scheduled cleanup must stay owned-only (no host-wide or shared-builder prunes)")
 if "if: github.event_name == 'workflow_dispatch' || github.event.schedule == '17 3 * * *'" not in artifact_retention_job:
     fail(".github/workflows/localcluster-docker-maintenance.yml: manual and daily runs must run artifact retention")
 if "ACTIONS_ARTIFACT_RETENTION_ENABLED: ${{ (github.event.schedule == '17 3 * * *' || (github.event_name == 'workflow_dispatch' && inputs.apply_artifacts == true)) && (vars.ACTIONS_ARTIFACT_RETENTION_ENABLED || 'false') }}" not in artifact_retention_job:

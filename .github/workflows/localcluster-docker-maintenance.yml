@@ -1,7 +1,8 @@
 name: LocalCluster Docker Maintenance
 
-# Host and Docker maintenance stays manual. The separate artifact-only job runs
-# daily under the shared deployment lock. See Deployment/LocalCluster/HowToDeployLocalCluster.md.
+# Host and Docker maintenance runs daily at 03:47 UTC and on dispatch; artifact retention
+# runs daily at 03:17 UTC. Both use the shared deployment lock and remove only resources
+# this repository owns. See Deployment/LocalCluster/Operations.md.
 on:
   workflow_dispatch:
     inputs:
@@ -17,13 +18,14 @@ on:
         default: false
   schedule:
     - cron: "17 3 * * *"
+    - cron: "47 3 * * *"
 
 permissions:
   contents: read
 
 jobs:
   prune:
-    if: github.event_name == 'workflow_dispatch' && inputs.artifact_only != true
+    if: (github.event_name == 'workflow_dispatch' && inputs.artifact_only != true) || github.event.schedule == '47 3 * * *'
     concurrency:
       group: localcluster-docker-maintenance
       cancel-in-progress: false
