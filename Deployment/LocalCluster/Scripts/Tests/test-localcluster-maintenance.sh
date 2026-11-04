@@ -29,6 +29,18 @@ if __name__ == "__main__":
         stream.write("ci-residue\n")
     raise SystemExit(int(os.environ.get("CI_STATUS", "0")))
 PY
+cat > "$TMP_ROOT/Deployment/LocalCluster/Scripts/prune-payload-images.py" <<'PY'
+import os
+import sys
+from pathlib import Path
+if __name__ == "__main__":
+    lock_dir = Path(os.environ["LOCALCLUSTER_DEPLOY_LOCK_DIR"])
+    assert (lock_dir / "token").read_text().strip() == os.environ["LOCALCLUSTER_DEPLOY_LOCK_TOKEN"]
+    assert sys.argv[1:] == ["--apply"], sys.argv
+    with open(os.environ["CALLS"], "a") as stream:
+        stream.write("payloads\n")
+    raise SystemExit(int(os.environ.get("PAYLOAD_STATUS", "0")))
+PY
 for filename in prune-actions-runner-residue.sh prune-docker-residue.sh prune-cluster-docker-residue.sh; do
   destination="$TMP_ROOT/Deployment/LocalCluster/Scripts"
   [[ "$filename" != prune-actions-runner-residue.sh ]] || destination="$TMP_ROOT/Deployment/Common/Scripts"
@@ -73,9 +85,13 @@ run_case() {
   [[ ! -e "$LOCALCLUSTER_DEPLOY_LOCK_DIR" ]] || { echo "lock leaked" >&2; exit 1; }
 }
 run_case 0
-[[ "$(paste -sd, "$CALLS")" == runner,ci-residue,docker,remote ]]
+[[ "$(paste -sd, "$CALLS")" == runner,ci-residue,docker,payloads,remote ]]
 run_case 0 --capacity-only
-[[ "$(paste -sd, "$CALLS")" == runner,docker ]]
+[[ "$(paste -sd, "$CALLS")" == runner,docker,payloads ]]
+PAYLOAD_STATUS=75 run_case 75
+grep -Fxq remote "$CALLS"
+PAYLOAD_STATUS=1 run_case 1
+PAYLOAD_STATUS=2 run_case 1
 PROTECTION_STATUS=1 run_case 75
 PROTECTION_STATUS=1 run_case 0 --capacity-only
 CI_STATUS=75 run_case 75

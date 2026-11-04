@@ -90,6 +90,8 @@ stage docker 180 bash "$SCRIPT_DIR/prune-docker-residue.sh" \
   --force --min-free-mb "$LOCALCLUSTER_LOAD_BALANCER_MIN_FREE_MB" \
   --dangling-image-until 168h --localcluster-image-until 168h \
   --defer-if-skipped
+# Payload images are only needed while a deployment extracts them; the lock rules that out.
+stage payload-images 300 python3 "$SCRIPT_DIR/prune-payload-images.py" --apply
 if [[ "$CAPACITY_ONLY" == false ]]; then
   stage remote-docker 300 bash "$SCRIPT_DIR/prune-cluster-docker-residue.sh" "${image_protection[@]}"
 fi
