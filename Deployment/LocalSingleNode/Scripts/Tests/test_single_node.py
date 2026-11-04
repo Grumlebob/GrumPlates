@@ -473,6 +473,19 @@ class MaintenanceTests(unittest.TestCase):
         ]
         self.assertEqual(["prefixed", "legacy", "pulled", "two-tags"],
                          maintenance.payload_candidates(images, [{"Image": "in-use"}], release, now))
+    def test_digest_listed_in_repo_tags_is_not_a_second_tag(self):
+        # Docker 29 (containerd image store) lists a pulled digest in RepoTags next to the tag.
+        now = datetime.now(timezone.utc)
+        release = dict(image='ghcr.io/fixture-owner/books', digest='sha256:' + 'a' * 64, source_repo_url='https://github.com/fixture-owner/fixture-repo')
+        digest_ref = release['image'] + '@sha256:' + 'b' * 64
+        base = dict(Created=(now - timedelta(hours=49)).isoformat(), RepoDigests=[digest_ref],
+                    Config=dict(Labels={'org.opencontainers.image.source': release['source_repo_url']}))
+        images = [{**base, 'Id': 'tag-and-digest', 'RepoTags': [release['image'] + ':old', digest_ref]},
+                  {**base, 'Id': 'two-real-tags', 'RepoTags': [release['image'] + ':a', release['image'] + ':b']},
+                  {**base, 'Id': 'protected', 'RepoTags': [release['image'] + ':keep', digest_ref.replace('b' * 64, 'c' * 64)]},
+                  {**base, 'Id': 'used', 'RepoTags': [release['image'] + ':used', digest_ref]}]
+        self.assertEqual(['tag-and-digest'], maintenance.candidates(images, [{'Image': 'used'}], release, now, (release['image'] + ':keep',)))
+
     def test_historical_ci_proof_and_foreign_reference_preservation(self):
         now = datetime.now(timezone.utc)
         release = dict(image='ghcr.io/fixture-owner/books', digest='sha256:' + 'a' * 64, source_repo_url='https://github.com/fixture-owner/fixture-repo')

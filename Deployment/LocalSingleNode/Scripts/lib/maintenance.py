@@ -54,6 +54,11 @@ def is_payload_reference(reference, app_image):
     return ref_parent == parent and (ref_name == suffix or ref_name.endswith("-" + suffix))
 
 
+def real_tags(image):
+    """Return the image's tags, leaving out digest references that Docker 29 also lists in RepoTags."""
+    return [ref for ref in image.get("RepoTags") or [] if "@" not in ref]
+
+
 def payload_candidates(images, containers, release, now, protected_refs=()):
     protected = {container["Image"] for container in containers}
     source = release["source_repo_url"].rstrip('/')
@@ -93,7 +98,9 @@ def candidates(images, containers, release, now, protected_refs=()):
         references_proven = bool(refs) and all(ref.split('@')[0].rsplit(':', 1)[0] == release["image"] or ref.split('@')[0] == release["image"] for ref in refs)
         belongs = (source_proven or ci_proven) and references_proven
         # Removing an ID with multiple tags requires force. Preserve it for inspection.
-        if len(image.get("RepoTags") or []) > 1:
+        # Docker 29's containerd store also lists the pulled digest (name@sha256:...) in RepoTags;
+        # that names the same image, so only real tags count.
+        if len(real_tags(image)) > 1:
             print("Report only: image has multiple tags; no forced removal " + image["Id"])
             continue
         created = datetime.fromisoformat(image["Created"].replace('Z', '+00:00'))
