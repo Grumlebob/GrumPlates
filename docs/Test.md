@@ -31,9 +31,8 @@ Run every command successfully before pushing non-Markdown changes. Use Linux or
 ```bash
 git diff --check
 dotnet restore GrumPlates.sln
-python3 -m unittest Scripts/CI/tests/test_frontend_profile.py Scripts/CI/tests/test_frontend_release.py Scripts/CI/tests/test_ci_report_store.py
-python3 -m unittest Scripts/CI/tests/test_require_ci_results.py
-python3 -m unittest Scripts/CI/tests/test_workflow_policy.py
+python3 -m unittest discover -s Scripts/Quality/tests -v
+python3 -m unittest discover -s Scripts/CI/tests -v
 python3 Scripts/CI/workflow_policy.py --repo-root .
 dotnet format GrumPlates.sln --verify-no-changes --verbosity minimal --no-restore
 bash Scripts/CI/validate-frontend-profiles.sh /tmp/frontend-profile-results # needs Docker
@@ -41,7 +40,9 @@ bash Deployment/Common/Scripts/validate-common-release.sh
 bash Deployment/Cloud/Scripts/validate-cloud-settings.sh
 bash Deployment/Common/observability/scripts/validate-observability.sh
 bash Deployment/LocalCluster/Scripts/audit-deployment.sh
-python3 -m unittest Deployment/LocalCluster/Scripts/Tests/test_doc_slice_loader.py -v
+python3 -m unittest discover -s Deployment/Common/Scripts/Tests -v
+python3 -m unittest discover -s Deployment/LocalCluster/Scripts/Tests -p 'test_*.py' -v
+python3 -m unittest discover -s Deployment/LocalSingleNode/Scripts/Tests -v
 python3 -m venv /tmp/tpl-venv && /tmp/tpl-venv/bin/pip install --constraint Deployment/Common/ci-python-constraints.txt jinja2 yamllint
 PATH="/tmp/tpl-venv/bin:$PATH" bash Deployment/LocalCluster/Scripts/validate-rendered-templates.sh
 PATH="/tmp/tpl-venv/bin:$PATH" yamllint .github Deployment docker-compose.yml .yamllint.yml
@@ -49,7 +50,7 @@ find Deployment Scripts/CI -type f -name '*.sh' -print0 | xargs -0 shellcheck --
 bash Scripts/CI/run-actionlint.sh
 ```
 
-If `GrumPlates.Client/Styles` or Razor classes change, run `npm ci && npm run css:build` from the client project and commit the generated `GrumPlates/wwwroot/tailwind.css` when it changes. Changes to deployment scripts also require suites under `Deployment/LocalCluster/Scripts/Tests/`, `Deployment/Common/Scripts/Tests/`, `Deployment/LocalSingleNode/Scripts/Tests/`, and `Scripts/CI/tests/`; CI's validate job lists the current commands.
+If `GrumPlates.Client/Styles` or Razor classes change, run `npm ci && npm run css:build` from the client project and commit the generated `GrumPlates/wwwroot/tailwind.css` when it changes. The `discover` commands run the same Python suites as CI's `validate` job; the shell suites are listed there.
 
 ## Lighthouse Performance
 

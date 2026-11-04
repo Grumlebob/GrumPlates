@@ -836,7 +836,7 @@ If execution uncovers a new decision: when one option is clearly leaner and safe
 | P06 | Complete | https://github.com/Grumlebob/GrumPlates/pull/424 (head `0943e3c6`, exact-head CI 41713555558 success; full local gate PASS on `a890c1e1`, same code tree) merged `28016b14`, main CI 41724047108. P05 follow-up: main CI 41713411785 ran every job on `node-demo-books`; `CI_RUNNER_ROUTING_ENABLED` deleted. |
 | P07 | Complete | https://github.com/Grumlebob/GrumPlates/pull/425 (head `3528ec9d`, exact-head CI 41724189780 success; full local gate PASS on `09209238`, same code tree) merged `49098f82`, main CI 41732967439. New migration `20261103193952_InitialSchema`, EF ProductVersion 10.0.14; normalised old and new schema dumps byte-identical (sha256 `ba5dd6a4…cd4032`). No CD with run_migrations=true until P14 step 3. |
 | P08 | Complete | https://github.com/Grumlebob/GrumPlates/pull/426 (head `cf8ec9ad`, exact-head CI 41733071880 success; full local gate PASS on `7fae83c3`, same code tree) merged `3612c0ff`, main CI 41741000212. `@dependabot rebase` posted on #406. |
-| P09 | Pending | |
+| P09 | Complete | https://github.com/Grumlebob/GrumPlates/pull/427 (head `0035825c`, exact-head CI 41741119162 success; full local gate PASS on `d23e0065`, same code tree) merged `78041da3`, main CI 41750584565. Compose web environment identical before/after (`Plans.local/compose-*.json`). |
 | P10 | Pending | |
 | P11 | Pending | |
 | P12 | Pending | |
