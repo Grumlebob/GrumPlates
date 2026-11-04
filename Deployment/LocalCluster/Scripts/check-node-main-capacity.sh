@@ -19,5 +19,6 @@ echo "/opt capacity: free_mb=$free_mb free_inode_percent=$free_inode_percent"
 if (( free_mb < LOCALCLUSTER_LOAD_BALANCER_MIN_FREE_MB \
   || free_inode_percent < LOCALCLUSTER_LOAD_BALANCER_MIN_FREE_INODE_PERCENT )); then
   echo "Required /opt reserve: ${LOCALCLUSTER_LOAD_BALANCER_MIN_FREE_MB}MiB and ${LOCALCLUSTER_LOAD_BALANCER_MIN_FREE_INODE_PERCENT}% free inodes." >&2
+  echo "Run the LocalCluster Docker Maintenance workflow first; see \"Runner And Docker Storage Maintenance\" in Deployment/LocalCluster/Operations.md." >&2
   exit 2
 fi
