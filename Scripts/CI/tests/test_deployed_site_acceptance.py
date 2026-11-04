@@ -114,6 +114,7 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
         self,
         capability_status: int = 200,
         capability_malformed: bool = False,
+        forwarded_proto: str = "https",
     ):
         AcceptanceHandler.requests = []
         AcceptanceHandler.capability_status = capability_status
@@ -126,6 +127,7 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
                 "-FrontendProfile", "React",
                 "-AcceptanceProfile", "ReactPublicV1",
                 "-BaseUrl", f"http://127.0.0.1:{server.server_port}",
+                *(("-ForwardedProto", forwarded_proto) if forwarded_proto else ()),
             )
             requests = list(AcceptanceHandler.requests)
         finally:
@@ -164,6 +166,16 @@ class DeployedSiteAcceptanceTests(unittest.TestCase):
         self.assertIn("/api/auth/login", paths)
         self.assertIn("/api/auth/not-a-real-operation", paths)
         self.assertTrue(all(not cookie for _method, _path, cookie in requests))
+
+    def test_react_plain_http_skips_account_session_checks(self):
+        result, requests = self.run_fixture(forwarded_proto="")
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+        self.assertNotIn("React-enabled-session", result.stdout)
+        self.assertIn("PASS React-enabled-post-only-GET", result.stdout)
+        self.assertIn("PASS React-enabled-unknown-api", result.stdout)
+        self.assertIn("RESULT: PASS", result.stdout)
+        paths = {path.split("?", 1)[0] for _method, path, _cookie in requests}
+        self.assertNotIn("/api/auth/session", paths)
 
     def test_react_missing_or_malformed_capability_fails_before_other_requests(self):
         for options in (
