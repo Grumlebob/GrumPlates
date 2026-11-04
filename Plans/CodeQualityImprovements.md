@@ -4,11 +4,6 @@ This backlog starts from the accepted SonarQube baseline at `8393173bc4f580ae1dc
 
 ## Prioritized work
 
-### Q-001 — Superseded: simulator retired
-
-- Original evidence: the 2026-10-12 analyzer baseline reported permissive localhost certificate callbacks in the standalone simulator.
-- Disposition: P16 removes the simulator project and both HTTP paths. No replacement TLS option or simulator test is needed. Keep ordinary app and deployment certificate validation unchanged.
-
 ### Q-002 — Replace the MD5-based packaged Caddyfile check with a package-aware verification
 
 - Evidence: `python:S4790` keys `6917f011-a7e9-4a61-ab3d-bede2d9924b0` (BlazorAuto) and `9c847807-d7f0-415f-a177-d0ac3a19699d` (React) at `Deployment/LocalSingleNode/Scripts/lib/collisions.py:21`.
@@ -44,50 +39,6 @@ This backlog starts from the accepted SonarQube baseline at `8393173bc4f580ae1dc
 - Dependencies: none.
 - Decision: fix in a future application-quality wave.
 - Acceptance: high-risk modal transitions have behavior-focused tests and the component's measured coverage improves without excluding production lines.
-
-### Q-005 — Complete: split the LocalSingleNode collision preflight into reviewable checks
-
-- Evidence: `python:S3776` keys `3496b328-0b1d-43af-8ecc-4490ed4d07b6` (BlazorAuto) and `1da6b910-3731-4c5a-89e0-4234d6b7264e` (React) at `Deployment/LocalSingleNode/Scripts/lib/collisions.py:28`; the function's cognitive complexity is 131 against the rule's 15 guideline. Related findings in the same function cover the Caddy checksum and static Caddy text scan.
-- Why it matters: the function combines ownership markers, symlink and directory checks, Caddy configuration, Compose port/subnet inspection, and Docker resources. This is fail-closed setup logic, so reviewers need to see each invariant clearly.
-- Proposed change: extract small read-only checks for owned paths, Caddy state, Compose bindings/networks, and existing Docker resources. Keep the public `check` entry point and return or raise the same actionable failures.
-- Behavior to preserve: no unowned host path, listener, network, Caddy site, or resource is adopted; no mutation occurs during the preflight.
-- Disposition: P20 keeps the public `check()` entry point and first-failure errors, and separates owned-path checks, Compose port/subnet checks, Caddy-site checks, runtime network and owned-container checks, and listener checks into narrow helpers. It preserves the current MD5 comparison against dpkg conffile metadata; Q-002 stays a separate design review.
-- Verification: P20 adds direct port-range boundary cases and rejection fixtures for Compose port/subnet conflicts, foreign Caddy sites and unrecognized Caddyfile digests. Existing ownership, runtime-network, listener, release-contract and deployment-audit checks pass.
-- Effort: large; behavior spans shared-host and privileged setup boundaries.
-- Dependencies: none.
-- Decision: structural decomposition complete in P20; Q-002 remains a separate design review for the MD5 verification basis.
-- Acceptance: all existing fail-closed cases remain covered, and each check has a direct test and a narrow responsibility.
-
-### Q-006 — Make the Redis fallback test assert the behavior it names
-
-- Evidence: `csharpsquid:S2699` keys `655b305a-ea46-4478-9e93-289f58a8f0eb` (BlazorAuto) and `6c52aa25-d84d-4a31-871f-78729cbe2c9b` (React) at `BlazorAutoApp.Test/Infrastructure/Hosting/RedisConfigurationTests.cs:33`.
-- Why it matters: the test currently resolves `factory.Services` and passes if startup does not throw. The code is intended to register an in-memory cache when `Redis:AllowMissing=true`; an explicit assertion would protect that contract from unrelated startup changes.
-- Proposed change: assert that the fallback `IDistributedCache` resolves and that the Redis health check is absent when the endpoint is a placeholder and fallback is enabled. Keep the existing negative test for fallback-disabled production.
-- Behavior to preserve: production requires Redis unless the operator explicitly opts into the local/test fallback.
-- Verification: run the focused Redis configuration tests and both profile test suites.
-- Effort: small.
-- Dependencies: none.
-- Disposition: P15 proves in-memory cache reads/writes, absence of Redis connection/health-check registrations in fallback, and the existing required-Redis failure. Focused tests and both profiles passed; no production fallback behavior changed.
-- Decision: complete in P15.
-- Acceptance: tests assert both fallback registration and required-Redis failure, without requiring a live Redis service.
-
-### Q-007 — Share common LocalCluster and Cloud settings validation
-
-- Evidence: `python:S3776` identifies `validate()` at `Deployment/LocalCluster/Scripts/Component/lib/deploy_settings.py:73` (keys `9c3b9547-18f7-4c0e-bfe6-9b21a717a8d8` / `1e253611-143a-4c1d-935f-f0a98d1d0805`, complexity 78) and `Deployment/Cloud/Scripts/Component/lib/cloud_settings.py:77` (keys `54491309-ebe7-42c6-838e-76ef052d42df` / `51185cca-82ba-448c-94a6-a637108a186b`, complexity 92). The reports also show 131 duplicated lines between the files.
-- Why it matters: common port, DNS, retention, path, and observability validation can drift across deployment targets. Their required settings and Cloud-only network checks still differ.
-- Proposed change: move only schema-independent validators into `Deployment/Common`; retain target-specific key sets and Cloud-only address checks in their owning modules.
-- Behavior to preserve: exact accepted settings, error conditions, defaults, and rendered deployment contracts for both targets.
-- Verification: add parity cases for shared inputs and target-specific cases, then run common, Cloud, LocalCluster, and deployment audit suites.
-- Effort: medium; shared validators affect multiple deployment surfaces.
-- Dependencies: none.
-- Disposition: P18 extracted pure shared validators and paired parity/CLI fixtures. It preserves target-specific schemas, defaults, error order/text, and Cloud-only address checks. The full deployment/settings/render gate passed.
-- Decision: complete in P18.
-- Acceptance: shared rules have one implementation, target-specific validation remains explicit, and both settings contracts produce equivalent results for equivalent input.
-
-### Q-008 — Superseded: simulator retired
-
-- Original evidence: the 2026-10-12 analyzer baseline reported high complexity in standalone simulator option parsing.
-- Disposition: P16 removes the parser, CLI and wrapper consumers. No parser decomposition is needed. Preserve the historical finding here as evidence, not as active work.
 
 ## Reviewed findings with no immediate follow-up
 
