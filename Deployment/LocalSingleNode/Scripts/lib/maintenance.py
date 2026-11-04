@@ -166,11 +166,15 @@ def remove_payload_images(images, containers, release, now, protected_refs, dock
             print("Payload image acquired a container reference; leaving it: " + image)
             continue
         # Untag each owned payload tag without force; remove a digest-only image by its ID.
+        # With the containerd image store, removing one reference can delete the whole image, so a
+        # later reference answers "No such image"; that image is removed, not refused.
         failures = []
         for tag in current[0].get("RepoTags") or []:
             ok, text = docker("image", "rm", tag)
             if not ok:
                 failures.append(f"{tag}: {text}")
+        if failures and not docker("image", "inspect", image)[0]:
+            failures = []
         if failures:
             refused.append(f"release payload {image}: " + "; ".join(failures))
             continue
