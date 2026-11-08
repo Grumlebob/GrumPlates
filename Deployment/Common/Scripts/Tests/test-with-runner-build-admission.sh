@@ -67,10 +67,17 @@ wait "$holder"
 status=$?
 set -e
 [[ "$status" != 0 ]] || fail "cancelled native command unexpectedly succeeded"
-if kill -0 -- "-$holder" 2>/dev/null; then
-  fail "cancelled native process group is still running"
-fi
-bash "$ADMISSION" --pool native true || fail "native lock was not released after cancellation"
+group_has_running_process() {
+  ps -eo pgid=,stat= | awk -v expected="$holder" '$1 == expected && $2 !~ /^Z/ { found=1 } END { exit found ? 0 : 1 }'
+}
+for _ in $(seq 1 100); do
+  if ! group_has_running_process; then
+    break
+  fi
+  sleep 0.1
+done
+group_has_running_process && fail "cancelled native process group still has a running process"
+LOCALSINGLENODE_BROWSER_LOCK_TIMEOUT_SECONDS=5 bash "$ADMISSION" --pool native true || fail "native lock was not released after cancellation"
 
 # Unknown routes fail closed, and no command is never treated as success.
 set +e
