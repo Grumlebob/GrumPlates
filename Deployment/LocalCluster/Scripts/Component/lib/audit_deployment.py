@@ -53,6 +53,13 @@ def workflow_step_text(workflow: str, step_name: str) -> str:
     return match.group(0) if match else ""
 
 
+def workflow_job_text(workflow: str, job_id: str) -> str:
+    match = re.search(
+        rf"(?ms)^  {re.escape(job_id)}:\r?\n(.*?)(?=^  [A-Za-z0-9_-]+:\r?\n|\Z)", workflow,
+    )
+    return match.group(1) if match else ""
+
+
 def tracked_files() -> set[str]:
     try:
         result = subprocess.run(
@@ -950,8 +957,6 @@ for path, checks in {
 for forbidden in ("prune-docker-residue.sh --force", "docker system prune", "docker container prune", "docker builder prune", "docker network prune", "docker volume prune"):
     if forbidden in ci:
         fail(f".github/workflows/ci.yml: CI must not run host-wide Docker cleanup: {forbidden}")
-if ci.count("run: bash Deployment/LocalCluster/Scripts/ci-docker-smoke.sh --cleanup-only") != 2:
-    fail(".github/workflows/ci.yml: both smoke jobs must recover their own interrupted resources")
 if ci.index("ci-docker-smoke.sh --cleanup-only") > ci.index("name: Remove this run's local Docker image"):
     fail(".github/workflows/ci.yml: owned smoke resources must be removed before their exact image tag")
 for needle in ("Cleanup-only requires the exact GitHub repository, run ID and attempt.", "expected_identity", "Owned smoke container remains", "Owned smoke network remains"):
@@ -2810,18 +2815,26 @@ for binding in ("GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}", "LOCALSINGLENODE_HO
     if binding not in maintenance_step:
         fail("Scoped maintenance must pass protected release-status inputs: " + binding.split(":", 1)[0])
 
-# Chromium and Docker smoke stages share the node with the other repository, so each runs under the node browser lock.
+# Resource-heavy workflow commands use runner admission. Native admission delegates to the shared node browser lock.
 require_file("Deployment/Common/Scripts/with-node-browser-lock.sh")
 require_file("Deployment/Common/Scripts/Tests/test-with-node-browser-lock.sh")
+require_file("Deployment/Common/Scripts/with-runner-build-admission.sh")
+require_file("Deployment/Common/Scripts/Tests/test-with-runner-build-admission.sh")
 for needle, why in [
-    ("with-node-browser-lock.sh pwsh -File Scripts/Testing/RunReactPublicE2E.ps1 -Browser chromium", "Chromium regression under the node browser lock"),
-    ("with-node-browser-lock.sh bash Deployment/LocalCluster/Scripts/ci-docker-smoke.sh", "Docker and browser smoke under the node browser lock"),
+    ("bash Deployment/Common/Scripts/Tests/test-with-runner-build-admission.sh", "runner build admission behaviour tests"),
 ]:
     require_contains(".github/workflows/ci.yml", needle, why)
-for line in read(".github/workflows/ci.yml").splitlines():
-    runs_browser_or_smoke = "RunReactPublicE2E.ps1" in line or re.search(r"Deployment/LocalCluster/Scripts/ci-docker-smoke\.sh", line)
-    if runs_browser_or_smoke and "--cleanup-only" not in line and "with-node-browser-lock.sh" not in line:
-        fail(f".github/workflows/ci.yml: browser and Docker smoke commands must run under the node browser lock: {line.strip()}")
+ci = read(".github/workflows/ci.yml")
+for job_id, step_name, expected_command in [
+    ("validate", "React public Chromium browser regression", "RunReactPublicE2E.ps1"),
+    ("validate", "Build and smoke both frontend image profiles", "Deployment/LocalCluster/Scripts/ci-docker-smoke.sh"),
+    ("validate", "Remove this run's smoke resources after interruption", "--cleanup-only"),
+    ("publish-main", "Docker smoke and browser smoke", "Deployment/LocalCluster/Scripts/ci-docker-smoke.sh"),
+    ("publish-main", "Remove this run's smoke resources after interruption", "--cleanup-only"),
+]:
+    step = workflow_step_text(workflow_job_text(ci, job_id), step_name)
+    if not step or "with-runner-build-admission.sh" not in step or expected_command not in step:
+        fail(f".github/workflows/ci.yml: {job_id}/{step_name} must use runner admission")
 
 if failures:
     print("Deployment audit failed:")

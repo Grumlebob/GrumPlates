@@ -22,6 +22,8 @@ CI stores full TRX and React unit-test reports, plus available browser screensho
 
 CI jobs run on the runner labelled by the `CI_RUNNER_LABEL` repository variable. Each job first checks that label's format and that the runner's hostname matches `CI_RUNNER_HOST`. The stable `build-test-push` result gate rejects skipped or failed validation, and skipped or failed publication on `main`.
 
+Resource-heavy validation and publication steps use `with-runner-build-admission.sh`: `localsinglenode` labels take the existing shared node browser lock, while `localcluster` labels run directly. Keep one wrapper around each heavy step or full shell block, including owned cleanup. Do not nest the lock inside an admitted block; its contention test runs outside admission.
+
 ## Local Gate
 
 For ordinary Markdown-only changes, follow the documentation exception in [AGENTS.md](../AGENTS.md#changes-and-checks). Mixed PRs use the full gate below.
