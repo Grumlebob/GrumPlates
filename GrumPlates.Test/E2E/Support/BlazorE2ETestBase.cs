@@ -462,9 +462,22 @@ public abstract class BlazorE2ETestBase : PageTest
         await Page.Locator("#Input\\.Email").FillAsync(email);
         await Page.Locator("#Input\\.Password").FillAsync(password);
         await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Log in", Exact = true }).ClickAsync();
-        // Attached rather than visible: a mobile viewport keeps the account link in the collapsed menu.
-        await Expect(Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = email }).First)
-            .ToBeAttachedAsync(new LocatorAssertionsToBeAttachedOptions { Timeout = 30_000 });
+        await WaitForInteractivityAsync();
+
+        var accountLink = Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = email }).First;
+        var mobileMenuToggle = Page.GetByTestId("nav-toggle");
+        var mobileMenuIsVisible = await mobileMenuToggle.IsVisibleAsync();
+        if (mobileMenuIsVisible)
+        {
+            await mobileMenuToggle.ClickAsync();
+        }
+
+        await Expect(accountLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+
+        if (mobileMenuIsVisible)
+        {
+            await mobileMenuToggle.ClickAsync();
+        }
 
         return email;
     }
