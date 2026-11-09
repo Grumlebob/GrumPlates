@@ -211,14 +211,16 @@ Exit: full local gate and applicable browser checks pass before pushing.
 
 ### U11 — Integrate and prepare the downstream handoff
 
-- [ ] Open a focused GrumPlates PR describing the simpler interaction and relevant verification. Split state preparation from replacement UI only if each integrated PR stays functional.
-- [ ] Require green `build-test-push` on the exact PR head. Retarget dependent PRs before merging/deleting their base.
-- [ ] Fetch and verify integrated main content and required exact-main CI; record full SHAs, PR URLs, and CI run/attempt references.
-- [ ] Populate section 7 with exact integrated paths and commits. Mark any mixed UI/backend commit for selective adaptation rather than blind cherry-pick.
-- [ ] Link the completed handoff from the RitzauDemo plan without importing product-specific behavior upstream.
-- [ ] Clean owned branches/worktrees and task-created Docker resources under the repository's closeout rules. Record deleted branch full SHAs and preserve useful private inputs.
+- [x] Open a focused GrumPlates PR describing the simpler interaction and relevant verification. Split state preparation from replacement UI only if each integrated PR stays functional.
+- [x] Require green `build-test-push` on the exact PR head. Retarget dependent PRs before merging/deleting their base.
+- [x] Fetch and verify integrated main content and required exact-main CI; record full SHAs, PR URLs, and CI run/attempt references.
+- [x] Populate section 7 with exact integrated paths and commits. Mark any mixed UI/backend commit for selective adaptation rather than blind cherry-pick.
+- [ ] Integrate the verified handoff record from RitzauDemo PR #19. Keep it pending while the target repository's enforced checks conflict with its documented `[skip ci]` rule; do not bypass protection or manufacture checks.
+- [x] Clean owned branches and Docker resources under the closeout rules. Record the deleted branch SHA and report the retained worktree dependency.
 
-Exit: upstream UI is integrated, verified, and ready for an agent to port without re-discovering its dependencies.
+Closeout: implementation branch `task/reusable-crud-ui-implementation-20261109` was deleted at full SHA `39349002c1008b5b9196ef8e5f9321272e4bb729` after its tree matched integrated main. Its task Compose project, database volume, and web image were removed. The task worktree remains detached at integrated main because the separate active `grumplates-ui-visual-20261109` project references its Compose file and bind-mounts its HTTPS directory; remove that checkout after the project and its live process no longer depend on it.
+
+Exit: upstream UI is integrated and verified. The R14 handoff PR is open; finish this packet after an approved docs-only protection path is available.
 
 ## 6. Verification checklist
 
@@ -323,13 +325,13 @@ Route contract: `/` and `/books` show the public catalog and the signed-in user'
 
 Rebuild generated CSS from `GrumPlates.Client` with `npm ci && npm run css:build`. Applicable verification covers `BooksE2ETests`, `BookNavigationE2ETests`, `BookEditAuthenticationTests`, `UserBookcaseStateTests`, pre-hydration controls, actual render-mode checks, both frontend profiles, and the full local gate. No upstream dependency remains beyond integrated PR #454; product RBAC and role selection remain downstream work.
 
-Handoff record to complete: upstream base SHA; full integrated UI commit SHA(s); PR URL(s); exact-main CI; explicit added/changed/deleted source paths; contracts or DI signatures touched; route table; regenerated asset instructions; applicable test scenarios; and any pending dependency. Do not keep an archive/bundle of the finished workspace as handoff evidence.
+The source handoff record is complete in [RitzauDemo PR #19](https://github.com/Grumlebob/RitzauDemo/pull/19): exact upstream base/head/integrated SHAs and CI runs, path manifest, contracts, routes, regenerated asset instructions, applicable tests, and product-specific adaptation notes. PR #19 changes only Markdown and has `[skip ci]` in its commit and title. RitzauDemo main enforces `build-test-push` and CodeQL, reports no checks for the skipped PR, and blocks the merge. Keep PR #19 open and this plan in progress until the target repository offers an approved path that preserves both its documentation rule and branch protection.
 
 The downstream port is a separate product PR under `Plans/InterviewCaseStarter.md`, packets R14–R16. Verify destination ownership rules, both seeded roles, caching, and actual render modes after adaptation. A clean textual patch alone is not port acceptance.
 
 ## 8. Blockers and decisions
 
-- No manual user action is required for planning, implementation, local verification, PR creation, or preparing the port based on current evidence.
+- Upstream implementation and verification are complete. The remaining blocker is integration of the docs-only handoff in RitzauDemo PR #19: its `[skip ci]` documentation rule leaves the two required main checks absent, and GitHub blocks the merge. The next action is to use an approved docs-only protection path while preserving both repository rules.
 - Default design is replacement of the Blazor Books UI, with public catalog/private list separation and ordinary routes as specified. React remains supported and unchanged.
 - Do not wait for RitzauDemo RBAC selection to implement the upstream UI; that is a downstream adaptation concern.
 - Do not dispatch a deployment as part of this work. Deployment authorization is separate if later requested.
@@ -341,5 +343,6 @@ The downstream port is a separate product PR under `Plans/InterviewCaseStarter.m
 | --- | --- | --- | --- |
 | U00 planning and baseline / [PR #454](https://github.com/Grumlebob/GrumPlates/pull/454) | `Plans/ReusableCrudUi.md` integrated as `b2dd255cea8c95f496b241b5517d246938e2d681` | Baseline, route, payload, and consumer inventory recorded; Markdown whitespace check passed | The UI path manifest awaits implementation. |
 | U01 private search prerequisite / [PR #454](https://github.com/Grumlebob/GrumPlates/pull/454) | PR head `48016999df1f68d339236480d859a114077a1553`; squash integrated on `origin/main` as `b2dd255cea8c95f496b241b5517d246938e2d681` | Full local gate passed; exact-head `build-test-push` run `42658249521` and CodeQL run `42658249876` passed; exact-main CI run `42661503975` and CodeQL run `42661504202` passed | Owner-scoped private search/pagination contract and endpoint are available for the Blazor list and downstream adaptation. |
+| U02–U10 implementation / [PR #455](https://github.com/Grumlebob/GrumPlates/pull/455) | Base `b2dd255cea8c95f496b241b5517d246938e2d681`; PR head `39349002c1008b5b9196ef8e5f9321272e4bb729`; squash-integrated on `origin/main` as `555cc103e33ae18838129cd79be8ec738a8a6d68`; deleted branch SHA `39349002c1008b5b9196ef8e5f9321272e4bb729` | Full local gate passed. Exact-head `build-test-push` [run 42683644193, attempt 1](https://github.com/Grumlebob/GrumPlates/actions/runs/42683644193) and CodeQL [run 42683644261, attempt 1](https://github.com/Grumlebob/GrumPlates/actions/runs/42683644261) passed. Exact-main `build-test-push` [run 42686724906, attempt 1](https://github.com/Grumlebob/GrumPlates/actions/runs/42686724906) and CodeQL [run 42686724951, attempt 1](https://github.com/Grumlebob/GrumPlates/actions/runs/42686724951) passed. | [RitzauDemo PR #19](https://github.com/Grumlebob/RitzauDemo/pull/19) records the complete R14 handoff and adaptation map; target integration is pending its enforced checks. |
 
 For each implementation PR, record exact head, local gate outcome, exact-head CI, main integration SHA, exact-main CI, and cleanup branch SHAs here or in the PR. Plan completion requires the new UI integrated on GrumPlates main, applicable checks green, dead presentation removed, minimal docs accurate, port manifest populated, and owned-resource closeout. RitzauDemo port completion is recorded in its own plan, not falsely claimed here.
