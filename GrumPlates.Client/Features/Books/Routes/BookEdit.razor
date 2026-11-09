@@ -1,0 +1,297 @@
+@page "/books/{Id:int}/edit"
+@attribute [Authorize]
+@implements IDisposable
+
+@inject IBooksApi Books
+@inject UserBookcaseState UserBooks
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@inject ILogger<BookEdit> Logger
+
+<PageTitle>Edit book</PageTitle>
+
+<main class="mx-auto max-w-2xl" data-testid="book-edit-page">
+    <a class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="@($"/books/{Id}")">← Back to book</a>
+    @if (_loading)
+    {
+        <p class="mt-5 rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-600" role="status">Loading book details...</p>
+    }
+    else if (_notFound)
+    {
+        <section class="mt-5 rounded-lg border border-gray-200 bg-white p-6">
+            <h1 class="text-2xl font-bold text-gray-900">Book not found</h1>
+            <p class="mt-2 text-sm text-gray-600">This book is unavailable in your account.</p>
+        </section>
+    }
+    else if (_model is not null)
+    {
+        <section class="mt-5 rounded-lg border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
+            <h1 class="text-2xl font-bold text-gray-900">Edit book</h1>
+            <p class="mt-2 text-sm text-gray-600">Update your book details.</p>
+            <div class="mt-6">
+                <BookForm Model="_model" SubmitLabel="Save changes" CancelHref="@($"/books/{Id}")" Error="@_error" IsBusy="_saving" OnValidSubmit="SaveAsync" />
+            </div>
+        </section>
+    }
+    else if (_error is not null)
+    {
+        <p class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@_error</p>
+    }
+</main>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private readonly CancellationTokenSource _lifetime = new();
+    private BookFormModel? _model;
+    private CancellationTokenSource? _activeLoad;
+    private CancellationTokenSource? _activeOperation;
+    private string? _loadedUserId;
+    private int _loadVersion;
+    private int _operationVersion;
+    private bool _loading = true;
+    private bool _notFound;
+    private bool _saving;
+    private bool _disposed;
+    private string? _error;
+
+    protected override void OnInitialized() =>
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        await LoadForIdentityAsync(GetUserKey(authenticationState.User));
+    }
+
+    private async Task LoadForIdentityAsync(string? userId)
+    {
+        CancelActiveLoad();
+        CancelActiveOperation();
+        var version = Interlocked.Increment(ref _loadVersion);
+        _loadedUserId = userId;
+        _loading = true;
+        _notFound = false;
+        _model = null;
+        _error = null;
+        _saving = false;
+
+        if (string.IsNullOrWhiteSpace(userId))
+        {
+            _loading = false;
+            return;
+        }
+
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeLoad = load;
+        try
+        {
+            var book = await Books.GetByIdAsync(new GetBookRequest { Id = Id }, load.Token);
+            var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!IsCurrentLoad(load, version) ||
+                !string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            if (book is null)
+            {
+                _notFound = true;
+                return;
+            }
+
+            _model = new BookFormModel
+            {
+                Title = book.Title,
+                Author = book.Author,
+                Url = book.Url
+            };
+        }
+        catch (OperationCanceledException) when (load.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (!IsCurrentLoad(load, version)) return;
+            Logger.LogWarning(ex, "Book edit form failed to load for book {BookId}", Id);
+            _error = "Book details could not be loaded. Please try again.";
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeLoad, load))
+            {
+                _activeLoad = null;
+                _loading = false;
+            }
+
+            load.Dispose();
+        }
+    }
+
+    private async Task SaveAsync(BookFormModel model)
+    {
+        if (!RendererInfo.IsInteractive || _saving || string.IsNullOrWhiteSpace(_loadedUserId)) return;
+        var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeOperation = operation;
+        var version = Interlocked.Increment(ref _operationVersion);
+        var userId = _loadedUserId;
+        _saving = true;
+        _error = null;
+        try
+        {
+            var success = await Books.UpdateAsync(new UpdateBookRequest
+            {
+                Id = Id,
+                Title = model.Title.Trim(),
+                Author = NormalizeOptional(model.Author),
+                Url = NormalizeOptional(model.Url)
+            }, operation.Token);
+
+            if (!IsCurrentOperation(operation, version)) return;
+
+            if (!success)
+            {
+                _error = "Book not found. Your changes were not saved.";
+                return;
+            }
+
+            var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            UserBooks.ApplySavedBook(new BookListItemResponse
+            {
+                Id = Id,
+                Title = model.Title.Trim(),
+                Author = NormalizeOptional(model.Author),
+                Url = NormalizeOptional(model.Url)
+            });
+            await UserBooks.LoadForCurrentUserAsync(operation.Token);
+            if (IsCurrentOperation(operation, version))
+            {
+                Nav.NavigateTo($"/books/{Id}");
+            }
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrentOperation(operation, version))
+            {
+                Logger.LogWarning(ex, "Book update failed for book {BookId}", Id);
+                _error = "The book could not be saved. Your entries are still here; please try again.";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeOperation, operation))
+            {
+                _activeOperation = null;
+                _saving = false;
+            }
+
+            operation.Dispose();
+        }
+    }
+
+    private bool IsCurrentLoad(CancellationTokenSource load, int version) =>
+        !load.IsCancellationRequested &&
+        version == Volatile.Read(ref _loadVersion) &&
+        ReferenceEquals(_activeLoad, load);
+
+    private bool IsCurrentOperation(CancellationTokenSource operation, int version) =>
+        !operation.IsCancellationRequested &&
+        version == Volatile.Read(ref _operationVersion) &&
+        ReferenceEquals(_activeOperation, operation);
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask) =>
+        _ = RefreshAfterAuthenticationChangeAsync(authenticationStateTask);
+
+    private async Task RefreshAfterAuthenticationChangeAsync(Task<AuthenticationState> authenticationStateTask)
+    {
+        try
+        {
+            var authenticationState = await authenticationStateTask;
+            var userId = GetUserKey(authenticationState.User);
+            if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await InvokeAsync(async () =>
+            {
+                if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                _loadedUserId = userId;
+                _model = null;
+                _notFound = false;
+                _error = null;
+                _saving = false;
+                _loading = !string.IsNullOrWhiteSpace(userId);
+                CancelActiveLoad();
+                CancelActiveOperation();
+                Interlocked.Increment(ref _loadVersion);
+                StateHasChanged();
+
+                if (!string.IsNullOrWhiteSpace(userId))
+                {
+                    await LoadForIdentityAsync(userId);
+                    if (!_disposed)
+                    {
+                        StateHasChanged();
+                    }
+                }
+            });
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+        }
+    }
+
+    private static string? GetUserKey(ClaimsPrincipal user) =>
+        user.Identity?.IsAuthenticated == true
+            ? user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value ?? user.Identity.Name
+            : null;
+
+    private void CancelActiveLoad()
+    {
+        var load = _activeLoad;
+        _activeLoad = null;
+        load?.Cancel();
+    }
+
+    private void CancelActiveOperation()
+    {
+        var operation = _activeOperation;
+        _activeOperation = null;
+        if (operation is not null)
+        {
+            Interlocked.Increment(ref _operationVersion);
+            operation.Cancel();
+        }
+    }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    public void Dispose()
+    {
+        _disposed = true;
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+        _lifetime.Cancel();
+        Interlocked.Increment(ref _loadVersion);
+        CancelActiveLoad();
+        CancelActiveOperation();
+        _lifetime.Dispose();
+    }
+}

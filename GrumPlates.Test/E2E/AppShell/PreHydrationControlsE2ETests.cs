@@ -10,11 +10,11 @@ namespace GrumPlates.Test.E2E.AppShell;
 [Collection(TestCollectionNames.E2E)]
 public sealed class PreHydrationControlsE2ETests : BlazorE2ETestBase
 {
-    private const string CreateBookPath = "/books?bookMode=create";
+    private const string CreateBookPath = "/books/new";
 
     [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
     [Trait("Category", "E2E")]
-    public async Task BookEditorSave_IsDisabledBeforeHydrationAndEnabledAfterwards()
+    public async Task BookCreateSave_IsDisabledBeforeHydrationAndEnabledAfterwards()
     {
         await RunWithFailureScreenshotAsync(async () =>
         {
@@ -47,7 +47,7 @@ public sealed class PreHydrationControlsE2ETests : BlazorE2ETestBase
             }
 
             await ReloadAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("book-form")).ToBeVisibleAsync();
             await Expect(Page.GetByTestId("book-save")).ToBeEnabledAsync();
         });
     }

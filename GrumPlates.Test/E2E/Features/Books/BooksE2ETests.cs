@@ -9,64 +9,83 @@ public sealed class BooksE2ETests : BlazorE2ETestBase
 {
     [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
     [Trait("Category", "E2E")]
-    public async Task Books_CanCreateViewEditCancelAndNavigateBack()
+    public async Task Books_PublicCatalogAndPrivateCrudUseRoutablePages()
     {
         await RunWithFailureScreenshotAsync(async () =>
         {
+            await Page.SetViewportSizeAsync(1440, 900);
             await GoHomeAndWaitForInteractivityAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Books", Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("author-book-list").GetByRole(AriaRole.Article).First).ToBeVisibleAsync();
+            await AssertNoPageHorizontalOverflowAsync("anonymous Books page at 1440px");
             await Page.SetViewportSizeAsync(390, 844);
-            await Page.GetByTestId("nav-toggle").ClickAsync();
-            await Page.GetByTestId("nav-toggle").ClickAsync();
-            await Page.SetViewportSizeAsync(1280, 900);
-            await GoToAsync("/Account/Login");
-            await Expect(Page.Locator("#Input\\.Email")).ToBeVisibleAsync();
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await ClickVisibleAuthorBookAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Expect(Page.GetByTestId("book-edit-pencil")).ToHaveCountAsync(0);
-            await Expect(Page.GetByTestId("book-modal")).ToBeFocusedAsync();
-            await Page.GetByTestId("book-modal").PressAsync("Escape");
-            await Expect(Page.GetByTestId("book-modal")).ToHaveCountAsync(0);
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await ClickVisibleAuthorBookAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await GoToAsync("/books?authorBookId=99999999&bookMode=view");
-            await Expect(Page.GetByText("Book not found.")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await Expect(Page.GetByTestId("bookcase-login-cta")).ToContainTextAsync("Create your own bookcase by logging in.");
+            await Expect(Page.GetByTestId("private-books-sign-in")).ToContainTextAsync("Sign in to create, edit, and remove books");
             await Expect(Page.GetByTestId("add-book")).ToHaveCountAsync(0);
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
+            await Expect(Page.GetByTestId("user-book-list")).ToHaveCountAsync(0);
+            await AssertNoPageHorizontalOverflowAsync("anonymous Books page at 390px");
 
-            var suffix = Guid.NewGuid().ToString("N")[..8];
-            var title = $"E2E Book {suffix}";
-            var updatedTitle = $"E2E Book Updated {suffix}";
-            var author = $"E2E Author {suffix}";
-            var url = $"https://example.test/books/{suffix}";
+            var publicSearch = Page.GetByTestId("author-book-search");
+            await publicSearch.FillAsync("no-public-book-matches-this-text");
+            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Search", Exact = true }).ClickAsync();
+            await Expect(Page.GetByTestId("author-book-no-results")).ToBeVisibleAsync();
+            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Clear", Exact = true }).ClickAsync();
+            await Expect(Page.GetByTestId("author-book-list").GetByRole(AriaRole.Article).First).ToBeVisibleAsync();
 
-            TrackCreatedBook(title, url);
-            TrackCreatedBook(updatedTitle, url);
+            var publicBookLink = Page.GetByTestId("author-book-list").GetByRole(AriaRole.Link).First;
+            await publicBookLink.ClickAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
+            var publicTitle = await Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Level = 1 }).InnerTextAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = publicTitle, Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Edit book" })).ToHaveCountAsync(0);
+            await Expect(Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Delete book" })).ToHaveCountAsync(0);
+            await Expect(Page.GetByText("Not provided", new PageGetByTextOptions { Exact = true })).ToBeVisibleAsync();
+            Assert.Contains("/books/catalog/", new Uri(Page.Url).AbsolutePath, StringComparison.Ordinal);
+            await Page.ReloadAsync(new PageReloadOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
+            await Page.GoBackAsync();
+            await Expect(Page.GetByTestId("author-book-list")).ToBeVisibleAsync();
 
+            await GoToAsync("/books/author/ship");
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
+            Assert.Contains("/books/catalog/", new Uri(Page.Url).AbsolutePath, StringComparison.Ordinal);
+
+            await GoHomeAndWaitForInteractivityAsync();
+            await Page.GetByTestId("private-books-sign-in").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Sign in" }).ClickAsync();
+            await Expect(Page.Locator("#Input\\.Email")).ToBeVisibleAsync();
+            Assert.Contains("returnUrl=%2Fbooks", Page.Url, StringComparison.Ordinal);
+
+            await GoToAsync("/books/new");
+            await Expect(Page.Locator("#Input\\.Email")).ToBeVisibleAsync();
+            await Page.SetViewportSizeAsync(1440, 900);
             await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Your books" })).ToBeVisibleAsync();
             await Expect(Page.GetByTestId("add-book")).ToBeVisibleAsync();
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
+            await AssertNoPageHorizontalOverflowAsync("signed-in Books page at 1440px");
+            await Page.SetViewportSizeAsync(390, 844);
+
+            var suffix = Guid.NewGuid().ToString("N")[..8];
+            var longTitle = string.Join(' ', Enumerable.Repeat("Long descriptive book title", 5));
+            var title = $"E2E Book {suffix} {longTitle}";
+            var updatedTitle = $"E2E Book Updated {suffix} {longTitle}";
+            TrackCreatedBook(title);
+            TrackCreatedBook(updatedTitle);
 
             await Page.GetByTestId("add-book").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("book-form")).ToBeVisibleAsync();
             await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(string.Empty);
             await Expect(Page.GetByTestId("book-author")).ToHaveValueAsync(string.Empty);
             await Expect(Page.GetByTestId("book-url")).ToHaveValueAsync(string.Empty);
+            await Page.GetByTestId("book-title").FillAsync(string.Empty);
+            await Page.GetByTestId("book-save").ClickAsync();
+            await Expect(Page.GetByTestId("book-form").GetByText("The Title field is required.").First).ToBeVisibleAsync();
             await Page.GetByTestId("book-title").FillAsync(title);
-            await Page.GetByTestId("book-author").FillAsync(author);
-            await Page.GetByTestId("book-url").FillAsync(url);
+            await Page.GetByTestId("book-url").FillAsync("not a URL");
+            await Page.GetByTestId("book-save").ClickAsync();
+            await Expect(Page.GetByTestId("book-form").GetByText("URL must be an absolute HTTP or HTTPS URL.").First).ToBeVisibleAsync();
+            await Page.GetByTestId("book-url").FillAsync(string.Empty);
 
-            await SkipIfBrowserApiRequestsAreNotObservableAsync("Book modal save-failure checks");
+            await SkipIfBrowserApiRequestsAreNotObservableAsync("Book create failure and retry checks");
             var failNextCreate = true;
             await Page.RouteAsync("**/api/books", async route =>
             {
@@ -84,270 +103,126 @@ public sealed class BooksE2ETests : BlazorE2ETestBase
 
                 await route.ContinueAsync();
             });
-            await Page.GetByTestId("book-save").ClickAsync();
-            await Expect(Page.GetByText("Book could not be saved.")).ToBeVisibleAsync();
+            await Page.GetByTestId("book-url").PressAsync("Enter");
+            await Expect(Page.GetByTestId("book-save-error")).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(title);
             await Page.UnrouteAsync("**/api/books");
             await Page.GetByTestId("book-save").ClickAsync();
 
-            var bookLink = UserBookLink(title);
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByText("Not listed", new PageGetByTextOptions { Exact = true })).ToBeVisibleAsync();
+            await Expect(Page.GetByText("Not provided", new PageGetByTextOptions { Exact = true })).ToBeVisibleAsync();
+            await Page.SetViewportSizeAsync(1440, 900);
+            await AssertNoPageHorizontalOverflowAsync("private book details at 1440px");
+            await Page.SetViewportSizeAsync(390, 844);
+            await ReloadAndWaitForInteractivityAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Back to your books" }).ClickAsync();
+
+            var bookLink = PrivateBookLink(title);
             await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByTestId("user-book-empty-state")).ToHaveCountAsync(0);
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
+
+            var privateSearch = Page.GetByTestId("user-book-search");
+            var privateSearchButton = Page.GetByTestId("user-books-panel").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Search", Exact = true });
+            await privateSearch.FillAsync("no-private-book-matches-this-text");
+            await privateSearchButton.ClickAsync();
+            await Expect(Page.GetByTestId("user-book-empty-state")).ToContainTextAsync("No books match that search.");
+            await privateSearch.FillAsync($"E2E Book {suffix}");
+            await privateSearchButton.ClickAsync();
+            await Expect(PrivateBookLink(title)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Page.GetByTestId("user-books-panel").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Clear", Exact = true }).ClickAsync();
+            await Expect(PrivateBookLink(title)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
 
             await ReloadAndWaitForInteractivityAsync();
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByTestId("user-book-empty-state")).ToHaveCountAsync(0);
+            await Expect(PrivateBookLink(title)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
 
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Expect(Page.GetByTestId("book-page-view").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = title }))
-                .ToBeVisibleAsync();
+            await PrivateBookLink(title).ClickAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
             await Page.GoBackAsync();
-            await Expect(bookLink).ToBeVisibleAsync();
+            await Expect(PrivateBookLink(title)).ToBeVisibleAsync();
 
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(bookLink).ToBeVisibleAsync();
-
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Expect(Page.GetByTestId("book-page-view").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = title }))
-                .ToBeVisibleAsync();
-            await Expect(Page.GetByTestId("book-url-link")).ToContainTextAsync("Go to site");
-            await Expect(Page.GetByTestId("book-edit-pencil")).ToBeVisibleAsync();
-            await Expect(Page.GetByText("Author:")).ToHaveCountAsync(0);
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(bookLink).ToBeVisibleAsync();
-
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = title }))
-                .ToBeVisibleAsync();
-            await Page.GetByTestId("book-edit-pencil").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await PrivateBookLink(title).ClickAsync();
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Edit book" }).ClickAsync();
+            await Expect(Page.GetByTestId("book-edit-page")).ToBeVisibleAsync();
+            await Page.SetViewportSizeAsync(1440, 900);
+            await AssertNoPageHorizontalOverflowAsync("book edit form at 1440px");
+            await Page.SetViewportSizeAsync(390, 844);
             await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(title);
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(bookLink).ToBeVisibleAsync();
+            await Page.GetByTestId("book-title").FillAsync($"Canceled {title}");
+            await Page.GetByTestId("book-cancel").ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true })).ToBeVisibleAsync();
 
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = title }))
-                .ToBeVisibleAsync();
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(bookLink).ToBeVisibleAsync();
-
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-
-            await bookLink.ClickAsync();
-            await Page.GetByTestId("book-edit-pencil").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Edit book" }).ClickAsync();
             await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(title);
             await Page.GetByTestId("book-title").FillAsync(updatedTitle);
             await Page.GetByTestId("book-save").ClickAsync();
-            var updatedBookLink = UserBookLink(updatedTitle);
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = updatedTitle, Exact = true }))
+                .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
 
-            await ReloadAndWaitForBooksDocumentAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByTestId("user-book-empty-state")).ToHaveCountAsync(0);
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
-
+            await Page.SetViewportSizeAsync(1440, 900);
+            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Logout", Exact = true }).ClickAsync();
+            await Expect(Page.GetByTestId("private-books-sign-in")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Expect(Page.GetByTestId("user-book-list")).ToHaveCountAsync(0);
+            await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await updatedBookLink.ClickAsync();
-            await Page.GetByTestId("book-edit-pencil").ClickAsync();
-            await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(updatedTitle);
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync();
+            await Expect(PrivateBookLink(updatedTitle)).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await PrivateBookLink(updatedTitle).ClickAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Page.SetViewportSizeAsync(390, 844);
 
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await updatedBookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-
-            await Page.GetByTestId("book-delete").ClickAsync();
-            await Expect(Page.GetByTestId("book-delete-confirm")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-delete-cancel").ClickAsync();
-            await Expect(Page.GetByTestId("book-delete-confirm")).ToHaveCountAsync(0);
-            await Expect(updatedBookLink).ToBeVisibleAsync();
-            await Page.GetByTestId("book-delete").ClickAsync();
-            await Expect(Page.GetByTestId("book-delete-confirm")).ToBeVisibleAsync();
+            var deleteRequestCount = 0;
+            var failNextDelete = true;
             await Page.RouteAsync("**/api/books/*", async route =>
             {
                 if (route.Request.Method == "DELETE")
                 {
-                    await route.FulfillAsync(new RouteFulfillOptions
+                    deleteRequestCount++;
+                    if (failNextDelete)
                     {
-                        Status = 500,
-                        ContentType = "application/problem+json",
-                        Body = "{\"title\":\"Synthetic delete failure\"}"
-                    });
-                    return;
+                        failNextDelete = false;
+                        await route.FulfillAsync(new RouteFulfillOptions
+                        {
+                            Status = 500,
+                            ContentType = "application/problem+json",
+                            Body = "{\"title\":\"Synthetic delete failure\"}"
+                        });
+                        return;
+                    }
                 }
 
                 await route.ContinueAsync();
             });
-            await Page.GetByTestId("book-delete-confirm").ClickAsync();
-            await Expect(Page.GetByTestId("book-operation-error")).ToContainTextAsync("Book could not be deleted.");
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Page.UnrouteAsync("**/api/books/*");
-            await Page.GetByTestId("book-delete-confirm").ClickAsync();
-            await Expect(updatedBookLink).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 30_000 });
-            await ReloadAndWaitForBooksDocumentAsync();
-            await Expect(updatedBookLink).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 30_000 });
 
-            await GoToAsync("/books?bookId=99999999&bookMode=view");
-            await Expect(Page.GetByText("Book not found.")).ToBeVisibleAsync();
-        });
-    }
-
-    [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
-    [Trait("Category", "E2E")]
-    public async Task AuthorBookcase_AllAuthorBooksCanOpenOnMobile()
-    {
-        await RunWithFailureScreenshotAsync(async () =>
-        {
+            await Page.GetByTestId("book-delete-request").ClickAsync();
+            await Expect(Page.GetByTestId("book-delete-confirmation")).ToContainTextAsync(updatedTitle);
+            await Page.SetViewportSizeAsync(1440, 900);
+            await AssertNoPageHorizontalOverflowAsync("delete confirmation at 1440px");
             await Page.SetViewportSizeAsync(390, 844);
-            await GoHomeAndWaitForInteractivityAsync();
+            Assert.Equal(0, deleteRequestCount);
+            await Page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Cancel", Exact = true }).ClickAsync();
+            await Expect(Page.GetByTestId("book-delete-confirmation")).ToHaveCountAsync(0);
+            Assert.Equal(0, deleteRequestCount);
 
-            var viewport = Page.GetByTestId("author-bookcase-viewport");
-            await Expect(viewport).ToBeVisibleAsync();
-            var overflowX = await viewport.EvaluateAsync<string>("element => getComputedStyle(element).overflowX");
-            Assert.Equal("auto", overflowX);
-            var isScrollable = await viewport.EvaluateAsync<bool>("element => element.scrollWidth > element.clientWidth");
-            Assert.True(isScrollable);
-            var touchAction = await viewport.EvaluateAsync<string>("element => getComputedStyle(element).touchAction");
-            Assert.Equal("manipulation", touchAction);
-
-            var track = Page.GetByTestId("author-bookcase-track");
-            var animationName = await track.EvaluateAsync<string>("element => getComputedStyle(element).animationName");
-            Assert.Equal("none", animationName);
-
-            var books = Page.GetByTestId("author-bookcase-book");
-            var count = await books.CountAsync();
-            Assert.True(count > 0);
-
-            for (var index = 0; index < count; index++)
-            {
-                await GoHomeAndWaitForInteractivityAsync();
-                var book = Page.GetByTestId("author-bookcase-book").Nth(index);
-                var label = await book.GetAttributeAsync("aria-label") ?? $"author book {index + 1}";
-
-                await book.ClickAsync();
-
-                await Expect(Page.GetByTestId("book-page-view"), $"Expected {label} to open.")
-                    .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-                await Expect(Page.GetByText("Book not found.")).ToHaveCountAsync(0);
-            }
-
-            await GoHomeAndWaitForInteractivityAsync();
-            viewport = Page.GetByTestId("author-bookcase-viewport");
-            await viewport.EvaluateAsync("element => { element.scrollLeft = element.scrollWidth; }");
-            await Page.GetByTestId("author-bookcase-book").Last.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view"), "Expected the last author book to open after manual mobile shelf scrolling.")
-                .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByText("Book not found.")).ToHaveCountAsync(0);
-        });
-    }
-
-    [Fact(Skip = "Set RUN_E2E=1 to run Playwright E2E tests.", SkipUnless = nameof(E2ETestGuard.IsEnabled), SkipType = typeof(E2ETestGuard))]
-    [Trait("Category", "E2E")]
-    public async Task SeededUser_BookcaseCrudSurvivesRefreshAndNavigation()
-    {
-        await RunWithFailureScreenshotAsync(async () =>
-        {
-            var suffix = Guid.NewGuid().ToString("N")[..8];
-            var title = $"E2E Book Seeded {suffix}";
-            var updatedTitle = $"E2E Book Updated Seeded {suffix}";
-            var author = $"E2E Author Seeded {suffix}";
-            var url = $"https://example.test/books/{suffix}";
-
-            TrackCreatedBook(title, url);
-            TrackCreatedBook(updatedTitle, url);
-
-            await SignInAsSeededUserAsync();
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
-            await Expect(Page.GetByTestId("add-book")).ToBeVisibleAsync();
-
-            await Page.GetByTestId("add-book").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-title").FillAsync(title);
-            await Page.GetByTestId("book-author").FillAsync(author);
-            await Page.GetByTestId("book-url").FillAsync(url);
-            await Page.GetByTestId("book-save").ClickAsync();
-
-            var bookLink = UserBookLink(title);
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByTestId("user-book-empty-state")).ToHaveCountAsync(0);
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
-
-            await ReloadAndWaitForInteractivityAsync();
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-
-            await GoToAsync("/Account/Manage");
-            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Profile" }))
-                .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-
-            await bookLink.ClickAsync();
-            await Page.GetByTestId("book-edit-pencil").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
-            await Page.GetByTestId("book-title").FillAsync(updatedTitle);
-            await Page.GetByTestId("book-save").ClickAsync();
-
-            var updatedBookLink = UserBookLink(updatedTitle);
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await ReloadAndWaitForBooksDocumentAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await Expect(Page.GetByText("Saved books")).ToHaveCountAsync(0);
-
-            await GoHomeAndWaitForInteractivityAsync();
-            await Expect(updatedBookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await updatedBookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-
-            await Page.GetByTestId("book-delete").ClickAsync();
-            await Expect(Page.GetByTestId("book-delete-confirm")).ToBeVisibleAsync();
+            await Page.GetByTestId("book-delete-request").ClickAsync();
             await Page.GetByTestId("book-delete-confirm").ClickAsync();
-            await Expect(updatedBookLink).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 30_000 });
-            await ReloadAndWaitForBooksDocumentAsync();
-            await Expect(updatedBookLink).ToBeHiddenAsync(new LocatorAssertionsToBeHiddenOptions { Timeout = 30_000 });
+            await Expect(Page.GetByTestId("book-operation-error")).ToContainTextAsync("could not be deleted");
+            Assert.Equal(1, deleteRequestCount);
+
+            await Page.GetByTestId("book-delete-request").ClickAsync();
+            await Page.GetByTestId("book-delete-confirm").ClickAsync();
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Your books" }))
+                .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Page.UnrouteAsync("**/api/books/*");
+            await ReloadAndWaitForInteractivityAsync();
+            await Expect(PrivateBookLink(updatedTitle)).ToHaveCountAsync(0);
+
+            await GoToAsync("/books/99999999");
+            await Expect(Page.GetByTestId("user-book-not-found")).ToBeVisibleAsync();
+            await AssertNoPageHorizontalOverflowAsync("private Books page at 390px");
         });
     }
 
-    private ILocator UserBookLink(string title) =>
-        Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = $"{title} details" }).First;
-
-    private async Task ClickVisibleAuthorBookAsync()
-    {
-        var books = Page.GetByTestId("author-bookcase-book");
-        var count = await books.CountAsync();
-        for (var index = 0; index < count; index++)
-        {
-            var book = books.Nth(index);
-            var isVisibleInViewport = await book.EvaluateAsync<bool>(
-                "element => { const rect = element.getBoundingClientRect(); return rect.width > 0 && rect.height > 0 && rect.right > 0 && rect.left < window.innerWidth && rect.bottom > 0 && rect.top < window.innerHeight; }");
-
-            if (isVisibleInViewport)
-            {
-                // The author shelf self-scrolls until hovered; hover first so the click target is stable.
-                await book.HoverAsync(new LocatorHoverOptions { Force = true });
-                await book.ClickAsync();
-                return;
-            }
-        }
-
-        throw new InvalidOperationException("No visible author book was available to click.");
-    }
-
-    private async Task ReloadAndWaitForBooksDocumentAsync()
-    {
-        await Page.ReloadAsync(new PageReloadOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
-        await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-    }
+    private ILocator PrivateBookLink(string title) =>
+        Page.GetByTestId("user-book-list").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = title, Exact = true });
 }

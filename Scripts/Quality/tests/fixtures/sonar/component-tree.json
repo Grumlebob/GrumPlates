@@ -3,9 +3,9 @@
   "baseComponent": {"key": "grumplates-abc12345-BlazorAuto", "name": "BlazorAuto", "qualifier": "TRK", "measures": []},
   "components": [
     {
-      "key": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs",
-      "name": "BookCoverGeometry.cs", "qualifier": "FIL",
-      "path": "GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs", "language": "cs",
+      "key": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookForm.razor",
+      "name": "BookForm.razor", "qualifier": "FIL",
+      "path": "GrumPlates.Client/Features/Books/Shared/BookForm.razor", "language": "cs",
       "measures": [
         {"metric": "ncloc", "value": "1813"}, {"metric": "cognitive_complexity", "value": "478"},
         {"metric": "coverage", "value": "58.5"}, {"metric": "lines_to_cover", "value": "900"},
@@ -14,9 +14,9 @@
       ]
     },
     {
-      "key": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookCoverRenderer.razor",
-      "name": "BookCoverRenderer.razor", "qualifier": "FIL",
-      "path": "GrumPlates.Client/Features/Books/Shared/BookCoverRenderer.razor", "language": "cs",
+      "key": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Routes/BookCreate.razor",
+      "name": "BookCreate.razor", "qualifier": "FIL",
+      "path": "GrumPlates.Client/Features/Books/Routes/BookCreate.razor", "language": "cs",
       "measures": [{"metric": "ncloc", "value": "84"}, {"metric": "cognitive_complexity", "value": "14"}]
     },
     {

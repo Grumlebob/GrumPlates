@@ -1,0 +1,96 @@
+@page "/books/catalog/{Id:int}"
+@implements IDisposable
+
+@inject IAuthorBooksApi AuthorBooks
+@inject ILogger<AuthorBookDetails> Logger
+
+<PageTitle>@(_book?.Title ?? "Public book")</PageTitle>
+
+<div data-testid="author-book-details-page">
+    @if (_loading)
+    {
+        <main class="mx-auto max-w-3xl">
+            <a class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="/books">← Back to catalog</a>
+            <p class="mt-5 rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-600" role="status">Loading book details...</p>
+        </main>
+    }
+    else if (_notFound)
+    {
+        <main class="mx-auto max-w-3xl">
+            <a class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="/books">← Back to catalog</a>
+            <div class="mt-5 rounded-md border border-gray-200 bg-white p-6" data-testid="catalog-book-not-found">
+                <h1 class="text-2xl font-bold text-gray-900">Public book not found</h1>
+                <p class="mt-2 text-sm text-gray-600">This public catalog entry is unavailable.</p>
+            </div>
+        </main>
+    }
+    else if (_error is not null)
+    {
+        <main class="mx-auto max-w-3xl">
+            <a class="text-sm font-semibold text-blue-700 underline underline-offset-2 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="/books">← Back to catalog</a>
+            <p class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@_error</p>
+        </main>
+    }
+    else if (_book is not null)
+    {
+        <BookDetailsView Title="@_book.Title"
+                         Author="@_book.Author"
+                         Url="@_book.Url"
+                         BackHref="/books"
+                         BackLabel="Back to catalog"
+                         ContextLabel="Public catalog" />
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private GetAuthorBookResponse? _book;
+    private CancellationTokenSource? _loadCancellation;
+    private int _loadVersion;
+    private bool _loading = true;
+    private bool _notFound;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+        _loadCancellation = new CancellationTokenSource();
+        var cancellationToken = _loadCancellation.Token;
+        var version = Interlocked.Increment(ref _loadVersion);
+        _loading = true;
+        _notFound = false;
+        _error = null;
+        _book = null;
+
+        try
+        {
+            var book = await AuthorBooks.GetByIdAsync(new GetAuthorBookRequest { Id = Id }, cancellationToken);
+            if (version != Volatile.Read(ref _loadVersion)) return;
+            _book = book;
+            _notFound = book is null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (version != Volatile.Read(ref _loadVersion)) return;
+            Logger.LogWarning(ex, "Public book details failed to load for book {BookId}", Id);
+            _error = "Book details could not be loaded. Please try again.";
+        }
+        finally
+        {
+            if (version == Volatile.Read(ref _loadVersion)) _loading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        Interlocked.Increment(ref _loadVersion);
+        _loadCancellation?.Cancel();
+        _loadCancellation?.Dispose();
+    }
+}

@@ -23,7 +23,7 @@ Books deliberately consumes Accounts' current-user abstraction and protected end
 
 React's generated-client factory and result helper are neutral transport operations in `app/api/api-client.ts` and `app/api/api-result.ts`. Public catalog requests explicitly omit credentials. Private features use the Accounts-decorated provider client with its session, captured-owner, cancellation and antiforgery behavior. Keep generated schemas in sync through the [documented generation workflow](Frontend/React.md#change-a-typed-public-feature).
 
-The Blazor book modal has one component-owned `BookModalLifecycle` for loading, editor/operation state, cancellation and stale-completion checks. `BookModalHost` retains rendering, route parsing, navigation subscription, focus, Escape handling and disposal. It constructs the lifecycle for its own instance; the lifecycle is not a shared DI service. Existing Books API implementations and `UserBookcaseState` remain their own owners.
+The Blazor Books UI uses ordinary routes for the public catalog and private list, details, create, and edit flows. `BookForm` is shared by create and edit; `BookDetailsView` is shared by public and private details. Public and private list state remain separate, and private state clears and reloads when the authenticated identity changes. Components use the existing Books API contracts and feature state rather than issuing raw HTTP requests.
 
 ## Verification boundaries
 

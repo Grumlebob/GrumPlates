@@ -106,7 +106,7 @@ Complete each packet's verification before checking it off. Record PR/head/integ
 - [x] Inventory current Books routes, navigation links, API contracts, test selectors, client/server DI registrations, and relevant assets.
 - [x] Record any source differences from section 2. Do not restore the inspected SHA over newer work.
 
-Exit: explicit current base and a list of exact consumers to update. Current base: `de6cfaec8d86373e14fee7a912122e815ddf4ce0`; the source SHA in section 2 remains the same through the Books feature. Open PRs 451–453 all target `main`; none depends on this work. Primary checkout has only the original untracked plan plus ignored local inputs. Implementation is isolated in branch `task/reusable-crud-ui-20261109` in a sibling task worktree.
+Exit: explicit current base and a list of exact consumers to update. The implementation branch started from `origin/main` at `b2dd255cea8c95f496b241b5517d246938e2d681`, after the separately reviewed private search prerequisite. The source SHA in section 2 remains a historical baseline through the Books feature. At kickoff, open PRs 451–453 targeted `main` and none depended on this work. The original untracked plan in the primary checkout was preserved. Implementation is isolated in branch `task/reusable-crud-ui-implementation-20261109` in a sibling task worktree.
 
 ### U01 — Record the UI replacement and deletion map
 
@@ -116,96 +116,96 @@ Exit: explicit current base and a list of exact consumers to update. Current bas
 - [x] Inspect list payload behavior and decide whether local search is valid for the bounded sample. Keep a server search prerequisite separate if needed.
 - [x] Put the compact path mapping and any justified route change in the implementation PR, not a new permanent design manual.
 
-Exit: a markup rewrite cannot silently discard behavior, and all planned deletions have a consumer check. `/books/new` does not collide with `/books/{id:int}`, and `/books/catalog/{id:int}` does not collide with the private integer route. `/books/author/{SeedKey}` has no in-repository Blazor navigation consumer; retain a bounded redirect to the new catalog details route while removing its modal target. `BooksServerService` loads every private row with `ToListAsync` and has no record or payload bound, while private CRUD can grow that collection; client-only search is therefore not a safe substitute for pagination. Before the UI packet, add a separately reviewed, owner-scoped search/pagination API on the existing `/api/books` resource, with per-query cache keys and existing owner-list invalidation tags. The static public author catalog has six seeded entries and can use local filtering.
+Exit: a markup rewrite cannot silently discard behavior, and all planned deletions have a consumer check. `/books/new` does not collide with `/books/{id:int}`, and `/books/catalog/{id:int}` does not collide with the private integer route. `/books/author/{SeedKey}` has no in-repository Blazor navigation consumer; retain a bounded redirect to the new catalog details route while removing its modal target. `BooksServerService` loads every private row with `ToListAsync` and has no record or payload bound, while private CRUD can grow that collection; client-only search is therefore not a safe substitute for pagination. The separately reviewed, owner-scoped search/pagination API is integrated on the existing `/api/books` resource with per-query cache keys and existing owner-list invalidation tags. The static public author catalog has six seeded entries and can use local filtering.
 
 ### U02 — Decouple list state from shelf geometry
 
-- [ ] Expose current contract DTOs or a small concrete row model from private/public list state instead of requiring `BookcaseBook`/`ShelfBooks` for every view.
-- [ ] Keep user identity/version checks, error handling, cancellation, and mutation refresh behavior.
-- [ ] Update state tests to assert records, ownership/identity transitions, and stale result rejection rather than cover layout.
-- [ ] Keep existing UI working while the branch introduces these state changes; do not leave broken consumers between commits intended for review.
+- [x] Expose current contract DTOs or a small concrete row model from private/public list state instead of requiring `BookcaseBook`/`ShelfBooks` for every view.
+- [x] Keep user identity/version checks, error handling, cancellation, and mutation refresh behavior.
+- [x] Update state tests to assert records, ownership/identity transitions, and stale result rejection rather than cover layout.
+- [x] Keep existing UI working while the branch introduces these state changes; do not leave broken consumers between commits intended for review.
 
 Exit: a normal row component can consume list state without cover geometry or a generic mapper framework.
 
 ### U03 — Implement the public catalog list and details
 
-- [ ] Add concrete list-row/detail components or pages under `Features/Books`; keep routes under `Routes`.
-- [ ] Implement public catalog list, labeled search, clear filter, no-results/empty/error/loading states, and normal detail links.
-- [ ] Add `/books/catalog/{id:int}` details using `IAuthorBooksApi`. Handle missing IDs and failed loads without showing edit/delete actions.
-- [ ] Verify anonymous SSR includes useful public content and no private data. Keep hydration controls disabled as required.
-- [ ] Verify both wide and narrow layouts with long titles, missing author, and absent URL.
+- [x] Add concrete list-row/detail components or pages under `Features/Books`; keep routes under `Routes`.
+- [x] Implement public catalog list, labeled search, clear filter, no-results/empty/error/loading states, and normal detail links.
+- [x] Add `/books/catalog/{id:int}` details using `IAuthorBooksApi`. Handle missing IDs and failed loads without showing edit/delete actions.
+- [x] Verify anonymous SSR includes useful public content and no private data. Keep hydration controls disabled as required.
+- [x] Verify both wide and narrow layouts with long titles, missing author, and absent URL.
 
 Exit: public browsing works without shelf rendering or query modals.
 
 ### U04 — Implement the private list and details
 
-- [ ] Add private own-books rows and actions through `IBooksApi`/feature state; add `/books/{id:int}` details.
-- [ ] Add authorization to private routes and preserve secure return navigation for sign-in.
-- [ ] Make signed-out/private-loading/error/empty/no-match states distinct. Do not flash the previous user's list after logout/login.
-- [ ] Keep explicit edit links and prepare inline deletion state without executing deletes yet.
-- [ ] Verify owner-visible rows, another user's not-found response, direct route refresh, and Back navigation.
+- [x] Add private own-books rows and actions through `IBooksApi`/feature state; add `/books/{id:int}` details.
+- [x] Add authorization to private routes and preserve secure return navigation for sign-in.
+- [x] Make signed-out/private-loading/error/empty/no-match states distinct. Do not flash the previous user's list after logout/login.
+- [x] Keep explicit edit links and prepare inline deletion state without executing deletes yet.
+- [x] Verify owner-visible rows, another user's not-found response, direct route refresh, and Back navigation.
 
 Exit: authenticated reading works in direct server and browser execution paths.
 
 ### U05 — Implement a normal create form
 
-- [ ] Add `/books/new` and a concrete reusable `BookForm.razor` using current DTO validation and normal form semantics.
-- [ ] Add proper labels, field messages, validation summary, Save/Cancel controls, and busy/interactivity gating.
-- [ ] Submit through current contracts. Retain entered values and show a bounded useful error if a request fails.
-- [ ] On success refresh own-book state and navigate predictably to the created detail or list; choose one behavior and use it consistently.
-- [ ] Verify valid create/reload, invalid title/URL, keyboard submit, cancel without mutation, and retry after a save failure.
+- [x] Add `/books/new` and a concrete reusable `BookForm.razor` using current DTO validation and normal form semantics.
+- [x] Add proper labels, field messages, validation summary, Save/Cancel controls, and busy/interactivity gating.
+- [x] Submit through current contracts. Retain entered values and show a bounded useful error if a request fails.
+- [x] On success refresh own-book state and navigate predictably to the created detail or list; choose one behavior and use it consistently.
+- [x] Verify valid create/reload, invalid title/URL, keyboard submit, cancel without mutation, and retry after a save failure.
 
 Exit: create no longer requires the illustrated editor or modal lifecycle.
 
 ### U06 — Implement edit and delete confirmation
 
-- [ ] Add `/books/{id:int}/edit`, load only the current user's record, and reuse `BookForm` with an independent edit model.
-- [ ] Cancel does not mutate cached/list DTO instances. A failed save leaves the user's form input intact.
-- [ ] Add explicit inline delete confirmation with title, Cancel, and busy state. Do not send a delete on the first request-to-delete click.
-- [ ] Handle a record deleted elsewhere, denied operation, and API failure without reporting false success.
-- [ ] Refresh state after update/delete and verify cache-backed normal reads display the changes.
+- [x] Add `/books/{id:int}/edit`, load only the current user's record, and reuse `BookForm` with an independent edit model.
+- [x] Cancel does not mutate cached/list DTO instances. A failed save leaves the user's form input intact.
+- [x] Add explicit inline delete confirmation with title, Cancel, and busy state. Do not send a delete on the first request-to-delete click.
+- [x] Handle a record deleted elsewhere, denied operation, and API failure without reporting false success.
+- [x] Refresh state after update/delete and verify cache-backed normal reads display the changes.
 
 Exit: the complete private CRUD workflow uses ordinary pages and controls.
 
 ### U07 — Switch navigation and remove the old presentation
 
-- [ ] Switch `/` and `/books`, list/detail/edit/create links, and author detail links to the new route contract.
-- [ ] Remove `BookModalHost`, parser/lifecycle, illustrated `BookPage` components, cover/shelf/side-view helpers, and mapper code only where no remaining consumer exists.
-- [ ] Search the full repository for old type names, query strings, test selectors, CSS/JS hooks, asset paths, and source-test assertions. Include tests, docs, and profile composition.
-- [ ] Inspect book assets before removal; preserve seeded sample data or files with a remaining React/public/API consumer.
-- [ ] Remove only unused presentation dependencies. No wholesale package upgrades or asset-directory deletion.
+- [x] Switch `/` and `/books`, list/detail/edit/create links, and author detail links to the new route contract.
+- [x] Remove `BookModalHost`, parser/lifecycle, illustrated `BookPage` components, cover/shelf/side-view helpers, and mapper code only where no remaining consumer exists.
+- [x] Search the full repository for old type names, query strings, test selectors, CSS/JS hooks, asset paths, and source-test assertions. Include tests, docs, and profile composition.
+- [x] Inspect book assets before removal; preserve seeded sample data or files with a remaining React/public/API consumer.
+- [x] Remove only unused presentation dependencies. No wholesale package upgrades or asset-directory deletion.
 
 Exit: one Books UI remains; no stale route convention or dead geometry dependency is needed by the new UI.
 
 ### U08 — Update focused UI verification
 
-- [ ] Adapt `BooksE2ETests` into a focused public-read plus authenticated CRUD journey using semantic selectors and a few stable test IDs.
-- [ ] Replace modal-specific navigation tests with direct link/refresh/Back coverage where those user actions remain meaningful.
-- [ ] Remove geometry/modal tests only with the deleted behavior; retain actual state, ownership, authentication-transition, API, cache, and security tests.
-- [ ] Adapt prehydration checks to the new Save/Delete/search controls as applicable. New markup must not silently bypass their assertions.
-- [ ] Keep actual render-mode verification for initial server interactivity and later WASM. An existing server component does not switch runtime merely because WASM downloaded.
-- [ ] Cover validation, failed save/retry, delete cancellation, logout state clearing, and narrow viewport behavior through existing suitable boundaries. Avoid adding many tiny markup tests.
+- [x] Adapt `BooksE2ETests` into a focused public-read plus authenticated CRUD journey using semantic selectors and a few stable test IDs.
+- [x] Replace modal-specific navigation tests with direct link/refresh/Back coverage where those user actions remain meaningful.
+- [x] Remove geometry/modal tests only with the deleted behavior; retain actual state, ownership, authentication-transition, API, cache, and security tests.
+- [x] Adapt prehydration checks to the new Save/Delete/search controls as applicable. New markup must not silently bypass their assertions.
+- [x] Keep actual render-mode verification for initial server interactivity and later WASM. An existing server component does not switch runtime merely because WASM downloaded.
+- [x] Cover validation, failed save/retry, delete cancellation, logout state clearing, and narrow viewport behavior through existing suitable boundaries. Avoid adding many tiny markup tests.
 
 Exit: tests describe the new user contract without losing retained security or render-mode coverage. Template-wide test reduction is outside this plan.
 
 ### U09 — Rebuild styles and inspect rendered results
 
-- [ ] From `GrumPlates.Client`, run the lockfile-based install and `npm run css:build` using the supported Node environment.
-- [ ] Commit the generated `GrumPlates/wwwroot/tailwind.css` when changed. Do not hand-edit generated CSS.
-- [ ] Run the application and inspect list, details, form, confirmation, loading/empty/error states, and keyboard focus at narrow and wide widths.
-- [ ] Verify long values wrap, labels/messages fit, controls are reachable, and no book-layout geometry or SVG clipping survives accidentally.
-- [ ] Run the existing browser/Lighthouse guidance appropriate to this material public-layout change. Do not add permanent screenshot artifacts or make a new performance claim without measurements.
+- [x] From `GrumPlates.Client`, run the lockfile-based install and `npm run css:build` using the supported Node environment.
+- [x] Commit the generated `GrumPlates/wwwroot/tailwind.css` when changed. Do not hand-edit generated CSS.
+- [x] Run the application and inspect list, details, form, confirmation, loading/empty/error states, and keyboard focus at narrow and wide widths.
+- [x] Verify long values wrap, labels/messages fit, controls are reachable, and no book-layout geometry or SVG clipping survives accidentally.
+- [x] Run the existing browser/Lighthouse guidance appropriate to this material public-layout change. Do not add permanent screenshot artifacts or make a new performance claim without measurements.
 
 Exit: rendered UI is clean and usable, not merely compilable.
 
 ### U10 — Minimal documentation and both-profile validation
 
-- [ ] Correct the modal-specific paragraph/source links in `docs/Features/Blazor.md` and any directly stale feature links. Keep examples short.
-- [ ] Update requirements or audit rules only when checked behavior actually changes. Do not delete an audit requirement to bypass a failure.
-- [ ] Review API/Core/backend diffs; presentation changes should not have rewritten backend contracts, cache semantics, identity, or migrations.
-- [ ] Run every command in the current `docs/Test.md#local-gate`, including the both-profile validation and deployment audits required by `AGENTS.md`.
-- [ ] Keep `dotnet build` and `dotnet test` sequential in each checkout. Run affected opt-in browser journeys separately using current documented configuration.
-- [ ] Verify React remains unchanged in behavior and passes its checks. Do not disable its composition because this plan targets Blazor.
+- [x] Correct the modal-specific paragraph/source links in `docs/Features/Blazor.md` and any directly stale feature links. Keep examples short.
+- [x] Update requirements or audit rules only when checked behavior actually changes. Do not delete an audit requirement to bypass a failure.
+- [x] Review API/Core/backend diffs; presentation changes should not have rewritten backend contracts, cache semantics, identity, or migrations.
+- [x] Run every command in the current `docs/Test.md#local-gate`, including the both-profile validation and deployment audits required by `AGENTS.md`.
+- [x] Keep `dotnet build` and `dotnet test` sequential in each checkout. Run affected opt-in browser journeys separately using current documented configuration.
+- [x] Verify React remains unchanged in behavior and passes its checks. Do not disable its composition because this plan targets Blazor.
 
 Exit: full local gate and applicable browser checks pass before pushing.
 
@@ -235,7 +235,7 @@ Use the repository's current canonical local gate, not a shortened command list 
 
 ## 7. Port manifest for RitzauDemo
 
-Fill actual final paths after implementation. This list describes categories to inspect, not permission to overwrite a destination directory.
+This list describes how to adapt the integrated upstream changes, not permission to overwrite a destination directory.
 
 | Source change category | Downstream treatment |
 | --- | --- |
@@ -248,6 +248,80 @@ Fill actual final paths after implementation. This list describes categories to 
 | Focused state/browser tests and selectors | Port applicable scenarios; preserve the product's small test budget and its single architecture test. |
 | Core/API changes, if any prerequisite genuinely required them | Review individually against product slices, caching, endpoint RBAC, and the selected role matrix; never overwrite them wholesale. |
 | Template docs, React, CI, deployment, unrelated accounts, historical plans | Do not copy merely because they share an upstream commit. Correct only destination facts affected by the actual port. |
+
+### Exact upstream source manifest
+
+Added by the UI implementation:
+
+- `GrumPlates.Client/Features/Books/Routes/AuthorBookDetails.razor`
+- `GrumPlates.Client/Features/Books/Routes/BookCreate.razor`
+- `GrumPlates.Client/Features/Books/Routes/BookEdit.razor`
+- `GrumPlates.Client/Features/Books/Routes/UserBookDetails.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookDetailsView.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookForm.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookFormModel.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookListRow.razor`
+- `GrumPlates.Test/E2E/Features/Books/BookNavigationE2ETests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookEditAuthenticationTests.cs`
+
+Updated by the UI implementation:
+
+- `GrumPlates.Client/Features/Books/AuthorBookcase/AuthorBookcase.razor`
+- `GrumPlates.Client/Features/Books/AuthorBookcase/AuthorBookcaseState.cs`
+- `GrumPlates.Client/Features/Books/Routes/AuthorDetails.razor`
+- `GrumPlates.Client/Features/Books/Routes/Index.razor`
+- `GrumPlates.Client/Features/Books/UserBookcase/UserBookcase.razor`
+- `GrumPlates.Client/Features/Books/UserBookcase/UserBookcaseLoginPrompt.razor`
+- `GrumPlates.Client/Features/Books/UserBookcase/UserBookcaseState.cs`
+- `GrumPlates.Client/Features/Books/_Imports.razor`
+- `GrumPlates.Test/E2E/AppShell/PreHydrationControlsE2ETests.cs`
+- `GrumPlates.Test/E2E/Features/Books/BooksE2ETests.cs`
+- `GrumPlates.Test/E2E/VisualRegression/VisualSnapshotE2ETests.cs`
+- `GrumPlates.Test/Features/Books/Client/UserBookcaseStateTests.cs`
+- `GrumPlates/wwwroot/app.css`
+- `GrumPlates/wwwroot/tailwind.css` (generated)
+- `Scripts/Quality/sonar_report.py`
+- `Scripts/Quality/tests/fixtures/sonar/component-tree.json`
+- `Scripts/Quality/tests/fixtures/sonar/issues-search.json`
+- `Scripts/Quality/tests/test_sonar_report.py`
+- `docs/Architecture.md`
+- `docs/Features/Blazor.md`
+- `Plans/ReusableCrudUi.md`
+
+Removed after checking for remaining consumers:
+
+- `GrumPlates.Client/Features/Books/BookModal/BookModalHost.razor`
+- `GrumPlates.Client/Features/Books/BookModal/BookModalLifecycle.cs`
+- `GrumPlates.Client/Features/Books/BookModal/BookModalRouteState.cs`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageCloseControl.razor`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageEditor.razor`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageEditorModel.cs`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageFrame.razor`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageTextLayout.cs`
+- `GrumPlates.Client/Features/Books/BookPage/BookPageView.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverArtwork.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverDesignCatalog.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverPageTabs.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverRenderer.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverTextLayout.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookCoverTheme.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookSideView.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookcaseBook.cs`
+- `GrumPlates.Client/Features/Books/Shared/BookcaseShelf.razor`
+- `GrumPlates.Client/Features/Books/Shared/BookcaseShelfItems.cs`
+- `GrumPlates.Client/Features/Books/UserBookcase/UserBookcaseBookMapper.cs`
+- `GrumPlates.Test/E2E/Features/Books/BookModalNavigationE2ETests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookCoverGeometryTests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookModalHostAuthenticationTests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookModalLifecycleTests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookModalRouteStateTests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookTitleLayoutTests.cs`
+- `GrumPlates.Test/Features/Books/Client/BookcaseShelfItemsTests.cs`
+
+Route contract: `/` and `/books` show the public catalog and the signed-in user's private list; `/books/catalog/{id:int}` is public detail; `/books/author/{SeedKey}` is a bounded legacy redirect; `/books/new`, `/books/{id:int}`, and `/books/{id:int}/edit` are authenticated create, detail, and edit routes. The UI implementation changes no Core/API contracts, backend services, DI registrations, or migrations. It consumes the owner-scoped `IBooksApi.SearchAsync(SearchBooksRequest)` prerequisite from PR #454 and the existing `IAuthorBooksApi`; downstream code must adapt these signatures and preserve owner scoping.
+
+Rebuild generated CSS from `GrumPlates.Client` with `npm ci && npm run css:build`. Applicable verification covers `BooksE2ETests`, `BookNavigationE2ETests`, `BookEditAuthenticationTests`, `UserBookcaseStateTests`, pre-hydration controls, actual render-mode checks, both frontend profiles, and the full local gate. No upstream dependency remains beyond integrated PR #454; product RBAC and role selection remain downstream work.
 
 Handoff record to complete: upstream base SHA; full integrated UI commit SHA(s); PR URL(s); exact-main CI; explicit added/changed/deleted source paths; contracts or DI signatures touched; route table; regenerated asset instructions; applicable test scenarios; and any pending dependency. Do not keep an archive/bundle of the finished workspace as handoff evidence.
 
@@ -265,6 +339,7 @@ The downstream port is a separate product PR under `Plans/InterviewCaseStarter.m
 
 | Packet / PR | Source and integrated full SHA | Verification | Downstream handoff |
 | --- | --- | --- | --- |
-| Planning | Local file created; implementation not started | Markdown review and whitespace check | Manifest categories prepared; exact paths await implementation |
+| U00 planning and baseline / [PR #454](https://github.com/Grumlebob/GrumPlates/pull/454) | `Plans/ReusableCrudUi.md` integrated as `b2dd255cea8c95f496b241b5517d246938e2d681` | Baseline, route, payload, and consumer inventory recorded; Markdown whitespace check passed | The UI path manifest awaits implementation. |
+| U01 private search prerequisite / [PR #454](https://github.com/Grumlebob/GrumPlates/pull/454) | PR head `48016999df1f68d339236480d859a114077a1553`; squash integrated on `origin/main` as `b2dd255cea8c95f496b241b5517d246938e2d681` | Full local gate passed; exact-head `build-test-push` run `42658249521` and CodeQL run `42658249876` passed; exact-main CI run `42661503975` and CodeQL run `42661504202` passed | Owner-scoped private search/pagination contract and endpoint are available for the Blazor list and downstream adaptation. |
 
 For each implementation PR, record exact head, local gate outcome, exact-head CI, main integration SHA, exact-main CI, and cleanup branch SHAs here or in the PR. Plan completion requires the new UI integrated on GrumPlates main, applicable checks green, dead presentation removed, minimal docs accurate, port manifest populated, and owned-resource closeout. RitzauDemo port completion is recorded in its own plan, not falsely claimed here.

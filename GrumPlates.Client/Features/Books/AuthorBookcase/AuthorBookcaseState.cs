@@ -1,4 +1,3 @@
-using GrumPlates.Client.Features.Books.Shared;
 using GrumPlates.Core.Features.Books.Contracts;
 using GrumPlates.Core.Features.Books.UseCases.GetAuthorBooks;
 
@@ -20,12 +19,10 @@ public sealed class AuthorBookcaseState(
 
     public IReadOnlyList<AuthorBookListItemResponse> Books { get; private set; } = [];
 
-    public IReadOnlyList<BookcaseBook> ShelfBooks { get; private set; } = [];
-
     public void ApplyLoadedBooks(IReadOnlyList<AuthorBookListItemResponse> books)
     {
         Interlocked.Increment(ref _version);
-        ApplyBooks(books.OrderBy(book => book.Id).ToList());
+        Books = books.OrderBy(book => book.Id).ToList();
         Error = null;
         IsLoading = false;
         NotifyChanged();
@@ -60,22 +57,10 @@ public sealed class AuthorBookcaseState(
             }
 
             _logger.LogWarning(ex, "Author bookcase load failed.");
-            Error = "The authors bookcase could not be loaded.";
+            Error = "The public catalog could not be loaded.";
             IsLoading = false;
             NotifyChanged();
         }
-    }
-
-    private void ApplyBooks(IReadOnlyList<AuthorBookListItemResponse> books)
-    {
-        Books = books;
-        ShelfBooks = books
-            .Select(book => new BookcaseBook(
-                book.Id,
-                book.Title,
-                book.Url,
-                $"/books?authorBookId={book.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)}&bookMode=view"))
-            .ToList();
     }
 
     private void NotifyChanged() => Changed?.Invoke();

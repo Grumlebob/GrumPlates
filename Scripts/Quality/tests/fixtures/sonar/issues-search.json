@@ -7,7 +7,7 @@
   "issues": [
     {
       "key": "46372986-af72-42d0-aa65-47adfff3d9aa", "rule": "csharpsquid:S6709", "severity": "MAJOR",
-      "component": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs",
+      "component": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookForm.razor",
       "project": "grumplates-abc12345-BlazorAuto", "line": 33,
       "message": "Provide a deterministic fallback for the geometry calculation.", "effort": "5min",
       "author": "reviewer@example.invalid", "tags": ["geometry"], "type": "CODE_SMELL", "scope": "MAIN",
@@ -27,7 +27,7 @@
     },
     {
       "key": "b9d4f2c3-6e1a-4f08-8a2b-5c7d9e0f1a22", "rule": "csharpsquid:S3776", "severity": "CRITICAL",
-      "component": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs",
+      "component": "grumplates-abc12345-BlazorAuto:GrumPlates.Client/Features/Books/Shared/BookForm.razor",
       "project": "grumplates-abc12345-BlazorAuto", "status": "OPEN",
       "message": "Refactor this method to reduce cognitive complexity.", "effort": "20min",
       "author": "reviewer@example.invalid", "tags": ["complexity"], "type": "CODE_SMELL", "scope": "MAIN",

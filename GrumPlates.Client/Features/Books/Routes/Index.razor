@@ -1,24 +1,18 @@
 @page "/"
 @page "/books"
 
-@* Canonical Books route. Compatibility route components in this slice redirect old URLs into the query-modal flow. *@
-
 <PageTitle>Books</PageTitle>
 
-<div class="mx-auto max-w-6xl">
-    <div class="mb-4">
-        <div>
-            <h1 class="mb-1 text-3xl font-bold leading-tight tracking-normal text-gray-900">Welcome to Books</h1>
-            <p class="text-[0.95rem] text-gray-600">A template for quickly deploying Blazor Auto production ready systems - in action!</p>
-            <p class="text-[0.95rem] text-gray-600">Check yourself, every subsequent visit is blazing fast, try to go to reddit.com and back to this site!</p>
+<main class="mx-auto max-w-6xl space-y-6">
+    <header class="rounded-xl border border-gray-200 bg-white px-5 py-6 shadow-sm sm:px-7">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900">Books</h1>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-gray-600">Browse the public sample catalog or manage books saved to your account.</p>
+        <div class="mt-4">
+            <RenderModeBadge Assigned="@AssignedRenderMode" ConfiguredMode="Interactive Auto" />
         </div>
-    </div>
+    </header>
 
     <AuthorBookcase />
-
-    <div class="mt-3">
-        <RenderModeBadge Assigned="@AssignedRenderMode" ConfiguredMode="Interactive Auto" />
-    </div>
 
     <AuthorizeView>
         <Authorized>
@@ -28,9 +22,7 @@
             <UserBookcaseLoginPrompt />
         </NotAuthorized>
         <Authorizing>
-            <p class="mt-6 text-gray-600">Checking your bookcase...</p>
+            <p class="rounded-lg bg-gray-50 px-4 py-5 text-sm text-gray-600" role="status">Checking your account...</p>
         </Authorizing>
     </AuthorizeView>
-
-    <BookModalHost />
-</div>
+</main>
