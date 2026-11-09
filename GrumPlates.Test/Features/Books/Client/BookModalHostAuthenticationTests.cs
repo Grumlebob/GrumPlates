@@ -140,6 +140,7 @@ public sealed class BookModalHostAuthenticationTests
         }
 
         public Task<GetBooksResponse> GetAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<CreateBookResponse> CreateAsync(CreateBookRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> UpdateAsync(UpdateBookRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(DeleteBookRequest request, CancellationToken cancellationToken = default) => throw new NotSupportedException();

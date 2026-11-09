@@ -121,6 +121,9 @@ public sealed class UserBookcaseStateTests
         public Task<GetBooksResponse> GetAsync(CancellationToken cancellationToken = default) =>
             Get(cancellationToken);
 
+        public Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
         public Task<GetBookResponse?> GetByIdAsync(GetBookRequest req, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
