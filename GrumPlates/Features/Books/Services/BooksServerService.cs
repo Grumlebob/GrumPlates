@@ -40,6 +40,27 @@ internal class BooksServerService(
         return result!;
     }
 
+    public async Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default)
+    {
+        var errors = req.Validate();
+        if (errors.Count > 0)
+        {
+            throw new ArgumentException("The book search request is invalid.", nameof(req));
+        }
+
+        var userId = await _currentUser.GetRequiredUserIdAsync(cancellationToken);
+        var searchTerm = req.SearchTerm?.Trim() ?? string.Empty;
+        var page = req.EffectivePage;
+        var pageSize = req.EffectivePageSize;
+        var key = BooksCacheKeys.SearchList(userId, searchTerm, page, pageSize);
+        var result = await _cache.GetOrCreateAsync(key,
+            ct => new ValueTask<SearchBooksResponse>(LoadSearchResultsAsync(userId, searchTerm, page, pageSize, ct)),
+            CreateEntryOptions(_cacheOptions.ListTtlMinutes, _cacheOptions.LocalListTtlSeconds),
+            tags: [BooksCacheKeys.AllTag, BooksCacheKeys.ListTag(userId)],
+            cancellationToken: cancellationToken);
+        return result!;
+    }
+
     public async Task<GetBookResponse?> GetByIdAsync(GetBookRequest req, CancellationToken cancellationToken = default)
     {
         var userId = await _currentUser.GetRequiredUserIdAsync(cancellationToken);
@@ -68,6 +89,58 @@ internal class BooksServerService(
             })
             .ToListAsync(ct);
         return new GetBooksResponse { Books = items };
+    }
+
+    private async Task<SearchBooksResponse> LoadSearchResultsAsync(
+        string userId,
+        string searchTerm,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken)
+    {
+        await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);
+        var query = db.UserBooks
+            .AsNoTracking()
+            .Where(userBook => userBook.OwnerUserId == userId);
+
+        if (!string.IsNullOrWhiteSpace(searchTerm))
+        {
+            var pattern = ToLikePattern(searchTerm);
+            query = query.Where(userBook =>
+                EF.Functions.ILike(userBook.Book.Title, pattern, "\\") ||
+                (userBook.Book.Author != null && EF.Functions.ILike(userBook.Book.Author, pattern, "\\")));
+        }
+
+        var totalCount = await query.CountAsync(cancellationToken);
+        var items = await query
+            .OrderBy(userBook => userBook.BookId)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(userBook => new BookListItemResponse
+            {
+                Id = userBook.Book.Id,
+                Title = userBook.Book.Title,
+                Author = userBook.Book.Author,
+                Url = userBook.Book.Url
+            })
+            .ToListAsync(cancellationToken);
+
+        return new SearchBooksResponse
+        {
+            Books = items,
+            Page = page,
+            PageSize = pageSize,
+            TotalCount = totalCount
+        };
+    }
+
+    private static string ToLikePattern(string searchTerm)
+    {
+        var escaped = searchTerm
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
+        return $"%{escaped}%";
     }
 
     private async Task<GetBookResponse?> LoadBookAsync(string userId, int id, CancellationToken ct)

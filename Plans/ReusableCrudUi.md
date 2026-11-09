@@ -1,0 +1,270 @@
+# Reusable CRUD UI for the Books reference feature
+
+Status: in progress. Prepared 2026-11-09. Planning was requested alongside RitzauDemo preparation. This document does not authorize deployment.
+
+## 1. Goal and scope
+
+Replace the Blazor Books shelf/illustrated-page/modal experience with a polished, ordinary CRUD interface that can be adapted quickly to another domain. Build and verify it in GrumPlates first. Then port the relevant UI into RitzauDemo using the explicit handoff below.
+
+The template keeps both frontend profiles and all supported deployment targets. This plan changes the **Blazor Books reference UI**, not the React UI, account capabilities, caching architecture, domain ownership model, or template test policy. React must continue passing its existing checks.
+
+The result includes a searchable list, details, create/edit forms, delete confirmation, and clear loading, empty, validation, permission, not-found, and server-error states. Keep a clean responsive appearance and existing Tailwind styling. Remove book-specific rendering geometry when it has no remaining consumer.
+
+Do not create a metadata-driven CRUD engine, generic repository, second design system, new UI framework, second frontend profile, or optional old/new Books UI switch. Use small concrete feature components. Generalize only a component already used in more than one real place.
+
+The product follow-up is [RitzauDemo: Interview case starter](https://github.com/Grumlebob/RitzauDemo/blob/main/Plans/InterviewCaseStarter.md). That URL becomes available when its planning document is integrated. RitzauDemo owns product RBAC, account reduction, and test reduction; do not copy those decisions upstream.
+
+## 2. Research completed
+
+Source baseline inspected: GrumPlates `ee9af0b985f86c9568cbf077aeb20336841446de`. Re-inventory before execution; this SHA is an observation, not a required reset target.
+
+| Existing source | Relevant coupling |
+| --- | --- |
+| `GrumPlates.Client/Features/Books/Routes/Index.razor` | `/` and `/books` render public author books, private user books when signed in, a render-mode badge, and `BookModalHost`. |
+| `UserBookcase/UserBookcase.razor` | Private list actions navigate to `/books?bookMode=create`; the list renders through `BookcaseShelf`. |
+| `UserBookcase/UserBookcaseState.cs` | Authentication-aware state exposes `ShelfBooks`, mapping DTOs into book-specific display types. Keep identity-change and stale-result protection when removing that mapping. |
+| `AuthorBookcase/AuthorBookcaseState.cs` | Public list state also participates in shelf presentation. |
+| `BookModal/BookModalHost.razor` | Owns query-modal interpretation, focus/Escape behavior, navigation subscriptions, and component-owned lifecycle. |
+| `BookModal/BookModalLifecycle.cs` | Owns loading, cancellation, save/delete, errors, and stale-completion guards. Behavioral responsibilities need replacement even if the class disappears. |
+| `BookPage/BookPageEditor.razor` | Uses SVG/`foreignObject` layout, validation, and manual input/change handling. Replace presentation while preserving validation and interactivity gating. |
+| `BookPage/*`, `Shared/BookCover*`, `BookcaseShelf*`, `BookSideView` | Book-specific layout, cover artwork, geometry, and rendering conventions are the main simplification candidates. |
+| `BooksClientService`, `BooksAntiforgeryHandler`, Core `IBooksApi` | Existing HTTP/contract seam for private CRUD. Components should continue using the contract or feature state. |
+| `IAuthorBooksApi`, `AuthorBooksClientService` | Separate public read-only catalog contract. Do not accidentally turn catalog rows into privately editable rows. |
+| `GrumPlates.Test/E2E/Features/Books/BooksE2ETests.cs` | Existing workflow depends on modal query strings, shelf selectors, Escape/focus behavior, and actual API operations. Adapt assertions to new behavior. |
+| `BookModalNavigationE2ETests`, prehydration/render-mode tests | Navigation and Interactive Auto are real requirements; retain applicable behavior checks as the modal-specific contract is retired. |
+| `docs/Features/Blazor.md` | Canonical guide explicitly describes the existing modal lifecycle and will need a small current-behavior correction. |
+
+Preparation completed:
+
+- [x] Locate the coupled UI, state, contracts, and browser verification paths.
+- [x] Separate public catalog viewing from private authenticated CRUD.
+- [x] Identify prerender, hydration, authentication-change, and cancellation requirements that a markup-only rewrite would lose.
+- [x] Define default routes, deletion rules, checks, and a downstream path manifest below.
+
+## 3. Intended experience
+
+### Routes and visibility
+
+Use ordinary routable pages instead of query-driven dialogs:
+
+| Route | Behavior |
+| --- | --- |
+| `/` and `/books` | Public catalog list; signed-in users also see a clearly separated own-books list. Anonymous users see a sign-in action for private CRUD. |
+| `/books/catalog/{id:int}` | Public author-book details; no edit/delete actions. |
+| `/books/new` | Authenticated create form. |
+| `/books/{id:int}` | Authenticated own-book details. |
+| `/books/{id:int}/edit` | Authenticated own-book edit form. |
+
+Keep existing account paths and return URL validation. Product-specific RBAC is applied later during the RitzauDemo port. A User and Admin in the template remain subject to existing owner-scoped private access.
+
+Retire `bookMode`, `bookId`, and `authorBookId` dialog query conventions once all local navigation and test consumers are updated. Do not keep a second modal implementation or indefinite compatibility subsystem. External-link compatibility is not established by this plan; if actual consumers are discovered, record that evidence and choose a bounded mapping before removing their routes.
+
+### Lists and search
+
+- Use readable rows with title, author, and explicit details/edit actions where permitted. Use responsive rows or cards on narrow screens without horizontal overflow.
+- Keep public and private data sources visibly separate. Search applies to the relevant loaded collection and has a visible label and clear action.
+- Reuse current list APIs for the presentation change. Inspect current payload bounds first. Local filtering is suitable only for the existing bounded demo collection; it is not server pagination or a scalability claim.
+- Do not silently truncate records. If current data is not bounded enough for a local filter, separate server search/pagination into a deliberately reviewed prerequisite rather than claiming that a UI filter solves it.
+- Distinguish no records, no search matches, loading, and failure. A failed request must not appear as an empty successful result.
+
+### Forms, details, and deletion
+
+- Use an ordinary labeled `EditForm`, current validation rules, validation summary/messages, and normal keyboard submission.
+- Reuse a concrete `BookForm.razor` between create and edit. Title, author, and URL remain sample domain fields; do not invent future case fields.
+- Keep user input after a failed save. Disable duplicate submissions while busy and disable interactive controls until `RendererInfo.IsInteractive`.
+- Keep cancel safe: no persistence, predictable return path, and no accidental form submission.
+- Details show a normal heading and field values. A valid external URL uses safe link behavior; never inject raw HTML.
+- Delete requires explicit confirmation containing the selected title. A simple inline confirmation is sufficient; a custom modal/focus framework is unnecessary.
+- Show not-found and permission outcomes clearly. Do not reveal another user's private record metadata.
+- After successful mutation, refresh relevant feature state using existing contracts and invalidation; Back/reload must not resurrect stale state.
+
+### Visual quality
+
+Use the existing application shell, Tailwind tokens, spacing, readable typography, focus rings, and button conventions. Favor clear content and actions over book illustrations. Include a restrained header, useful count/search context, and stable loading space where appropriate. Keep native labels, semantic links/buttons, visible keyboard focus, and touch-friendly controls. No marketing page or new theme system is required.
+
+## 4. Non-negotiable behavior
+
+- Blazor product routes work with SSR/prerender, initial server interactivity, and later WebAssembly interactivity under Interactive Auto.
+- Do not force Interactive Server to hide a browser/SSR issue. Verify the actual renderer rather than the mode badge text.
+- Components call Core API contracts or feature state, not raw `HttpClient`.
+- Keep direct server and browser implementations consistent. Continue using current account/CSRF handlers and owner-scoped server queries.
+- On logout or identity change, clear private rows and in-flight results before another user's data can be displayed.
+- Retain cancellation and stale-completion guards when moving state out of the modal lifecycle. Dispose subscriptions and cancellation sources.
+- Keep public prerender data bounded. Do not embed private response graphs in `PersistentComponentState`.
+- Keep caches, invalidation, backend endpoint names/contracts, seeded catalog behavior, and database schema unchanged unless a separately reviewed prerequisite is needed.
+- Rebuild and commit `GrumPlates/wwwroot/tailwind.css` for Razor class/style changes using the existing client lockfile.
+- Preserve both frontend profiles, shared-host safeguards, required CI, and all deployment targets.
+
+## 5. Execution packets
+
+Complete each packet's verification before checking it off. Record PR/head/integration evidence in section 9. Start with a working route, then replace remaining behavior in bounded steps. Temporary internal wiring during a branch is acceptable; do not ship two competing Books experiences.
+
+### U00 — Establish ownership and current baseline
+
+- [x] Read applicable `AGENTS.md`, `docs/Requirements.md`, `docs/Features/Blazor.md`, `docs/Test.md`, and `docs/Testing/Browser.md`.
+- [x] Inspect actual branch/worktree ownership, dirty tracked/untracked/ignored files, open PR dependencies, and current main SHA. Create an owned task branch without disturbing another session.
+- [x] Inventory current Books routes, navigation links, API contracts, test selectors, client/server DI registrations, and relevant assets.
+- [x] Record any source differences from section 2. Do not restore the inspected SHA over newer work.
+
+Exit: explicit current base and a list of exact consumers to update. Current base: `de6cfaec8d86373e14fee7a912122e815ddf4ce0`; the source SHA in section 2 remains the same through the Books feature. Open PRs 451–453 all target `main`; none depends on this work. Primary checkout has only the original untracked plan plus ignored local inputs. Implementation is isolated in branch `task/reusable-crud-ui-20261109` in a sibling task worktree.
+
+### U01 — Record the UI replacement and deletion map
+
+- [x] Confirm the default route table above against existing route collisions, especially numeric private IDs and literal `new`/`catalog` segments.
+- [x] Map each modal lifecycle responsibility to the new list/detail/form state owner: load, identity check, cancellation, save/delete, errors, state refresh, disposal.
+- [x] Map each old component/helper/test/asset to retain, adapt, or delete-after-last-consumer.
+- [x] Inspect list payload behavior and decide whether local search is valid for the bounded sample. Keep a server search prerequisite separate if needed.
+- [x] Put the compact path mapping and any justified route change in the implementation PR, not a new permanent design manual.
+
+Exit: a markup rewrite cannot silently discard behavior, and all planned deletions have a consumer check. `/books/new` does not collide with `/books/{id:int}`, and `/books/catalog/{id:int}` does not collide with the private integer route. `/books/author/{SeedKey}` has no in-repository Blazor navigation consumer; retain a bounded redirect to the new catalog details route while removing its modal target. `BooksServerService` loads every private row with `ToListAsync` and has no record or payload bound, while private CRUD can grow that collection; client-only search is therefore not a safe substitute for pagination. Before the UI packet, add a separately reviewed, owner-scoped search/pagination API on the existing `/api/books` resource, with per-query cache keys and existing owner-list invalidation tags. The static public author catalog has six seeded entries and can use local filtering.
+
+### U02 — Decouple list state from shelf geometry
+
+- [ ] Expose current contract DTOs or a small concrete row model from private/public list state instead of requiring `BookcaseBook`/`ShelfBooks` for every view.
+- [ ] Keep user identity/version checks, error handling, cancellation, and mutation refresh behavior.
+- [ ] Update state tests to assert records, ownership/identity transitions, and stale result rejection rather than cover layout.
+- [ ] Keep existing UI working while the branch introduces these state changes; do not leave broken consumers between commits intended for review.
+
+Exit: a normal row component can consume list state without cover geometry or a generic mapper framework.
+
+### U03 — Implement the public catalog list and details
+
+- [ ] Add concrete list-row/detail components or pages under `Features/Books`; keep routes under `Routes`.
+- [ ] Implement public catalog list, labeled search, clear filter, no-results/empty/error/loading states, and normal detail links.
+- [ ] Add `/books/catalog/{id:int}` details using `IAuthorBooksApi`. Handle missing IDs and failed loads without showing edit/delete actions.
+- [ ] Verify anonymous SSR includes useful public content and no private data. Keep hydration controls disabled as required.
+- [ ] Verify both wide and narrow layouts with long titles, missing author, and absent URL.
+
+Exit: public browsing works without shelf rendering or query modals.
+
+### U04 — Implement the private list and details
+
+- [ ] Add private own-books rows and actions through `IBooksApi`/feature state; add `/books/{id:int}` details.
+- [ ] Add authorization to private routes and preserve secure return navigation for sign-in.
+- [ ] Make signed-out/private-loading/error/empty/no-match states distinct. Do not flash the previous user's list after logout/login.
+- [ ] Keep explicit edit links and prepare inline deletion state without executing deletes yet.
+- [ ] Verify owner-visible rows, another user's not-found response, direct route refresh, and Back navigation.
+
+Exit: authenticated reading works in direct server and browser execution paths.
+
+### U05 — Implement a normal create form
+
+- [ ] Add `/books/new` and a concrete reusable `BookForm.razor` using current DTO validation and normal form semantics.
+- [ ] Add proper labels, field messages, validation summary, Save/Cancel controls, and busy/interactivity gating.
+- [ ] Submit through current contracts. Retain entered values and show a bounded useful error if a request fails.
+- [ ] On success refresh own-book state and navigate predictably to the created detail or list; choose one behavior and use it consistently.
+- [ ] Verify valid create/reload, invalid title/URL, keyboard submit, cancel without mutation, and retry after a save failure.
+
+Exit: create no longer requires the illustrated editor or modal lifecycle.
+
+### U06 — Implement edit and delete confirmation
+
+- [ ] Add `/books/{id:int}/edit`, load only the current user's record, and reuse `BookForm` with an independent edit model.
+- [ ] Cancel does not mutate cached/list DTO instances. A failed save leaves the user's form input intact.
+- [ ] Add explicit inline delete confirmation with title, Cancel, and busy state. Do not send a delete on the first request-to-delete click.
+- [ ] Handle a record deleted elsewhere, denied operation, and API failure without reporting false success.
+- [ ] Refresh state after update/delete and verify cache-backed normal reads display the changes.
+
+Exit: the complete private CRUD workflow uses ordinary pages and controls.
+
+### U07 — Switch navigation and remove the old presentation
+
+- [ ] Switch `/` and `/books`, list/detail/edit/create links, and author detail links to the new route contract.
+- [ ] Remove `BookModalHost`, parser/lifecycle, illustrated `BookPage` components, cover/shelf/side-view helpers, and mapper code only where no remaining consumer exists.
+- [ ] Search the full repository for old type names, query strings, test selectors, CSS/JS hooks, asset paths, and source-test assertions. Include tests, docs, and profile composition.
+- [ ] Inspect book assets before removal; preserve seeded sample data or files with a remaining React/public/API consumer.
+- [ ] Remove only unused presentation dependencies. No wholesale package upgrades or asset-directory deletion.
+
+Exit: one Books UI remains; no stale route convention or dead geometry dependency is needed by the new UI.
+
+### U08 — Update focused UI verification
+
+- [ ] Adapt `BooksE2ETests` into a focused public-read plus authenticated CRUD journey using semantic selectors and a few stable test IDs.
+- [ ] Replace modal-specific navigation tests with direct link/refresh/Back coverage where those user actions remain meaningful.
+- [ ] Remove geometry/modal tests only with the deleted behavior; retain actual state, ownership, authentication-transition, API, cache, and security tests.
+- [ ] Adapt prehydration checks to the new Save/Delete/search controls as applicable. New markup must not silently bypass their assertions.
+- [ ] Keep actual render-mode verification for initial server interactivity and later WASM. An existing server component does not switch runtime merely because WASM downloaded.
+- [ ] Cover validation, failed save/retry, delete cancellation, logout state clearing, and narrow viewport behavior through existing suitable boundaries. Avoid adding many tiny markup tests.
+
+Exit: tests describe the new user contract without losing retained security or render-mode coverage. Template-wide test reduction is outside this plan.
+
+### U09 — Rebuild styles and inspect rendered results
+
+- [ ] From `GrumPlates.Client`, run the lockfile-based install and `npm run css:build` using the supported Node environment.
+- [ ] Commit the generated `GrumPlates/wwwroot/tailwind.css` when changed. Do not hand-edit generated CSS.
+- [ ] Run the application and inspect list, details, form, confirmation, loading/empty/error states, and keyboard focus at narrow and wide widths.
+- [ ] Verify long values wrap, labels/messages fit, controls are reachable, and no book-layout geometry or SVG clipping survives accidentally.
+- [ ] Run the existing browser/Lighthouse guidance appropriate to this material public-layout change. Do not add permanent screenshot artifacts or make a new performance claim without measurements.
+
+Exit: rendered UI is clean and usable, not merely compilable.
+
+### U10 — Minimal documentation and both-profile validation
+
+- [ ] Correct the modal-specific paragraph/source links in `docs/Features/Blazor.md` and any directly stale feature links. Keep examples short.
+- [ ] Update requirements or audit rules only when checked behavior actually changes. Do not delete an audit requirement to bypass a failure.
+- [ ] Review API/Core/backend diffs; presentation changes should not have rewritten backend contracts, cache semantics, identity, or migrations.
+- [ ] Run every command in the current `docs/Test.md#local-gate`, including the both-profile validation and deployment audits required by `AGENTS.md`.
+- [ ] Keep `dotnet build` and `dotnet test` sequential in each checkout. Run affected opt-in browser journeys separately using current documented configuration.
+- [ ] Verify React remains unchanged in behavior and passes its checks. Do not disable its composition because this plan targets Blazor.
+
+Exit: full local gate and applicable browser checks pass before pushing.
+
+### U11 — Integrate and prepare the downstream handoff
+
+- [ ] Open a focused GrumPlates PR describing the simpler interaction and relevant verification. Split state preparation from replacement UI only if each integrated PR stays functional.
+- [ ] Require green `build-test-push` on the exact PR head. Retarget dependent PRs before merging/deleting their base.
+- [ ] Fetch and verify integrated main content and required exact-main CI; record full SHAs, PR URLs, and CI run/attempt references.
+- [ ] Populate section 7 with exact integrated paths and commits. Mark any mixed UI/backend commit for selective adaptation rather than blind cherry-pick.
+- [ ] Link the completed handoff from the RitzauDemo plan without importing product-specific behavior upstream.
+- [ ] Clean owned branches/worktrees and task-created Docker resources under the repository's closeout rules. Record deleted branch full SHAs and preserve useful private inputs.
+
+Exit: upstream UI is integrated, verified, and ready for an agent to port without re-discovering its dependencies.
+
+## 6. Verification checklist
+
+Use the repository's current canonical local gate, not a shortened command list copied into this plan. Focused checks during packets supplement the required full gate before code pushes.
+
+- Anonymous: list/detail render public content, private actions require sign-in, no private payload is prerendered into public state.
+- Signed in: own list, create, details, edit, cancel, delete confirmation, delete, reload, and Back work.
+- Validation/errors: errors preserve input; requests do not falsely show success; missing records and denied access remain distinct from empty lists.
+- Identity: logout and a different login clear private rows and stale pending responses.
+- Cache: writes still invalidate and subsequent normal reads display fresh data; no production caching switch is disabled for the demo.
+- Rendering: SSR/prerender, initial server interactivity, and later actual WASM behavior work under Interactive Auto.
+- Accessibility/layout: labeled fields/search, keyboard submit, focus, touch controls, narrow widths, and long data are usable.
+- Regression: React and all required template gates stay green; no identity or database migration surprise.
+
+## 7. Port manifest for RitzauDemo
+
+Fill actual final paths after implementation. This list describes categories to inspect, not permission to overwrite a destination directory.
+
+| Source change category | Downstream treatment |
+| --- | --- |
+| New `GrumPlates.Client/Features/Books/Routes/*` list/detail/create/edit pages | Adapt namespaces, imports, routes, and product-specific role visibility. |
+| Concrete form/list/detail components under the Books feature | Port the relevant source; avoid copying unused public/private variants. |
+| Updated public/private feature state and row models | Adapt current contract signatures and retain product authentication/cancellation behavior. |
+| Client/server UI-state DI registrations and `_Imports.razor` | Apply the minimal matching changes in current product composition; preserve its handler wiring. |
+| Removed modal/shelf/cover/page helpers and their assets | Remove downstream equivalents only after checking all destination consumers. |
+| Tailwind class/style sources | Port source changes; rebuild destination CSS with its own lockfile. |
+| Focused state/browser tests and selectors | Port applicable scenarios; preserve the product's small test budget and its single architecture test. |
+| Core/API changes, if any prerequisite genuinely required them | Review individually against product slices, caching, endpoint RBAC, and the selected role matrix; never overwrite them wholesale. |
+| Template docs, React, CI, deployment, unrelated accounts, historical plans | Do not copy merely because they share an upstream commit. Correct only destination facts affected by the actual port. |
+
+Handoff record to complete: upstream base SHA; full integrated UI commit SHA(s); PR URL(s); exact-main CI; explicit added/changed/deleted source paths; contracts or DI signatures touched; route table; regenerated asset instructions; applicable test scenarios; and any pending dependency. Do not keep an archive/bundle of the finished workspace as handoff evidence.
+
+The downstream port is a separate product PR under `Plans/InterviewCaseStarter.md`, packets R14–R16. Verify destination ownership rules, both seeded roles, caching, and actual render modes after adaptation. A clean textual patch alone is not port acceptance.
+
+## 8. Blockers and decisions
+
+- No manual user action is required for planning, implementation, local verification, PR creation, or preparing the port based on current evidence.
+- Default design is replacement of the Blazor Books UI, with public catalog/private list separation and ordinary routes as specified. React remains supported and unchanged.
+- Do not wait for RitzauDemo RBAC selection to implement the upstream UI; that is a downstream adaptation concern.
+- Do not dispatch a deployment as part of this work. Deployment authorization is separate if later requested.
+- A discovered real dependency, failing gate, or in-use route gets a concrete diagnosis and next action. Do not invent manual blockers before such evidence exists.
+
+## 9. Execution ledger and completion
+
+| Packet / PR | Source and integrated full SHA | Verification | Downstream handoff |
+| --- | --- | --- | --- |
+| Planning | Local file created; implementation not started | Markdown review and whitespace check | Manifest categories prepared; exact paths await implementation |
+
+For each implementation PR, record exact head, local gate outcome, exact-head CI, main integration SHA, exact-main CI, and cleanup branch SHAs here or in the PR. Plan completion requires the new UI integrated on GrumPlates main, applicable checks green, dead presentation removed, minimal docs accurate, port manifest populated, and owned-resource closeout. RitzauDemo port completion is recorded in its own plan, not falsely claimed here.

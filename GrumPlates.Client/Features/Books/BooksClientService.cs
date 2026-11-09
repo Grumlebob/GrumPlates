@@ -18,6 +18,20 @@ public class BooksClientService(HttpClient http) : IBooksApi
         return res ?? new GetBooksResponse { Books = [] };
     }
 
+    public async Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default)
+    {
+        var searchTerm = Uri.EscapeDataString(req.SearchTerm ?? string.Empty);
+        var path = $"api/books/search?searchTerm={searchTerm}&page={req.EffectivePage}&pageSize={req.EffectivePageSize}";
+        var response = await _http.GetFromJsonAsync<SearchBooksResponse>(path, cancellationToken);
+        return response ?? new SearchBooksResponse
+        {
+            Books = [],
+            Page = req.EffectivePage,
+            PageSize = req.EffectivePageSize,
+            TotalCount = 0
+        };
+    }
+
     public async Task<GetBookResponse?> GetByIdAsync(GetBookRequest req, CancellationToken cancellationToken = default)
     {
         using var res = await _http.GetAsync($"api/books/{req.Id}", cancellationToken);

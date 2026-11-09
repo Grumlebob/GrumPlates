@@ -29,6 +29,12 @@ public static class BookEndpoints
             .WithName("ListBooks")
             .WithAuthorizationResponses();
 
+        group.MapGet("/search", SearchBooksAsync)
+            .WithName("SearchBooks")
+            .Produces<SearchBooksResponse>(StatusCodes.Status200OK)
+            .ProducesValidationProblem()
+            .WithAuthorizationResponses();
+
         group.MapGet("/{id:int}", GetBookAsync)
             .WithName("GetBook")
             .ProducesProblem(StatusCodes.Status404NotFound)
@@ -75,6 +81,20 @@ public static class BookEndpoints
             BooksTelemetry.RecordException(operation, startTimestamp, ex);
             throw;
         }
+    }
+
+    private static async Task<IResult> SearchBooksAsync(
+        [AsParameters] SearchBooksRequest req,
+        IBooksApi books,
+        CancellationToken cancellationToken)
+    {
+        var errors = req.Validate();
+        if (errors.Count > 0)
+        {
+            return TypedResults.ValidationProblem(errors);
+        }
+
+        return TypedResults.Ok(await books.SearchAsync(req, cancellationToken));
     }
 
     private static async Task<Results<Ok<GetBookResponse>, ProblemHttpResult>> GetBookAsync(

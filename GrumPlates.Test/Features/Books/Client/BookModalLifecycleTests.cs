@@ -205,6 +205,7 @@ public sealed class BookModalLifecycleTests
         public Task<CreateBookResponse> CreateAsync(CreateBookRequest req, CancellationToken cancellationToken = default) => Create(req, cancellationToken);
         public Task<bool> DeleteAsync(DeleteBookRequest req, CancellationToken cancellationToken = default) => Delete(req, cancellationToken);
         public Task<GetBooksResponse> GetAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<bool> UpdateAsync(UpdateBookRequest req, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 

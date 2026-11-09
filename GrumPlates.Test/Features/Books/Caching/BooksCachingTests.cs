@@ -57,6 +57,56 @@ public class BooksCachingTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task SearchList_Cache_IsScopedByUserAndInvalidatedByCreate()
+    {
+        var first = await (await _client.PostAsJsonAsync("/api/books", new CreateBookRequest
+        {
+            Title = "Cache Search First",
+            Author = null,
+            Url = null
+        })).Content.ReadFromJsonAsync<CreateBookResponse>();
+        var other = await (await _otherClient.PostAsJsonAsync("/api/books", new CreateBookRequest
+        {
+            Title = "Cache Search Other",
+            Author = null,
+            Url = null
+        })).Content.ReadFromJsonAsync<CreateBookResponse>();
+        Assert.NotNull(first);
+        Assert.NotNull(other);
+
+        var firstList = await _client.GetFromJsonAsync<SearchBooksResponse>("/api/books/search?searchTerm=cache");
+        var otherList = await _otherClient.GetFromJsonAsync<SearchBooksResponse>("/api/books/search?searchTerm=cache");
+        Assert.Single(firstList!.Books);
+        Assert.Single(otherList!.Books);
+        Assert.Equal(first!.Id, firstList.Books[0].Id);
+        Assert.Equal(other!.Id, otherList.Books[0].Id);
+
+        var direct = _data.Generator.Generate();
+        direct.Title = "Cache Search Direct";
+        await using (var db = await _dbFactory.CreateDbContextAsync())
+        {
+            await BookTestUsers.EnsureAsync(db, BookTestUsers.DefaultUserId);
+            db.UserBooks.Add(BookDataGenerator.AsUserBook(direct));
+            await db.SaveChangesAsync();
+        }
+
+        var stillCached = await _client.GetFromJsonAsync<SearchBooksResponse>("/api/books/search?searchTerm=cache");
+        Assert.Single(stillCached!.Books);
+
+        var created = await _client.PostAsJsonAsync("/api/books", new CreateBookRequest
+        {
+            Title = "Cache Search Invalidation",
+            Author = null,
+            Url = null
+        });
+        created.EnsureSuccessStatusCode();
+
+        var refreshed = await _client.GetFromJsonAsync<SearchBooksResponse>("/api/books/search?searchTerm=cache");
+        Assert.NotNull(refreshed);
+        Assert.Equal(3, refreshed!.TotalCount);
+    }
+
+    [Fact]
     public async Task GetList_IsCached_UntilInvalidatedByCreate()
     {
         // Seed two books directly (bypass API so cache must read DB)
