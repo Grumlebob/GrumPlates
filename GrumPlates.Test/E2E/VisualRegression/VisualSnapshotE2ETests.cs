@@ -19,12 +19,13 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
             var url = $"https://example.test/books/{suffix}";
 
             await GoHomeAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("author-bookcase-title")).ToHaveTextAsync("The Authors Bookcase");
-            await Page.GetByTestId("author-bookcase-book").First.ClickAsync(new LocatorClickOptions { Force = true });
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await CaptureAsync("books-author-details");
-            await Page.GetByTestId("book-back").ClickAsync();
-            await Expect(Page.GetByTestId("bookcase-login-cta")).ToContainTextAsync("Create your own bookcase by logging in.");
+            await Expect(Page.GetByTestId("author-book-list")).ToBeVisibleAsync();
+            var publicBook = Page.GetByTestId("author-book-list").GetByRole(AriaRole.Link).First;
+            await publicBook.ClickAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync();
+            await CaptureAsync("books-catalog-details");
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Back to catalog" }).ClickAsync();
+            await Expect(Page.GetByTestId("private-books-sign-in")).ToContainTextAsync("Sign in to create, edit, and remove books");
             await CaptureAsync("home");
 
             TrackCreatedBook(title, url);
@@ -36,10 +37,10 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
             await CaptureAsync("register");
             await SignInAsSeededUserAsync();
             await GoHomeAndWaitForInteractivityAsync();
-            await Expect(Page.GetByTestId("user-bookcase-title")).ToHaveTextAsync("Your Bookcase");
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = "Your books" })).ToBeVisibleAsync();
 
             await Page.GetByTestId("add-book").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("book-form")).ToBeVisibleAsync();
             await CaptureAsync("books-create");
 
             await Page.GetByTestId("book-title").FillAsync(title);
@@ -47,18 +48,16 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
             await Page.GetByTestId("book-url").FillAsync(url);
             await Page.GetByTestId("book-save").ClickAsync();
 
-            var bookLink = Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = $"{title} details" }).First;
-            await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
-            await bookLink.ClickAsync();
-            await Expect(Page.GetByTestId("book-page-view")).ToBeVisibleAsync();
-            await Expect(Page.GetByTestId("book-page-view").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = title })).ToBeVisibleAsync();
+            await Expect(Page.GetByTestId("book-details")).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
+            await Expect(Page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = title, Exact = true })).ToBeVisibleAsync();
             await CaptureAsync("books-details");
 
-            await Page.GetByTestId("book-back").ClickAsync();
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Back to your books" }).ClickAsync();
+            var bookLink = Page.GetByTestId("user-book-list").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = title, Exact = true });
             await Expect(bookLink).ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
             await bookLink.ClickAsync();
-            await Page.GetByTestId("book-edit-pencil").ClickAsync();
-            await Expect(Page.GetByTestId("book-page-editor")).ToBeVisibleAsync();
+            await Page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Edit book" }).ClickAsync();
+            await Expect(Page.GetByTestId("book-edit-page")).ToBeVisibleAsync();
             await Expect(Page.GetByTestId("book-title")).ToHaveValueAsync(title);
             await CaptureAsync("books-edit");
 
@@ -67,8 +66,8 @@ public sealed class VisualSnapshotE2ETests : BlazorE2ETestBase
                 .ToBeVisibleAsync(new LocatorAssertionsToBeVisibleOptions { Timeout = 30_000 });
             await CaptureAsync("account-manage");
 
-            await GoToAsync("/books?bookId=99999999&bookMode=view");
-            await Expect(Page.GetByText("Book not found.")).ToBeVisibleAsync();
+            await GoToAsync("/books/99999999");
+            await Expect(Page.GetByTestId("user-book-not-found")).ToBeVisibleAsync();
             await CaptureAsync("not-found");
         });
     }

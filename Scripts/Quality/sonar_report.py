@@ -512,8 +512,8 @@ def build_scope_evidence(profile: str, tree: list[dict[str, Any]]) -> dict[str, 
     paths = set(by_path)
     if profile == "BlazorAuto":
         expected = {
-            "bookGeometry": "GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs",
-            "bookRazor": "GrumPlates.Client/Features/Books/Shared/BookCoverRenderer.razor",
+            "bookRoutes": "GrumPlates.Client/Features/Books/Routes/BookCreate.razor",
+            "bookForm": "GrumPlates.Client/Features/Books/Shared/BookForm.razor",
             "sharedCore": next((path for path in sorted(paths) if path.startswith("GrumPlates.Core/")), ""),
             "handwrittenCss": "GrumPlates.Client/Styles/input.css",
         }

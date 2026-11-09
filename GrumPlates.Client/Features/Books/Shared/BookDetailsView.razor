@@ -1,0 +1,124 @@
+<main class="mx-auto max-w-3xl">
+    <a class="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+       href="@BackHref">@BackLabel</a>
+
+    <article class="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm sm:p-7" data-testid="book-details">
+        <p class="text-sm font-semibold uppercase tracking-wide text-gray-500">@ContextLabel</p>
+        <h1 class="mt-2 break-words text-3xl font-bold tracking-tight text-gray-900">@Title</h1>
+        <dl class="mt-6 space-y-5">
+            <div>
+                <dt class="text-sm font-semibold text-gray-700">Author</dt>
+                <dd class="mt-1 break-words text-sm text-gray-900">@(string.IsNullOrWhiteSpace(Author) ? "Not listed" : Author)</dd>
+            </div>
+            <div>
+                <dt class="text-sm font-semibold text-gray-700">URL</dt>
+                <dd class="mt-1 break-all text-sm text-gray-900">
+                    @if (SafeUrl is { } safeUrl)
+                    {
+                        <a class="rounded-sm text-blue-700 underline decoration-blue-300 underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                           href="@safeUrl"
+                           target="_blank"
+                           rel="noopener noreferrer">@safeUrl</a>
+                    }
+                    else
+                    {
+                        <span>Not provided</span>
+                    }
+                </dd>
+            </div>
+        </dl>
+
+        @if (EditHref is not null || CanDelete)
+        {
+            <div class="mt-7 flex flex-wrap gap-2 border-t border-gray-200 pt-5">
+                @if (EditHref is not null)
+                {
+                    <a class="inline-flex min-h-11 items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                       href="@EditHref">Edit book</a>
+                }
+                @if (CanDelete && !IsDeleteConfirming)
+                {
+                    <button type="button"
+                            data-testid="book-delete-request"
+                            class="inline-flex min-h-11 items-center justify-center rounded-md border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled="@(IsDeleteBusy || !RendererInfo.IsInteractive)"
+                            @onclick="OnDeleteRequest">Delete book</button>
+                }
+            </div>
+        }
+
+        @if (CanDelete && IsDeleteConfirming)
+        {
+            <section class="mt-6 rounded-lg border border-red-200 bg-red-50 p-4" role="group" aria-labelledby="delete-book-confirm-title" data-testid="book-delete-confirmation">
+                <h2 id="delete-book-confirm-title" class="font-semibold text-red-900">Delete this book?</h2>
+                <p class="mt-1 break-words text-sm text-red-800">“@Title” will be removed from your books.</p>
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <button type="button"
+                            class="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled="@(IsDeleteBusy || !RendererInfo.IsInteractive)"
+                            @onclick="OnDeleteCancel">Cancel</button>
+                    <button type="button"
+                            data-testid="book-delete-confirm"
+                            class="inline-flex min-h-11 items-center justify-center rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled="@(IsDeleteBusy || !RendererInfo.IsInteractive)"
+                            @onclick="OnDeleteConfirm">@(IsDeleteBusy ? "Deleting..." : "Confirm delete")</button>
+                </div>
+            </section>
+        }
+
+        @if (OperationError is not null)
+        {
+            <p class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert" data-testid="book-operation-error">@OperationError</p>
+        }
+    </article>
+</main>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Author { get; set; }
+
+    [Parameter]
+    public string? Url { get; set; }
+
+    [Parameter, EditorRequired]
+    public string BackHref { get; set; } = "/books";
+
+    [Parameter]
+    public string BackLabel { get; set; } = "Back to books";
+
+    [Parameter]
+    public string ContextLabel { get; set; } = "Book";
+
+    [Parameter]
+    public string? EditHref { get; set; }
+
+    [Parameter]
+    public bool CanDelete { get; set; }
+
+    [Parameter]
+    public bool IsDeleteConfirming { get; set; }
+
+    [Parameter]
+    public bool IsDeleteBusy { get; set; }
+
+    [Parameter]
+    public string? OperationError { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleteRequest { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleteConfirm { get; set; }
+
+    [Parameter]
+    public EventCallback OnDeleteCancel { get; set; }
+
+    private string? SafeUrl =>
+        Uri.TryCreate(Url, UriKind.Absolute, out var url) &&
+        (url.Scheme == Uri.UriSchemeHttp || url.Scheme == Uri.UriSchemeHttps)
+            ? url.AbsoluteUri
+            : null;
+}

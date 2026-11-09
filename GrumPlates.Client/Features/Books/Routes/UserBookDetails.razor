@@ -1,0 +1,301 @@
+@page "/books/{Id:int}"
+@attribute [Authorize]
+@implements IDisposable
+
+@inject IBooksApi Books
+@inject UserBookcaseState UserBooks
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Nav
+@inject ILogger<UserBookDetails> Logger
+
+<PageTitle>@(_book?.Title ?? "Your book")</PageTitle>
+
+@if (_isLoading)
+{
+    <main class="mx-auto max-w-3xl">
+        <p class="rounded-lg bg-gray-50 px-4 py-5 text-sm text-gray-600" role="status">Loading your book...</p>
+    </main>
+}
+else if (_loadError is not null)
+{
+    <main class="mx-auto max-w-3xl">
+        <a class="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="/books">Back to your books</a>
+        <p class="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@_loadError</p>
+    </main>
+}
+else if (_book is null)
+{
+    <main class="mx-auto max-w-3xl">
+        <a class="inline-flex min-h-10 items-center rounded-sm text-sm font-semibold text-blue-700 underline underline-offset-4 hover:text-blue-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" href="/books">Back to your books</a>
+        <section class="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-sm" data-testid="user-book-not-found">
+            <h1 class="text-2xl font-bold text-gray-900">Book not found</h1>
+            <p class="mt-2 text-sm text-gray-600">This book is unavailable or is not part of your account.</p>
+        </section>
+    </main>
+}
+else
+{
+    <BookDetailsView Title="@_book.Title"
+                     Author="@_book.Author"
+                     Url="@_book.Url"
+                     BackHref="/books"
+                     BackLabel="Back to your books"
+                     ContextLabel="Your book"
+                     EditHref="@GetEditHref(Id)"
+                     CanDelete="true"
+                     IsDeleteConfirming="@_confirmDelete"
+                     IsDeleteBusy="@_isDeleting"
+                     OperationError="@_operationError"
+                     OnDeleteRequest="RequestDelete"
+                     OnDeleteConfirm="ConfirmDeleteAsync"
+                     OnDeleteCancel="CancelDelete" />
+}
+
+@code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _activeLoad;
+    private CancellationTokenSource? _activeOperation;
+    private GetBookResponse? _book;
+    private string? _loadedUserId;
+    private string? _loadError;
+    private string? _operationError;
+    private bool _isLoading = true;
+    private bool _confirmDelete;
+    private bool _isDeleting;
+    private bool _disposed;
+    private int _loadVersion;
+    private int _operationVersion;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    protected override void OnInitialized() =>
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        CancelActiveLoad();
+        CancelActiveOperation();
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeLoad = load;
+        var version = Interlocked.Increment(ref _loadVersion);
+        _book = null;
+        _loadError = null;
+        _operationError = null;
+        _confirmDelete = false;
+        _isLoading = true;
+
+        try
+        {
+            var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userId = GetUserKey(authenticationState.User);
+            _loadedUserId = userId;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return;
+            }
+
+            var response = await Books.GetByIdAsync(new GetBookRequest { Id = Id }, load.Token);
+            var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (version != Volatile.Read(ref _loadVersion) || load.IsCancellationRequested ||
+                !string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _book = response;
+        }
+        catch (OperationCanceledException) when (load.IsCancellationRequested)
+        {
+            // A newer route parameter, identity change, or disposal owns this view.
+        }
+        catch (Exception exception)
+        {
+            if (version == Volatile.Read(ref _loadVersion))
+            {
+                Logger.LogWarning(exception, "Private book details load failed for book {BookId}", Id);
+                _loadError = "Your book details could not be loaded.";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeLoad, load))
+            {
+                _activeLoad = null;
+                _isLoading = false;
+            }
+
+            load.Dispose();
+        }
+    }
+
+    private void RequestDelete()
+    {
+        if (RendererInfo.IsInteractive && !_isDeleting)
+        {
+            _confirmDelete = true;
+            _operationError = null;
+        }
+    }
+
+    private void CancelDelete()
+    {
+        if (!_isDeleting)
+        {
+            _confirmDelete = false;
+            _operationError = null;
+        }
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (!RendererInfo.IsInteractive || !_confirmDelete || _isDeleting || _book is null)
+        {
+            return;
+        }
+
+        var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeOperation = operation;
+        var version = Interlocked.Increment(ref _operationVersion);
+        var userId = _loadedUserId;
+        _isDeleting = true;
+        _operationError = null;
+
+        try
+        {
+            var deleted = await Books.DeleteAsync(new DeleteBookRequest { Id = Id }, operation.Token);
+            if (!IsCurrentOperation(operation, version))
+            {
+                return;
+            }
+
+            if (!deleted)
+            {
+                _operationError = "This book could not be deleted. It may no longer be available.";
+                _confirmDelete = false;
+                return;
+            }
+
+            var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (!string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            {
+                _book = null;
+                return;
+            }
+
+            await UserBooks.LoadForCurrentUserAsync(operation.Token);
+            if (IsCurrentOperation(operation, version))
+            {
+                Nav.NavigateTo("/books");
+            }
+        }
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
+        {
+            // Route changes and disposal cancel this operation.
+        }
+        catch (Exception exception)
+        {
+            if (IsCurrentOperation(operation, version))
+            {
+                Logger.LogWarning(exception, "Private book delete failed for book {BookId}", Id);
+                _operationError = "Book could not be deleted. Please try again.";
+                _confirmDelete = false;
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeOperation, operation))
+            {
+                _activeOperation = null;
+                _isDeleting = false;
+            }
+
+            operation.Dispose();
+        }
+    }
+
+    private bool IsCurrentOperation(CancellationTokenSource operation, int version) =>
+        !operation.IsCancellationRequested &&
+        version == Volatile.Read(ref _operationVersion) &&
+        ReferenceEquals(_activeOperation, operation);
+
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask) =>
+        _ = ClearAfterAuthenticationChangeAsync(authenticationStateTask);
+
+    private async Task ClearAfterAuthenticationChangeAsync(Task<AuthenticationState> authenticationStateTask)
+    {
+        try
+        {
+            var authenticationState = await authenticationStateTask;
+            var userId = GetUserKey(authenticationState.User);
+            if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            await InvokeAsync(() =>
+            {
+                if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                _loadedUserId = userId;
+                _book = null;
+                _isLoading = false;
+                _confirmDelete = false;
+                _operationError = null;
+                CancelActiveLoad();
+                CancelActiveOperation();
+                Interlocked.Increment(ref _loadVersion);
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            // The route component was removed while authentication changed.
+        }
+    }
+
+    private static string GetEditHref(int id) => $"/books/{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}/edit";
+
+    private static string? GetUserKey(ClaimsPrincipal user)
+    {
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            return null;
+        }
+
+        return user.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+               user.FindFirst(ClaimTypes.Name)?.Value ??
+               user.Identity.Name;
+    }
+
+    private void CancelActiveLoad()
+    {
+        var active = _activeLoad;
+        _activeLoad = null;
+        active?.Cancel();
+    }
+
+    private void CancelActiveOperation()
+    {
+        var active = _activeOperation;
+        _activeOperation = null;
+        if (active is not null)
+        {
+            Interlocked.Increment(ref _operationVersion);
+            active.Cancel();
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
+        _lifetime.Cancel();
+        CancelActiveLoad();
+        CancelActiveOperation();
+        _lifetime.Dispose();
+    }
+}

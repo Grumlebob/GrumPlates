@@ -1,45 +1,113 @@
 @page "/books/author/{SeedKey}"
+@implements IDisposable
 
 @inject IAuthorBooksApi AuthorBooks
 @inject NavigationManager Nav
+@inject ILogger<AuthorDetails> Logger
 
-<PageTitle>Author Book</PageTitle>
+<PageTitle>Public book</PageTitle>
 
-<h1 class="sr-only">Opening author book</h1>
-
-@if (_notFound)
-{
-    <p class="mt-6 text-gray-600">Author book not found.</p>
-}
-
-@* Compatibility route: author seed-key URLs open the current modal flow on /books. *@
+<main class="mx-auto max-w-2xl">
+    @if (_isLoading)
+    {
+        <p class="rounded-lg bg-gray-50 px-4 py-5 text-sm text-gray-600" role="status">Opening catalog entry...</p>
+    }
+    else if (_error is not null)
+    {
+        <p class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@_error</p>
+        <a class="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-blue-700 underline underline-offset-4" href="/books">Back to catalog</a>
+    }
+    else if (_notFound)
+    {
+        <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <h1 class="text-2xl font-bold text-gray-900">Public book not found</h1>
+            <p class="mt-2 text-sm text-gray-600">This catalog entry may have been removed or the link may be incorrect.</p>
+            <a class="mt-4 inline-flex min-h-10 items-center text-sm font-semibold text-blue-700 underline underline-offset-4" href="/books">Back to catalog</a>
+        </section>
+    }
+</main>
 
 @code {
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _activeLoad;
+    private bool _isLoading = true;
+    private bool _notFound;
+    private string? _error;
+    private int _loadVersion;
+
     [Parameter]
     public string SeedKey { get; set; } = string.Empty;
 
-    private bool _notFound;
-
     protected override async Task OnParametersSetAsync()
     {
-        var normalizedSeedKey = SeedKey.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedSeedKey))
+        CancelActiveLoad();
+        var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeLoad = load;
+        var version = Interlocked.Increment(ref _loadVersion);
+        _isLoading = true;
+        _notFound = false;
+        _error = null;
+
+        try
         {
-            _notFound = true;
-            return;
+            var normalizedSeedKey = SeedKey.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedSeedKey))
+            {
+                _notFound = true;
+                return;
+            }
+
+            var response = await AuthorBooks.GetAsync(load.Token);
+            if (version != Volatile.Read(ref _loadVersion) || load.IsCancellationRequested)
+            {
+                return;
+            }
+
+            var book = response.Books.FirstOrDefault(candidate =>
+                string.Equals(candidate.SeedKey, normalizedSeedKey, StringComparison.OrdinalIgnoreCase));
+            if (book is null)
+            {
+                _notFound = true;
+                return;
+            }
+
+            Nav.NavigateTo($"/books/catalog/{book.Id.ToString(System.Globalization.CultureInfo.InvariantCulture)}", replace: true);
         }
-
-        var response = await AuthorBooks.GetAsync();
-        var book = response.Books.FirstOrDefault(candidate =>
-            string.Equals(candidate.SeedKey, normalizedSeedKey, StringComparison.OrdinalIgnoreCase));
-
-        if (book is null)
+        catch (OperationCanceledException) when (load.IsCancellationRequested)
         {
-            _notFound = true;
-            return;
+            // A newer route parameter or disposal owns the current route.
         }
+        catch (Exception exception)
+        {
+            if (version == Volatile.Read(ref _loadVersion))
+            {
+                Logger.LogWarning(exception, "Legacy author-book route could not resolve seed key {SeedKey}", SeedKey);
+                _error = "The public catalog entry could not be opened.";
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeLoad, load))
+            {
+                _activeLoad = null;
+                _isLoading = false;
+            }
 
-        var authorBookId = book.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        Nav.NavigateTo($"/books?authorBookId={authorBookId}&bookMode=view", forceLoad: false, replace: true);
+            load.Dispose();
+        }
+    }
+
+    private void CancelActiveLoad()
+    {
+        var active = _activeLoad;
+        _activeLoad = null;
+        active?.Cancel();
+    }
+
+    public void Dispose()
+    {
+        _lifetime.Cancel();
+        CancelActiveLoad();
+        _lifetime.Dispose();
     }
 }

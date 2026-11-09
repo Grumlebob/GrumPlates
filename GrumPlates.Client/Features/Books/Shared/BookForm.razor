@@ -1,0 +1,63 @@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync" FormName="book-form" data-testid="book-form">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" />
+
+    <fieldset class="space-y-5" disabled="@(IsBusy || !RendererInfo.IsInteractive)">
+        <div>
+            <label for="book-title" class="mb-1 block text-sm font-semibold text-gray-800">Title <span aria-hidden="true">*</span></label>
+            <InputText id="book-title" data-testid="book-title" @bind-Value="Model.Title" maxlength="@BookRules.TitleMaxLength" autocomplete="off"
+                       class="min-h-11 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" />
+            <ValidationMessage For="@(() => Model.Title)" class="mt-1 block text-sm text-red-700" />
+        </div>
+
+        <div>
+            <label for="book-author" class="mb-1 block text-sm font-semibold text-gray-800">Author</label>
+            <InputText id="book-author" data-testid="book-author" @bind-Value="Model.Author" maxlength="@BookRules.AuthorMaxLength" autocomplete="off"
+                       class="min-h-11 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" />
+            <ValidationMessage For="@(() => Model.Author)" class="mt-1 block text-sm text-red-700" />
+        </div>
+
+        <div>
+            <label for="book-url" class="mb-1 block text-sm font-semibold text-gray-800">URL</label>
+            <InputText id="book-url" data-testid="book-url" @bind-Value="Model.Url" maxlength="@BookRules.UrlMaxLength" inputmode="url" autocomplete="url"
+                       class="min-h-11 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600" />
+            <p class="mt-1 text-xs text-gray-500">Optional. Use an absolute HTTP or HTTPS URL.</p>
+            <ValidationMessage For="@(() => Model.Url)" class="mt-1 block text-sm text-red-700" />
+        </div>
+    </fieldset>
+
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <p class="mt-5 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert" data-testid="book-save-error">@Error</p>
+    }
+
+    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+        <a data-testid="book-cancel" href="@CancelHref"
+           class="inline-flex items-center justify-center rounded-md border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-800 no-underline hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600">Cancel</a>
+        <button type="submit" data-testid="book-save"
+                class="inline-flex items-center justify-center rounded-md bg-gray-800 px-4 py-2.5 text-sm font-semibold text-white hover:bg-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled="@(IsBusy || !RendererInfo.IsInteractive)">@((IsBusy) ? "Saving..." : SubmitLabel)</button>
+    </div>
+</EditForm>
+
+@code {
+    [Parameter, EditorRequired]
+    public BookFormModel Model { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public string SubmitLabel { get; set; } = string.Empty;
+
+    [Parameter, EditorRequired]
+    public string CancelHref { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Error { get; set; }
+
+    [Parameter]
+    public bool IsBusy { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback<BookFormModel> OnValidSubmit { get; set; }
+
+    private Task SubmitAsync() => OnValidSubmit.InvokeAsync(Model);
+}

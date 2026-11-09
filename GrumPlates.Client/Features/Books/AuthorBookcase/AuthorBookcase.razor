@@ -3,34 +3,77 @@
 @inject AuthorBookcaseState AuthorBooks
 @inject PersistentComponentState PersistentState
 
-@if (AuthorBooks.IsLoading)
-{
-    <p class="mt-4 text-gray-600">Loading the authors bookcase...</p>
-}
-else if (AuthorBooks.Error is not null)
-{
-    <p class="mt-4 text-red-600">@AuthorBooks.Error</p>
-}
-else
-{
-    <BookcaseShelf Title="The Authors Bookcase"
-                   Description=""
-                   TestId="author-bookcase"
-                   Books="AuthorBooks.ShelfBooks"
-                   LinkBooks="true"
-                   LimitItems="false"
-                   AutoScroll="@_autoScrollReady"
-                   EmptyMessage="The authors bookcase is empty."
-                   EmptyTestId="author-book-empty-state"
-                   SectionClass="mt-4" />
-}
+<section class="mt-8" aria-labelledby="author-books-heading" data-testid="public-catalog-panel">
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <h2 id="author-books-heading" class="text-2xl font-bold text-gray-900">Public catalog</h2>
+            <p class="mt-1 text-sm text-gray-600">Browse the sample books. Public catalog entries are read-only.</p>
+        </div>
+        @if (!AuthorBooks.IsLoading && AuthorBooks.Error is null && AuthorBooks.Books.Count > 0)
+        {
+            <form class="flex w-full gap-2 sm:max-w-md" role="search" @onsubmit="SearchAsync" @onsubmit:preventDefault>
+                <label class="sr-only" for="author-book-search">Search public books</label>
+                <input id="author-book-search" data-testid="author-book-search" type="search"
+                       class="min-w-0 flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                       placeholder="Search title or author" @bind="_searchTerm" @bind:event="oninput"
+                       disabled="@(!RendererInfo.IsInteractive)" />
+                <button class="rounded-md bg-gray-800 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                        type="submit" disabled="@(!RendererInfo.IsInteractive)">Search</button>
+                @if (!string.IsNullOrWhiteSpace(_searchTerm))
+                {
+                    <button class="rounded-md border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            type="button" disabled="@(!RendererInfo.IsInteractive)" @onclick="ClearSearchAsync">Clear</button>
+                }
+            </form>
+        }
+    </div>
+
+    @if (AuthorBooks.IsLoading)
+    {
+        <p class="rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-600" role="status">Loading public books...</p>
+    }
+    else if (AuthorBooks.Error is not null)
+    {
+        <p class="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@AuthorBooks.Error</p>
+    }
+    else if (AuthorBooks.Books.Count == 0)
+    {
+        <p class="rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-600" data-testid="author-book-empty-state">The public catalog is empty.</p>
+    }
+    else if (VisibleBooks.Count == 0)
+    {
+        <p class="rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-600" data-testid="author-book-no-results">No public books match your search.</p>
+    }
+    else
+    {
+        <div class="mt-5 space-y-3" data-testid="author-book-list" aria-live="polite">
+            @foreach (var book in VisibleBooks)
+            {
+                <BookListRow Id="@book.Id"
+                             Title="@book.Title"
+                             Author="@book.Author"
+                             DetailsHref="@GetDetailsHref(book.Id)" />
+            }
+        </div>
+        <p class="mt-2 text-sm text-gray-600" data-testid="author-book-count">Showing @VisibleBooks.Count of @AuthorBooks.Books.Count public books.</p>
+    }
+</section>
 
 @code {
-    private const string PersistedStateKey = "author-bookcase-books";
+    private const string PersistedStateKey = "public-catalog-books";
 
     private readonly CancellationTokenSource _loadCancellation = new();
     private PersistingComponentStateSubscription _persistingSubscription;
-    private bool _autoScrollReady;
+    private string _searchTerm = string.Empty;
+    private string _appliedSearch = string.Empty;
+
+    private IReadOnlyList<AuthorBookListItemResponse> VisibleBooks =>
+        string.IsNullOrWhiteSpace(_appliedSearch)
+            ? AuthorBooks.Books
+            : AuthorBooks.Books.Where(book =>
+                    book.Title.Contains(_appliedSearch, StringComparison.OrdinalIgnoreCase) ||
+                    (book.Author?.Contains(_appliedSearch, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -49,18 +92,22 @@ else
         _persistingSubscription = PersistentState.RegisterOnPersisting(PersistAuthorBooks);
     }
 
-    protected override void OnAfterRender(bool firstRender)
-    {
-        if (!firstRender)
-        {
-            return;
-        }
+    private void HandleBooksChanged() => _ = InvokeAsync(StateHasChanged);
 
-        _autoScrollReady = true;
-        StateHasChanged();
+    private Task SearchAsync()
+    {
+        _appliedSearch = _searchTerm.Trim();
+        return Task.CompletedTask;
     }
 
-    private void HandleBooksChanged() => _ = InvokeAsync(StateHasChanged);
+    private Task ClearSearchAsync()
+    {
+        _searchTerm = string.Empty;
+        _appliedSearch = string.Empty;
+        return Task.CompletedTask;
+    }
+
+    private static string GetDetailsHref(int id) => $"/books/catalog/{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 
     private Task PersistAuthorBooks()
     {

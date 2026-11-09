@@ -21,7 +21,7 @@ ANALYSIS_ID = "7d5ec4c9-f501-46e1-91fd-44f653016317"
 PROJECT_VERSION = "20261008-ed87fedcaf09"
 SETTINGS_DIGEST = "a" * 64
 REPO_ROOT = "C:/fake/repo"
-GEOMETRY = "GrumPlates.Client/Features/Books/Shared/BookCoverGeometry.cs"
+BOOK_FORM = "GrumPlates.Client/Features/Books/Shared/BookForm.razor"
 CORE = "GrumPlates.Core/Features/Books/UseCases/GetBooks/GetBooksResponse.cs"
 
 
@@ -38,17 +38,17 @@ GATE = load("qualitygate.json")
 ANALYSES = load("project-analyses.json")
 CHURN_TEXT = (
     "@@aaa111\n"
-    f"{GEOMETRY}\n{GEOMETRY}\n{CORE}\n"
+    f"{BOOK_FORM}\n{BOOK_FORM}\n{CORE}\n"
     "\n@@bbb222\n"
-    f"{GEOMETRY}\n"
+    f"{BOOK_FORM}\n"
     "\n@@ccc333\n"
-    f"{GEOMETRY}\n"
+    f"{BOOK_FORM}\n"
 )
 RUN_EVIDENCE = {
     "tests": {"frontendTests": {"status": "not-applicable"},
               "dotnet": {"passed": 190, "failed": 0, "skipped": 13, "total": 203, "result": "tests/suite.trx"}},
     "coverage": {"reactLcov": "not-applicable", "dotnet": {"valid": True, "directReportCount": 1,
-                                                                  "coveredProductionSources": [GEOMETRY]}},
+                                                                  "coveredProductionSources": [BOOK_FORM]}},
 }
 
 
@@ -111,7 +111,7 @@ def build_standard_report(routes: dict | None = None, path_exists=None, profile:
             "tests": {"frontendTests": {"passed": 31, "failed": 0, "skipped": 0, "total": 31},
                       "dotnet": {"passed": 182, "failed": 0, "skipped": 13, "total": 195, "result": "tests/suite.trx"}},
             "coverage": {"reactLcov": "validated", "dotnet": {"valid": True, "directReportCount": 1,
-                                                                        "coveredProductionSources": [GEOMETRY]}},
+                                                                        "coveredProductionSources": [BOOK_FORM]}},
         }
     return sr.build_report(
         FakeClient(routes or standard_routes()), report_request(profile, run_evidence), CHURN_TEXT,
@@ -139,11 +139,11 @@ class RiskAndClassificationTests(unittest.TestCase):
     def test_file_risk_uses_churn_coverage_and_unique_issue_counts(self) -> None:
         report = build_standard_report()
         files = {entry["path"]: entry for entry in report["files"]}
-        geometry = files[GEOMETRY]
-        self.assertEqual(geometry["commits"], 3)
-        self.assertEqual(geometry["relsec"], 1)
-        self.assertEqual(geometry["other"], 1)
-        self.assertEqual(geometry["risk"], sr.risk_score(478, 3, 0.415, 1, 1))
+        book_form = files[BOOK_FORM]
+        self.assertEqual(book_form["commits"], 3)
+        self.assertEqual(book_form["relsec"], 1)
+        self.assertEqual(book_form["other"], 1)
+        self.assertEqual(book_form["risk"], sr.risk_score(478, 3, 0.415, 1, 1))
         core = files[CORE]
         self.assertEqual(core["commits"], 1)
         self.assertEqual(core["relsec"], 1)
@@ -249,7 +249,7 @@ class ReportCompletenessTests(unittest.TestCase):
         self.assertEqual(report["frontendProfile"], "BlazorAuto")
         self.assertEqual(report["analysisId"], ANALYSIS_ID)
         self.assertEqual(report["qualityGate"], {"status": "OK", "analysisId": ANALYSIS_ID, "informational": True})
-        self.assertTrue(all(report["scopeEvidence"][name] for name in ("bookGeometry", "bookRazor", "sharedCore", "handwrittenCss", "reactImplementationExcluded")))
+        self.assertTrue(all(report["scopeEvidence"][name] for name in ("bookRoutes", "bookForm", "sharedCore", "handwrittenCss", "reactImplementationExcluded")))
         self.assertIn(("api/qualitygates/project_status", {"analysisId": ANALYSIS_ID}), client.calls)
 
     def test_latest_analysis_change_during_export_aborts(self) -> None:
@@ -267,7 +267,7 @@ class ReportCompletenessTests(unittest.TestCase):
             build_standard_report(routes)
 
     def test_report_incomplete_when_path_or_profile_evidence_is_missing(self) -> None:
-        report = build_standard_report(path_exists=lambda path: path != GEOMETRY)
+        report = build_standard_report(path_exists=lambda path: path != BOOK_FORM)
         self.assertFalse(report["complete"])
         self.assertEqual(report["dataCompleteness"]["fileList"], "incomplete")
 

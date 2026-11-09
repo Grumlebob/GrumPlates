@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using GrumPlates.Client.Features.Books.Shared;
 using GrumPlates.Core.Features.Books.Contracts;
 using GrumPlates.Core.Features.Books.UseCases.DeleteBook;
 using GrumPlates.Core.Features.Books.UseCases.GetBooks;
@@ -23,29 +22,109 @@ public sealed class UserBookcaseState(
 
     public string? Error { get; private set; }
 
-    private IReadOnlyList<BookListItemResponse> Books { get; set; } = [];
+    private string? _currentUserKey;
 
-    public IReadOnlyList<BookcaseBook> ShelfBooks { get; private set; } = [];
+    public IReadOnlyList<BookListItemResponse> Books { get; private set; } = [];
+
+    public int Page { get; private set; } = 1;
+
+    public int PageSize { get; private set; } = SearchBooksRequest.DefaultPageSize;
+
+    public int TotalCount { get; private set; }
+
+    public string SearchTerm { get; private set; } = string.Empty;
+
+    public bool HasPreviousPage => Page > 1;
+
+    public bool HasNextPage => Page * PageSize < TotalCount;
 
     public async Task LoadForCurrentUserAsync(CancellationToken cancellationToken = default)
     {
+        await LoadPageForCurrentUserAsync(null, null, cancellationToken);
+    }
+
+    public Task SearchAsync(string? searchTerm, CancellationToken cancellationToken = default) =>
+        LoadPageForCurrentUserAsync(searchTerm ?? string.Empty, 1, cancellationToken);
+
+    public Task GoToPageAsync(int page, CancellationToken cancellationToken = default) =>
+        LoadPageForCurrentUserAsync(SearchTerm, page, cancellationToken);
+
+    public void ResetForIdentity(string? userId)
+    {
+        if (string.Equals(userId, _currentUserKey, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _currentUserKey = userId;
+        Interlocked.Increment(ref _version);
+        ApplyBooks([]);
+        Page = 1;
+        TotalCount = 0;
+        SearchTerm = string.Empty;
+        Error = null;
+        IsLoading = false;
+        NotifyChanged();
+    }
+
+    public void ResetForIdentity(ClaimsPrincipal user) => ResetForIdentity(GetUserKey(user));
+
+    private async Task LoadPageForCurrentUserAsync(
+        string? searchTerm,
+        int? page,
+        CancellationToken cancellationToken)
+    {
+        var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+        var userId = GetUserKey(authState.User);
+        var identityChanged = !string.Equals(userId, _currentUserKey, StringComparison.Ordinal);
+        if (identityChanged)
+        {
+            ResetForIdentity(userId);
+        }
+
+        SearchTerm = searchTerm ?? (identityChanged ? string.Empty : SearchTerm);
+        Page = Math.Clamp(page ?? (identityChanged ? 1 : Page), 1, SearchBooksRequest.MaximumPage);
         var version = Interlocked.Increment(ref _version);
         IsLoading = true;
         Error = null;
         NotifyChanged();
 
-        var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
-        var userId = GetUserKey(authState.User);
         if (string.IsNullOrWhiteSpace(userId))
         {
-            ApplyLoadResult(version, []);
+            ApplyBooks([]);
+            IsLoading = false;
+            ApplyLoadResult(version, new SearchBooksResponse
+            {
+                Books = [],
+                Page = Page,
+                PageSize = PageSize,
+                TotalCount = 0
+            });
             return;
         }
 
         try
         {
-            var response = await _books.GetAsync(cancellationToken);
-            ApplyLoadResult(version, response.Books);
+            var response = await _books.SearchAsync(new SearchBooksRequest
+            {
+                SearchTerm = SearchTerm,
+                Page = Page,
+                PageSize = PageSize
+            }, cancellationToken);
+            if (version != Volatile.Read(ref _version))
+            {
+                return;
+            }
+
+            var latestAuthState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+            var latestUserId = GetUserKey(latestAuthState.User);
+            if (!string.Equals(userId, latestUserId, StringComparison.Ordinal))
+            {
+                ResetForIdentity(latestUserId);
+                return;
+            }
+
+            ApplyLoadResult(version, response);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -58,8 +137,8 @@ public sealed class UserBookcaseState(
                 return;
             }
 
-            _logger.LogWarning(ex, "User bookcase load failed for user {UserId}", userId);
-            Error = "Your bookcase could not be loaded.";
+            _logger.LogWarning(ex, "User books load failed for user {UserId}", userId);
+            Error = "Your books could not be loaded.";
             IsLoading = false;
             NotifyChanged();
         }
@@ -68,6 +147,7 @@ public sealed class UserBookcaseState(
     public void ApplySavedBook(BookListItemResponse savedBook)
     {
         Interlocked.Increment(ref _version);
+        var isNewBook = Books.All(book => book.Id != savedBook.Id);
         var next = Books
             .Where(book => book.Id != savedBook.Id)
             .Append(savedBook)
@@ -75,6 +155,11 @@ public sealed class UserBookcaseState(
             .ToList();
 
         ApplyBooks(next);
+        if (isNewBook)
+        {
+            TotalCount++;
+        }
+
         IsLoading = false;
         Error = null;
         NotifyChanged();
@@ -93,7 +178,13 @@ public sealed class UserBookcaseState(
 
             if (version == Volatile.Read(ref _version))
             {
+                var wasLoaded = Books.Any(book => book.Id == id);
                 ApplyBooks(Books.Where(book => book.Id != id).ToList());
+                if (wasLoaded)
+                {
+                    TotalCount = Math.Max(0, TotalCount - 1);
+                }
+
                 IsLoading = false;
                 Error = null;
                 NotifyChanged();
@@ -103,7 +194,7 @@ public sealed class UserBookcaseState(
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // The modal ignores canceled deletes when navigation or disposal supersedes them.
+            // Navigation or component disposal superseded this delete.
             return false;
         }
         catch (Exception ex)
@@ -120,14 +211,17 @@ public sealed class UserBookcaseState(
         }
     }
 
-    private void ApplyLoadResult(int version, IReadOnlyList<BookListItemResponse> books)
+    private void ApplyLoadResult(int version, SearchBooksResponse response)
     {
         if (version != Volatile.Read(ref _version))
         {
             return;
         }
 
-        ApplyBooks(books.OrderBy(book => book.Id).ToList());
+        ApplyBooks(response.Books.OrderBy(book => book.Id).ToList());
+        Page = response.Page;
+        PageSize = response.PageSize;
+        TotalCount = response.TotalCount;
         Error = null;
         IsLoading = false;
         NotifyChanged();
@@ -136,7 +230,6 @@ public sealed class UserBookcaseState(
     private void ApplyBooks(IReadOnlyList<BookListItemResponse> books)
     {
         Books = books;
-        ShelfBooks = UserBookcaseBookMapper.ToBookcaseBooks(books);
     }
 
     private void NotifyChanged() => Changed?.Invoke();

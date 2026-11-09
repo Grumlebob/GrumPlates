@@ -2,9 +2,9 @@ using System.ComponentModel.DataAnnotations;
 using GrumPlates.Core.Features.Books.Contracts;
 using GrumPlates.Core.Features.Books.UseCases.Shared;
 
-namespace GrumPlates.Client.Features.Books.BookPage;
+namespace GrumPlates.Client.Features.Books.Shared;
 
-public sealed class BookPageEditorModel : IValidatableObject
+public sealed class BookFormModel : IValidatableObject
 {
     [Required]
     [StringLength(BookRules.TitleMaxLength)]

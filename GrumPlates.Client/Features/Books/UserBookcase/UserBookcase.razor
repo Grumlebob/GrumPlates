@@ -1,47 +1,187 @@
 @implements IDisposable
 
 @inject UserBookcaseState UserBooks
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
-@if (UserBooks.IsLoading)
-{
-    <p class="mt-6 text-gray-600">Loading your bookcase...</p>
-}
-else if (UserBooks.Error is not null)
-{
-    <p class="mt-6 text-red-600">@UserBooks.Error</p>
-}
-else
-{
-    <BookcaseShelf Title="Your Bookcase"
-                   Description="Only books you have saved."
-                   TestId="user-bookcase"
-                   Books="UserBooks.ShelfBooks"
-                   LinkBooks="true"
-                   LimitItems="false"
-                   EmptyMessage="Your bookcase is empty."
-                   EmptyTestId="user-book-empty-state">
-        <Actions>
-            <a data-testid="add-book"
-               class="inline-flex items-center justify-center rounded-md border border-gray-800 bg-gray-800 px-3.5 py-2.5 text-sm font-bold leading-5 text-white no-underline transition-colors hover:bg-gray-950 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-               href="/books?bookMode=create">Add Book</a>
-        </Actions>
-    </BookcaseShelf>
-}
+<section class="mt-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
+         data-testid="user-books-panel"
+         aria-labelledby="user-books-title">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <h2 id="user-books-title" class="text-xl font-bold text-gray-900">Your books</h2>
+            <p class="mt-1 text-sm text-gray-600">Only books saved to your account are shown here.</p>
+        </div>
+        <a data-testid="add-book"
+           class="inline-flex min-h-11 items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white no-underline hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+           href="/books/new">Add book</a>
+    </div>
+
+    @if (UserBooks.IsLoading)
+    {
+        <p class="mt-5 rounded-lg bg-gray-50 px-4 py-5 text-sm text-gray-600" role="status">Loading your books...</p>
+    }
+    else if (UserBooks.Error is not null)
+    {
+        <p class="mt-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">@UserBooks.Error</p>
+    }
+    else
+    {
+        <form class="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end"
+              role="search"
+              @onsubmit="SearchAsync"
+              @onsubmit:preventDefault="true">
+            <div class="min-w-0 flex-1">
+                <label for="user-book-search" class="mb-1 block text-sm font-semibold text-gray-800">Search your books</label>
+                <input id="user-book-search"
+                       data-testid="user-book-search"
+                       @bind="_searchInput"
+                       @bind:event="oninput"
+                       maxlength="200"
+                       disabled="@(!RendererInfo.IsInteractive)"
+                       class="min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                       placeholder="Title or author" />
+            </div>
+            <div class="flex gap-2">
+                <button type="submit"
+                        class="inline-flex min-h-11 items-center justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled="@(!RendererInfo.IsInteractive || UserBooks.IsLoading)">Search</button>
+                @if (!string.IsNullOrEmpty(UserBooks.SearchTerm))
+                {
+                    <button type="button"
+                            class="inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled="@(!RendererInfo.IsInteractive || UserBooks.IsLoading)"
+                            @onclick="ClearSearchAsync">Clear</button>
+                }
+            </div>
+        </form>
+
+        <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            @if (UserBooks.TotalCount == 0)
+            {
+                <p class="text-sm text-gray-600" data-testid="user-book-empty-state">
+                    @(string.IsNullOrWhiteSpace(UserBooks.SearchTerm) ? "You have not added any books yet." : "No books match that search.")
+                </p>
+            }
+            else
+            {
+                <p class="text-sm text-gray-600" aria-live="polite">
+                    Showing @UserBooks.Books.Count of @UserBooks.TotalCount books
+                    @if (!string.IsNullOrWhiteSpace(UserBooks.SearchTerm))
+                    {
+                        <span> matching “@UserBooks.SearchTerm”</span>
+                    }
+                </p>
+                <nav class="flex items-center gap-2" aria-label="Your books pages">
+                    <button type="button"
+                            class="inline-flex min-h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            data-testid="user-books-previous"
+                            disabled="@(!RendererInfo.IsInteractive || !UserBooks.HasPreviousPage || UserBooks.IsLoading)"
+                            @onclick="PreviousPageAsync">Previous</button>
+                    <span class="min-w-24 text-center text-sm text-gray-600">Page @UserBooks.Page of @PageCount</span>
+                    <button type="button"
+                            class="inline-flex min-h-10 items-center justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            data-testid="user-books-next"
+                            disabled="@(!RendererInfo.IsInteractive || !UserBooks.HasNextPage || UserBooks.IsLoading)"
+                            @onclick="NextPageAsync">Next</button>
+                </nav>
+            }
+        </div>
+
+        @if (UserBooks.Books.Count > 0)
+        {
+            <div class="mt-4 space-y-3" data-testid="user-book-list" aria-live="polite">
+                @foreach (var book in UserBooks.Books)
+                {
+                    <BookListRow Id="@book.Id"
+                                 Title="@book.Title"
+                                 Author="@book.Author"
+                                 DetailsHref="@GetDetailsHref(book.Id)"
+                                 EditHref="@GetEditHref(book.Id)" />
+                }
+            </div>
+        }
+    }
+</section>
 
 @code {
     private readonly CancellationTokenSource _loadCancellation = new();
+    private string _searchInput = string.Empty;
+    private bool _disposed;
+
+    private int PageCount => Math.Max(1, (UserBooks.TotalCount + UserBooks.PageSize - 1) / UserBooks.PageSize);
 
     protected override async Task OnInitializedAsync()
     {
         UserBooks.Changed += HandleBooksChanged;
+        AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
         await UserBooks.LoadForCurrentUserAsync(_loadCancellation.Token);
+        _searchInput = UserBooks.SearchTerm;
     }
+
+    private async Task SearchAsync()
+    {
+        await UserBooks.SearchAsync(_searchInput.Trim(), _loadCancellation.Token);
+    }
+
+    private async Task ClearSearchAsync()
+    {
+        _searchInput = string.Empty;
+        await UserBooks.SearchAsync(string.Empty, _loadCancellation.Token);
+    }
+
+    private Task PreviousPageAsync() => UserBooks.GoToPageAsync(UserBooks.Page - 1, _loadCancellation.Token);
+
+    private Task NextPageAsync() => UserBooks.GoToPageAsync(UserBooks.Page + 1, _loadCancellation.Token);
+
+    private static string GetDetailsHref(int id) => $"/books/{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+    private static string GetEditHref(int id) => $"/books/{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}/edit";
 
     private void HandleBooksChanged() => _ = InvokeAsync(StateHasChanged);
 
+    private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask) =>
+        _ = RefreshAfterAuthenticationChangeAsync(authenticationStateTask);
+
+    private async Task RefreshAfterAuthenticationChangeAsync(Task<AuthenticationState> authenticationStateTask)
+    {
+        try
+        {
+            var authenticationState = await authenticationStateTask;
+            if (_disposed)
+            {
+                return;
+            }
+
+            await InvokeAsync(async () =>
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                UserBooks.ResetForIdentity(authenticationState.User);
+                _searchInput = UserBooks.SearchTerm;
+                if (authenticationState.User.Identity?.IsAuthenticated == true)
+                {
+                    await UserBooks.LoadForCurrentUserAsync(_loadCancellation.Token);
+                }
+            });
+        }
+        catch (OperationCanceledException) when (_loadCancellation.IsCancellationRequested)
+        {
+            // Navigation or disposal canceled the current identity's reload.
+        }
+        catch (ObjectDisposedException) when (_disposed)
+        {
+            // The component was removed while the authentication update was being delivered.
+        }
+    }
+
     public void Dispose()
     {
+        _disposed = true;
         UserBooks.Changed -= HandleBooksChanged;
+        AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
         _loadCancellation.Cancel();
         _loadCancellation.Dispose();
     }
