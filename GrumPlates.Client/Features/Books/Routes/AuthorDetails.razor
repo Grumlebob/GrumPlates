@@ -33,7 +33,6 @@
     private bool _isLoading = true;
     private bool _notFound;
     private string? _error;
-    private int _loadVersion;
 
     [Parameter]
     public string SeedKey { get; set; } = string.Empty;
@@ -43,7 +42,6 @@
         CancelActiveLoad();
         var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _activeLoad = load;
-        var version = Interlocked.Increment(ref _loadVersion);
         _isLoading = true;
         _notFound = false;
         _error = null;
@@ -58,7 +56,7 @@
             }
 
             var response = await AuthorBooks.GetAsync(load.Token);
-            if (version != Volatile.Read(ref _loadVersion) || load.IsCancellationRequested)
+            if (load.IsCancellationRequested || !ReferenceEquals(_activeLoad, load))
             {
                 return;
             }
@@ -79,7 +77,7 @@
         }
         catch (Exception exception)
         {
-            if (version == Volatile.Read(ref _loadVersion))
+            if (ReferenceEquals(_activeLoad, load) && !load.IsCancellationRequested)
             {
                 Logger.LogWarning(exception, "Legacy author-book route could not resolve seed key {SeedKey}", SeedKey);
                 _error = "The public catalog entry could not be opened.";

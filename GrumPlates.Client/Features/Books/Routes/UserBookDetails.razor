@@ -63,8 +63,6 @@ else
     private bool _confirmDelete;
     private bool _isDeleting;
     private bool _disposed;
-    private int _loadVersion;
-    private int _operationVersion;
 
     [Parameter]
     public int Id { get; set; }
@@ -78,7 +76,6 @@ else
         CancelActiveOperation();
         var load = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _activeLoad = load;
-        var version = Interlocked.Increment(ref _loadVersion);
         _book = null;
         _loadError = null;
         _operationError = null;
@@ -88,7 +85,7 @@ else
         try
         {
             var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            var userId = GetUserKey(authenticationState.User);
+            var userId = BookUserIdentity.GetUserKey(authenticationState.User);
             _loadedUserId = userId;
             if (string.IsNullOrWhiteSpace(userId))
             {
@@ -97,8 +94,8 @@ else
 
             var response = await Books.GetByIdAsync(new GetBookRequest { Id = Id }, load.Token);
             var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (version != Volatile.Read(ref _loadVersion) || load.IsCancellationRequested ||
-                !string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            if (load.IsCancellationRequested || !ReferenceEquals(_activeLoad, load) ||
+                !string.Equals(userId, BookUserIdentity.GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
             {
                 return;
             }
@@ -111,7 +108,7 @@ else
         }
         catch (Exception exception)
         {
-            if (version == Volatile.Read(ref _loadVersion))
+            if (ReferenceEquals(_activeLoad, load) && !load.IsCancellationRequested)
             {
                 Logger.LogWarning(exception, "Private book details load failed for book {BookId}", Id);
                 _loadError = "Your book details could not be loaded.";
@@ -156,7 +153,6 @@ else
 
         var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _activeOperation = operation;
-        var version = Interlocked.Increment(ref _operationVersion);
         var userId = _loadedUserId;
         _isDeleting = true;
         _operationError = null;
@@ -164,7 +160,7 @@ else
         try
         {
             var deleted = await Books.DeleteAsync(new DeleteBookRequest { Id = Id }, operation.Token);
-            if (!IsCurrentOperation(operation, version))
+            if (!IsCurrentOperation(operation))
             {
                 return;
             }
@@ -177,14 +173,14 @@ else
             }
 
             var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (!string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            if (!string.Equals(userId, BookUserIdentity.GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
             {
                 _book = null;
                 return;
             }
 
             await UserBooks.LoadForCurrentUserAsync(operation.Token);
-            if (IsCurrentOperation(operation, version))
+            if (IsCurrentOperation(operation))
             {
                 Nav.NavigateTo("/books");
             }
@@ -195,7 +191,7 @@ else
         }
         catch (Exception exception)
         {
-            if (IsCurrentOperation(operation, version))
+            if (IsCurrentOperation(operation))
             {
                 Logger.LogWarning(exception, "Private book delete failed for book {BookId}", Id);
                 _operationError = "Book could not be deleted. Please try again.";
@@ -214,10 +210,8 @@ else
         }
     }
 
-    private bool IsCurrentOperation(CancellationTokenSource operation, int version) =>
-        !operation.IsCancellationRequested &&
-        version == Volatile.Read(ref _operationVersion) &&
-        ReferenceEquals(_activeOperation, operation);
+    private bool IsCurrentOperation(CancellationTokenSource operation) =>
+        !operation.IsCancellationRequested && ReferenceEquals(_activeOperation, operation);
 
     private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask) =>
         _ = ClearAfterAuthenticationChangeAsync(authenticationStateTask);
@@ -227,7 +221,7 @@ else
         try
         {
             var authenticationState = await authenticationStateTask;
-            var userId = GetUserKey(authenticationState.User);
+            var userId = BookUserIdentity.GetUserKey(authenticationState.User);
             if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
             {
                 return;
@@ -247,7 +241,6 @@ else
                 _operationError = null;
                 CancelActiveLoad();
                 CancelActiveOperation();
-                Interlocked.Increment(ref _loadVersion);
                 StateHasChanged();
             });
         }
@@ -258,18 +251,6 @@ else
     }
 
     private static string GetEditHref(int id) => $"/books/{id.ToString(System.Globalization.CultureInfo.InvariantCulture)}/edit";
-
-    private static string? GetUserKey(ClaimsPrincipal user)
-    {
-        if (user.Identity?.IsAuthenticated != true)
-        {
-            return null;
-        }
-
-        return user.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
-               user.FindFirst(ClaimTypes.Name)?.Value ??
-               user.Identity.Name;
-    }
 
     private void CancelActiveLoad()
     {
@@ -282,11 +263,7 @@ else
     {
         var active = _activeOperation;
         _activeOperation = null;
-        if (active is not null)
-        {
-            Interlocked.Increment(ref _operationVersion);
-            active.Cancel();
-        }
+        active?.Cancel();
     }
 
     public void Dispose()

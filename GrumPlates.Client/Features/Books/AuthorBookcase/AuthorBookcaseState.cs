@@ -21,7 +21,7 @@ public sealed class AuthorBookcaseState(
 
     public void ApplyLoadedBooks(IReadOnlyList<AuthorBookListItemResponse> books)
     {
-        Interlocked.Increment(ref _version);
+        _version++;
         Books = books.OrderBy(book => book.Id).ToList();
         Error = null;
         IsLoading = false;
@@ -30,7 +30,7 @@ public sealed class AuthorBookcaseState(
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        var version = Interlocked.Increment(ref _version);
+        var version = ++_version;
         IsLoading = true;
         Error = null;
         NotifyChanged();
@@ -38,7 +38,7 @@ public sealed class AuthorBookcaseState(
         try
         {
             var response = await _authorBooks.GetAsync(cancellationToken);
-            if (version != Volatile.Read(ref _version))
+            if (version != _version)
             {
                 return;
             }
@@ -51,7 +51,7 @@ public sealed class AuthorBookcaseState(
         }
         catch (Exception ex)
         {
-            if (version != Volatile.Read(ref _version))
+            if (version != _version)
             {
                 return;
             }
