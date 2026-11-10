@@ -561,7 +561,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A15 `shared/allocation-four-node`
 
-- [ ] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalCluster and Cloud (multi-tier) — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalCluster and Cloud (multi-tier) — both frontend profiles`.
   - Nodes: `User device` (as A14), `Cloudflare edge` («external»), `node-main / cloud-main`, `node-app1 / cloud-app1`, `node-app2 / cloud-app2`, `node-db / cloud-db`.
   - Allocations: main → `Caddy load balancer`, `cloudflared`, opt frame `observability backend` (prometheus 384m/0.50, alertmanager 128m/0.15, loki 256m/0.50, tempo 384m/0.35, grafana 256m/0.35). Each app node → Docker Engine → `web (APP_IMAGE_REF)`, opt `alloy 192m/0.35`, `node-exporter 64m/0.10`. db → Docker Engine → `postgres`, `redis`, `postgres-exporter 128m/0.15`, `redis-exporter 96m/0.10`, opt agent.
   - Protocol links: User – edge `HTTPS`; edge – cloudflared `outbound tunnel`; Caddy – each `web` `HTTP app_port · sticky cookie · health /health/ready every 5 s`; each web – postgres `PostgreSQL protocol (private network)`; each web – redis `Redis protocol (private network)`; agents → backend `telemetry (private)`.
