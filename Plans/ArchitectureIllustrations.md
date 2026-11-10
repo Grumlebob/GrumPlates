@@ -470,7 +470,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A06 `blazorauto/module-packages`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — BlazorAuto profile`.
   - `package-list` boxes: `GrumPlates (server host)` with its five sub-folders; `GrumPlates.Client (Blazor WebAssembly)` with its three sub-folders; `GrumPlates.Core` with its four sub-folders (7.1).
   - Relations: `uses` server → Client (label `«uses» (BlazorAuto profile)`); `uses` server → Core; `uses` Client → Core.
   - `note` "Enforced by GrumPlates.Test/Architecture": the rules from 7.1 that mention Core, Client or the server.
@@ -480,7 +480,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A07 `react/module-packages`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — React profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — React profile`.
   - `package-list` boxes: `GrumPlates (server host)`, `GrumPlates.Core`, `GrumPlates.React (TypeScript SPA)` listing `app/routes`, `app/features/books`, `app/features/accounts`, `app/api`, `app/components`.
   - `artifact` boxes: `openapi.json` (label "GrumPlates.React/api/openapi.json") and `schema.d.ts` (label "app/api/generated").
   - Relations: `uses` server → Core. Dashed `uses` with label `«generated from»`: openapi.json → server; schema.d.ts → openapi.json. `uses` GrumPlates.React → schema.d.ts. No arrow from GrumPlates.React to any .NET package.
