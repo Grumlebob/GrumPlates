@@ -499,12 +499,12 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A09 `react/module-books-client`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: React client — React profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: React client — React profile`.
   - Package `app/routes`: `home.tsx`, `books.tsx`, `author-book.tsx`, `my-books.tsx` (with their paths from 7.4).
   - Package `app/features/books`: `catalog-page.tsx`, `author-book-page.tsx`, `book-card.tsx`, `private-book-list.tsx`, `read-states.tsx`.
   - Package `app/features/accounts`: `AccountSessionController`, `account-provider.tsx`.
   - Package `app/api`: `api-client.ts`, `client.ts` (public, no credentials), `queries.ts`, `api-result.ts`, `errors.ts`, `generated/schema.d.ts`.
-  - Relations (`uses`): books.tsx → catalog-page; author-book.tsx → author-book-page; my-books.tsx → private-book-list, account-provider; catalog-page and author-book-page → queries; queries → client.ts; private-book-list → account-provider; account-provider → AccountSessionController; AccountSessionController → api-client.ts; client.ts → api-client.ts; api-client.ts → schema.d.ts; pages → api-result/errors (one arrow from the package is fine).
+  - Relations (`uses`): books.tsx → catalog-page; author-book.tsx → author-book-page; my-books.tsx → private-book-list, account-context; catalog-page and author-book-page → queries; queries → client.ts; private-book-list → account-context; `root.tsx` → account-provider; account-provider → account-context («provides»), AccountSessionController (corrected in A09 from the imports: private code reads `account-context.ts`, which `account-provider.tsx`, mounted in `root.tsx`, supplies); AccountSessionController → api-client.ts; client.ts → api-client.ts; api-client.ts → schema.d.ts; pages → api-result/errors (one arrow from the package is fine).
   - Note: "Public catalog requests omit credentials. Private requests use the session-decorated client (cookie, X-Expected-User, X-CSRF-TOKEN). Accounts are disabled by default in the React profile."
 - **Verify / Done when:** as A05 (commit `docs: add React Books client module view [skip ci]`).
 
