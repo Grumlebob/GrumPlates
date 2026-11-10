@@ -47,19 +47,16 @@
     public int Id { get; set; }
 
     private GetAuthorBookResponse? _book;
-    private CancellationTokenSource? _loadCancellation;
-    private int _loadVersion;
+    private CancellationTokenSource? _activeLoad;
     private bool _loading = true;
     private bool _notFound;
     private string? _error;
 
     protected override async Task OnParametersSetAsync()
     {
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
-        _loadCancellation = new CancellationTokenSource();
-        var cancellationToken = _loadCancellation.Token;
-        var version = Interlocked.Increment(ref _loadVersion);
+        CancelActiveLoad();
+        var load = new CancellationTokenSource();
+        _activeLoad = load;
         _loading = true;
         _notFound = false;
         _error = null;
@@ -67,30 +64,44 @@
 
         try
         {
-            var book = await AuthorBooks.GetByIdAsync(new GetAuthorBookRequest { Id = Id }, cancellationToken);
-            if (version != Volatile.Read(ref _loadVersion)) return;
+            var book = await AuthorBooks.GetByIdAsync(new GetAuthorBookRequest { Id = Id }, load.Token);
+            if (!IsCurrentLoad(load)) return;
             _book = book;
             _notFound = book is null;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (load.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
-            if (version != Volatile.Read(ref _loadVersion)) return;
+            if (!IsCurrentLoad(load)) return;
             Logger.LogWarning(ex, "Public book details failed to load for book {BookId}", Id);
             _error = "Book details could not be loaded. Please try again.";
         }
         finally
         {
-            if (version == Volatile.Read(ref _loadVersion)) _loading = false;
+            if (ReferenceEquals(_activeLoad, load))
+            {
+                _activeLoad = null;
+                _loading = false;
+            }
+
+            load.Dispose();
         }
+    }
+
+    private bool IsCurrentLoad(CancellationTokenSource load) =>
+        !load.IsCancellationRequested && ReferenceEquals(_activeLoad, load);
+
+    private void CancelActiveLoad()
+    {
+        var load = _activeLoad;
+        _activeLoad = null;
+        load?.Cancel();
     }
 
     public void Dispose()
     {
-        Interlocked.Increment(ref _loadVersion);
-        _loadCancellation?.Cancel();
-        _loadCancellation?.Dispose();
+        CancelActiveLoad();
     }
 }

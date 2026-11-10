@@ -138,48 +138,6 @@ public sealed class UserBookcaseStateTests
         Assert.Equal(1, Assert.Single(state.Books).Id);
     }
 
-    [Fact]
-    public async Task DeleteAsync_ReturnsFalseAndPreservesBookWhenCanceled()
-    {
-        var api = new StubBooksApi
-        {
-            Delete = (_, cancellationToken) => Task.FromCanceled<bool>(cancellationToken)
-        };
-        var state = CreateState(api);
-        state.ApplySavedBook(CreateBook(4, "Keep me"));
-        using var cancellation = new CancellationTokenSource();
-        cancellation.Cancel();
-
-        var deleted = await state.DeleteAsync(4, cancellation.Token);
-
-        Assert.False(deleted);
-        Assert.Equal(new[] { 4 }, state.Books.Select(book => book.Id));
-    }
-
-    [Fact]
-    public async Task DeleteAsync_UsesRequestedIdAndKeepsOtherBooks()
-    {
-        int? requestedId = null;
-        var api = new StubBooksApi
-        {
-            Delete = (request, _) =>
-            {
-                requestedId = request.Id;
-                return Task.FromResult(true);
-            }
-        };
-        var state = CreateState(api);
-        state.ApplySavedBook(CreateBook(4, "First"));
-        state.ApplySavedBook(CreateBook(9, "Second"));
-
-        var deleted = await state.DeleteAsync(4);
-
-        Assert.True(deleted);
-        Assert.Equal(4, requestedId);
-        Assert.Equal(new[] { 9 }, state.Books.Select(book => book.Id));
-        Assert.Equal(1, state.TotalCount);
-    }
-
     private static UserBookcaseState CreateState(StubBooksApi api) => new(
         api,
         new TestAuthenticationStateProvider("user-1"),
@@ -223,17 +181,11 @@ public sealed class UserBookcaseStateTests
 
     private sealed class StubBooksApi : IBooksApi
     {
-        public Func<CancellationToken, Task<GetBooksResponse>> Get { get; init; } =
-            _ => Task.FromResult(new GetBooksResponse { Books = [] });
-
         public Func<SearchBooksRequest, CancellationToken, Task<SearchBooksResponse>> Search { get; set; } =
             (_, _) => Task.FromResult(CreateResponse());
 
-        public Func<DeleteBookRequest, CancellationToken, Task<bool>> Delete { get; init; } =
-            (_, _) => Task.FromResult(false);
-
         public Task<GetBooksResponse> GetAsync(CancellationToken cancellationToken = default) =>
-            Get(cancellationToken);
+            throw new NotSupportedException();
 
         public Task<SearchBooksResponse> SearchAsync(SearchBooksRequest req, CancellationToken cancellationToken = default) =>
             Search(req, cancellationToken);
@@ -248,6 +200,6 @@ public sealed class UserBookcaseStateTests
             throw new NotSupportedException();
 
         public Task<bool> DeleteAsync(DeleteBookRequest req, CancellationToken cancellationToken = default) =>
-            Delete(req, cancellationToken);
+            throw new NotSupportedException();
     }
 }

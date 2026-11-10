@@ -48,8 +48,6 @@
     private CancellationTokenSource? _activeLoad;
     private CancellationTokenSource? _activeOperation;
     private string? _loadedUserId;
-    private int _loadVersion;
-    private int _operationVersion;
     private bool _loading = true;
     private bool _notFound;
     private bool _saving;
@@ -62,14 +60,13 @@
     protected override async Task OnParametersSetAsync()
     {
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        await LoadForIdentityAsync(GetUserKey(authenticationState.User));
+        await LoadForIdentityAsync(BookUserIdentity.GetUserKey(authenticationState.User));
     }
 
     private async Task LoadForIdentityAsync(string? userId)
     {
         CancelActiveLoad();
         CancelActiveOperation();
-        var version = Interlocked.Increment(ref _loadVersion);
         _loadedUserId = userId;
         _loading = true;
         _notFound = false;
@@ -89,8 +86,8 @@
         {
             var book = await Books.GetByIdAsync(new GetBookRequest { Id = Id }, load.Token);
             var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (!IsCurrentLoad(load, version) ||
-                !string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            if (!IsCurrentLoad(load) ||
+                !string.Equals(userId, BookUserIdentity.GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
             {
                 return;
             }
@@ -113,7 +110,7 @@
         }
         catch (Exception ex)
         {
-            if (!IsCurrentLoad(load, version)) return;
+            if (!IsCurrentLoad(load)) return;
             Logger.LogWarning(ex, "Book edit form failed to load for book {BookId}", Id);
             _error = "Book details could not be loaded. Please try again.";
         }
@@ -134,7 +131,6 @@
         if (!RendererInfo.IsInteractive || _saving || string.IsNullOrWhiteSpace(_loadedUserId)) return;
         var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         _activeOperation = operation;
-        var version = Interlocked.Increment(ref _operationVersion);
         var userId = _loadedUserId;
         _saving = true;
         _error = null;
@@ -148,7 +144,7 @@
                 Url = NormalizeOptional(model.Url)
             }, operation.Token);
 
-            if (!IsCurrentOperation(operation, version)) return;
+            if (!IsCurrentOperation(operation)) return;
 
             if (!success)
             {
@@ -157,20 +153,13 @@
             }
 
             var latestAuthenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-            if (!string.Equals(userId, GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
+            if (!string.Equals(userId, BookUserIdentity.GetUserKey(latestAuthenticationState.User), StringComparison.Ordinal))
             {
                 return;
             }
 
-            UserBooks.ApplySavedBook(new BookListItemResponse
-            {
-                Id = Id,
-                Title = model.Title.Trim(),
-                Author = NormalizeOptional(model.Author),
-                Url = NormalizeOptional(model.Url)
-            });
             await UserBooks.LoadForCurrentUserAsync(operation.Token);
-            if (IsCurrentOperation(operation, version))
+            if (IsCurrentOperation(operation))
             {
                 Nav.NavigateTo($"/books/{Id}");
             }
@@ -180,7 +169,7 @@
         }
         catch (Exception ex)
         {
-            if (IsCurrentOperation(operation, version))
+            if (IsCurrentOperation(operation))
             {
                 Logger.LogWarning(ex, "Book update failed for book {BookId}", Id);
                 _error = "The book could not be saved. Your entries are still here; please try again.";
@@ -198,15 +187,11 @@
         }
     }
 
-    private bool IsCurrentLoad(CancellationTokenSource load, int version) =>
-        !load.IsCancellationRequested &&
-        version == Volatile.Read(ref _loadVersion) &&
-        ReferenceEquals(_activeLoad, load);
+    private bool IsCurrentLoad(CancellationTokenSource load) =>
+        !load.IsCancellationRequested && ReferenceEquals(_activeLoad, load);
 
-    private bool IsCurrentOperation(CancellationTokenSource operation, int version) =>
-        !operation.IsCancellationRequested &&
-        version == Volatile.Read(ref _operationVersion) &&
-        ReferenceEquals(_activeOperation, operation);
+    private bool IsCurrentOperation(CancellationTokenSource operation) =>
+        !operation.IsCancellationRequested && ReferenceEquals(_activeOperation, operation);
 
     private void HandleAuthenticationStateChanged(Task<AuthenticationState> authenticationStateTask) =>
         _ = RefreshAfterAuthenticationChangeAsync(authenticationStateTask);
@@ -216,7 +201,7 @@
         try
         {
             var authenticationState = await authenticationStateTask;
-            var userId = GetUserKey(authenticationState.User);
+            var userId = BookUserIdentity.GetUserKey(authenticationState.User);
             if (_disposed || string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
             {
                 return;
@@ -237,7 +222,6 @@
                 _loading = !string.IsNullOrWhiteSpace(userId);
                 CancelActiveLoad();
                 CancelActiveOperation();
-                Interlocked.Increment(ref _loadVersion);
                 StateHasChanged();
 
                 if (!string.IsNullOrWhiteSpace(userId))
@@ -258,11 +242,6 @@
         }
     }
 
-    private static string? GetUserKey(ClaimsPrincipal user) =>
-        user.Identity?.IsAuthenticated == true
-            ? user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst(ClaimTypes.Name)?.Value ?? user.Identity.Name
-            : null;
-
     private void CancelActiveLoad()
     {
         var load = _activeLoad;
@@ -274,11 +253,7 @@
     {
         var operation = _activeOperation;
         _activeOperation = null;
-        if (operation is not null)
-        {
-            Interlocked.Increment(ref _operationVersion);
-            operation.Cancel();
-        }
+        operation?.Cancel();
     }
 
     private static string? NormalizeOptional(string? value) =>
@@ -289,7 +264,6 @@
         _disposed = true;
         AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
         _lifetime.Cancel();
-        Interlocked.Increment(ref _loadVersion);
         CancelActiveLoad();
         CancelActiveOperation();
         _lifetime.Dispose();

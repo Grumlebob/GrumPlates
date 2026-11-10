@@ -4,6 +4,7 @@
 
 @inject IBooksApi Books
 @inject UserBookcaseState UserBooks
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager Nav
 @inject ILogger<BookCreate> Logger
 
@@ -21,46 +22,128 @@
 </main>
 
 @code {
-    private readonly BookFormModel _model = new();
-    private readonly CancellationTokenSource _operationCancellation = new();
+    private BookFormModel _model = new();
+    private readonly CancellationTokenSource _lifetime = new();
+    private CancellationTokenSource? _activeOperation;
+    private string? _loadedUserId;
     private bool _saving;
+    private bool _disposed;
     private string? _error;
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; } = default!;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var authenticationState = await AuthenticationStateTask;
+        ApplyIdentityChange(BookUserIdentity.GetUserKey(authenticationState.User));
+    }
 
     private async Task SaveAsync(BookFormModel model)
     {
-        if (_saving) return;
+        if (!RendererInfo.IsInteractive || _saving || _disposed || string.IsNullOrWhiteSpace(_loadedUserId))
+        {
+            return;
+        }
+
+        var userId = _loadedUserId;
+        var operation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
+        _activeOperation = operation;
         _saving = true;
         _error = null;
         try
         {
+            if (!await IsCurrentUserAsync(userId, operation))
+            {
+                return;
+            }
+
             var created = await Books.CreateAsync(new CreateBookRequest
             {
                 Title = model.Title.Trim(),
                 Author = NormalizeOptional(model.Author),
                 Url = NormalizeOptional(model.Url)
-            }, _operationCancellation.Token);
+            }, operation.Token);
 
-            UserBooks.ApplySavedBook(new BookListItemResponse
+            if (!await IsCurrentUserAsync(userId, operation))
             {
-                Id = created.Id,
-                Title = created.Title,
-                Author = created.Author,
-                Url = created.Url
-            });
-            await UserBooks.LoadForCurrentUserAsync(_operationCancellation.Token);
+                return;
+            }
+
+            await UserBooks.LoadForCurrentUserAsync(operation.Token);
+            if (!await IsCurrentUserAsync(userId, operation))
+            {
+                return;
+            }
+
             Nav.NavigateTo($"/books/{created.Id}");
         }
-        catch (OperationCanceledException) when (_operationCancellation.IsCancellationRequested)
+        catch (OperationCanceledException) when (operation.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Book creation failed.");
-            _error = "The book could not be saved. Your entries are still here; please try again.";
+            if (IsCurrentOperation(operation))
+            {
+                Logger.LogWarning(ex, "Book creation failed.");
+                _error = "The book could not be saved. Your entries are still here; please try again.";
+            }
         }
         finally
         {
-            _saving = false;
+            if (ReferenceEquals(_activeOperation, operation))
+            {
+                _activeOperation = null;
+                _saving = false;
+            }
+
+            operation.Dispose();
+        }
+    }
+
+    private bool IsCurrentOperation(CancellationTokenSource operation) =>
+        !operation.IsCancellationRequested &&
+        ReferenceEquals(_activeOperation, operation);
+
+    private async Task<bool> IsCurrentUserAsync(string expectedUserId, CancellationTokenSource operation)
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!IsCurrentOperation(operation))
+        {
+            return false;
+        }
+
+        var userId = BookUserIdentity.GetUserKey(authenticationState.User);
+        if (string.Equals(expectedUserId, userId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        ApplyIdentityChange(userId);
+        return false;
+    }
+
+    private void ApplyIdentityChange(string? userId)
+    {
+        if (string.Equals(userId, _loadedUserId, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _loadedUserId = userId;
+        _model = new BookFormModel();
+        _error = null;
+        _saving = false;
+        CancelActiveOperation();
+    }
+
+    private void CancelActiveOperation()
+    {
+        var operation = _activeOperation;
+        _activeOperation = null;
+        if (operation is not null)
+        {
+            operation.Cancel();
         }
     }
 
@@ -69,7 +152,9 @@
 
     public void Dispose()
     {
-        _operationCancellation.Cancel();
-        _operationCancellation.Dispose();
+        _disposed = true;
+        _lifetime.Cancel();
+        CancelActiveOperation();
+        _lifetime.Dispose();
     }
 }
