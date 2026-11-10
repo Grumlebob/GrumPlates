@@ -510,7 +510,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A10 `blazorauto/cc-runtime`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — BlazorAuto profile`.
   - Components: `Browser: Blazor WebAssembly client`, `Reverse proxy`, `Web app (ASP.NET Core: SSR, interactive server, JSON API)`, `Account mail outbox worker` (draw inside the web app component as a nested component), `PostgreSQL`, `Redis`. Externals: `SMTP server`, `Google OAuth (optional)`. Optional group (dashed `frame` labelled `opt [observability enabled]`): `Alloy agent`, `Observability backend`.
   - Connectors with labels: Browser–Reverse proxy `HTTPS: HTML (SSR), JSON API, SignalR WebSocket circuit, WebAssembly assets`; Reverse proxy–Web app `HTTP`; Web app–PostgreSQL `SQL (EF Core + Npgsql)`; Web app–Redis `Redis: cache + pub/sub invalidation`; worker → SMTP `SMTP`; Web app → Google `OAuth 2.0 redirect flow` (the browser follows the redirect; a note may say so); Web app → Alloy `OTLP`; Alloy → backend `OTLP / logs`.
   - Note listing patterns: client-server, shared-data (PostgreSQL), publish-subscribe (Redis invalidation).
@@ -518,7 +518,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A11 `react/cc-runtime`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — React profile`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — React profile`.
   - Components as A10, but the browser component is `Browser: React SPA`, the web app is `Web app (ASP.NET Core: static SPA host, JSON API)`, and there is no Google OAuth and no SignalR.
   - Browser–Reverse proxy label: `HTTPS: static SPA assets, JSON API (public: no credentials; private: cookie + X-Expected-User + X-CSRF-TOKEN)`.
   - Note: "HTML navigations fall back to index.html; API, health and reserved account paths never do. Accounts are disabled by default."
