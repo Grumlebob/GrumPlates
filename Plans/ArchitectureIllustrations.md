@@ -4,6 +4,13 @@ Status: ready. Steps A00–A19 are not started. Prepared 2026-11-10 from source 
 
 This plan is written so that an executor with no prior context can finish it. Do the steps in order. Do not skip a **Verify** block. When a fact in this plan no longer matches the code, the code wins: update the fact in this plan in the same PR and draw what the code does.
 
+### How to run this plan
+
+- Start it with `/goal Plans/ArchitectureIllustrations.md` (or by reading this file) from the primary GrumPlates checkout. Read `AGENTS.md` first; it overrides nothing here but sets repository rules.
+- Work autonomously. The owner authorized branches, commits, the documentation PR(s), squash merges and closeout for this plan. Do not stop to ask for confirmation between steps. Ask only if a step's **Done when** cannot be reached after fixing what you can. Deployment is out of scope; never dispatch one.
+- Progress lives in this file: tick each step's box and add a line to section 10 as you go, so a later session can resume from the first unticked step.
+- The goal is complete when A19 is done: all 11 diagrams, the READMEs and links are on `origin/main`, and this plan is marked complete with SHAs.
+
 ## 1. Goal and scope
 
 Add draw.io diagrams under `docs/illustrations/` that describe GrumPlates using the **3+1 approach** to architecture description (Christensen, Corry and Hansen, "An Approach to Software Architecture Description Using UML"). The owner learned this terminology in a Software Architecture course, so labels, titles and README prose use it exactly as defined in section 2.
@@ -365,7 +372,11 @@ Review checklist (all must be true):
 
 - [ ] **Do:** `git fetch origin` and confirm that `origin/main` contains the documentation-rule change: `git show origin/main:AGENTS.md | grep -n "drawio"` prints the documentation-only line, and `git show origin/main:Deployment/Common/Scripts/verify-operation-source.py | grep -n DIAGRAM_SUFFIXES` prints matches.
 - **Verify:** both commands print at least one line.
-- **Done when:** both are true. If not, stop: this plan's PR (which carries that rule) is not merged yet. Do not commit diagrams with `[skip ci]` before it is.
+- **Done when:** both are true. If not, the prerequisite PR (branch `chore/template-batch-20261110`, which carries this plan and the rule) is not merged yet. Finish it instead of stopping:
+  1. `gh pr list -R Grumlebob/GrumPlates --state all --head chore/template-batch-20261110 --json number,state,mergedAt` to find it. If no PR exists, push the branch and open one with `gh pr create -R Grumlebob/GrumPlates --base main --head chore/template-batch-20261110`.
+  2. Wait for `build-test-push` on its exact head (`gh pr checks <n> -R Grumlebob/GrumPlates --watch`). If it fails, read the failing log, fix it on that branch, run the relevant local checks, push, and wait again.
+  3. When green, `gh pr merge <n> -R Grumlebob/GrumPlates --squash --delete-branch`, then `git fetch origin` and repeat the A00 commands.
+  Do not commit diagrams with `[skip ci]` before the rule is on `origin/main`.
 
 ### A01 Workspace
 
@@ -618,3 +629,4 @@ python -I -c "import importlib.util,subprocess,sys; s=importlib.util.spec_from_f
 ## 10. Progress and integration record
 
 - 2026-11-10: plan prepared. The documentation-rule change (AGENTS.md, `verify-operation-source.py` and its tests, `.gitattributes`, `docs/Test.md`, `Deployment/LocalSingleNode/Operations.md`) ships in the same PR as this plan. Verified locally before commit: `test_operation_source.py` 12 tests passed in WSL; deployment audit passed. Toolchain probes (draw.io 26.1.1 SVG/PNG export, validator positive and negative cases) passed.
+- 2026-11-10: the prerequisite PR is the batched branch `chore/template-batch-20261110`. Besides this plan and the rule, it moves `docker/` and local scripts into `Scripts/LocalDevelopment`, `Scripts/LocalObservability` and `Scripts/Quality`, documents why Blazor stale-result checks need no `Interlocked`/`Volatile`, and records fork lessons. None of that changes the facts in section 7. It was rebased onto `33d51451` (#459, which simplified the Blazor Books async guards and added the internal helper `BookUserIdentity`; the helper is too small for the package diagrams). Section 7 facts were rechecked after that rebase.
