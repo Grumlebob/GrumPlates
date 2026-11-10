@@ -277,7 +277,7 @@ React only: the web app serves a static SPA (`index.html` fallback for HTML navi
 
 | Target | Nodes (role names) | Allocation |
 | --- | --- | --- |
-| LocalSingleNode | one Linux PC | Host services: Caddy (site bound to `127.0.0.1`, origin port setting `public_origin_port`), cloudflared tunnel connector. Docker Compose project per app: `web` (app image `APP_IMAGE_REF`, published on `127.0.0.1:${APP_PORT}`), `postgres`, `redis` (both published on loopback only). Telemetry disabled. Nightly local PostgreSQL dump. Other app instances can share Caddy, cloudflared and Docker. |
+| LocalSingleNode | one Linux PC | Host services: Caddy (site bound to `127.0.0.1`, origin port setting `public_origin_port`), cloudflared tunnel connector. Docker Compose project per app: `web` (app image `APP_IMAGE_REF`, published on `127.0.0.1:${APP_PORT}`), `postgres`, `redis` (both published on loopback only, for host tools; `web` reaches them over the Compose network by service name), volumes `postgres_data` and `redis_data`. Telemetry disabled. Nightly local PostgreSQL dump. Other app instances can share Caddy, cloudflared and Docker. |
 | LocalCluster | `node-main`, `node-app1`, `node-app2`, `node-db` | `node-main`: Caddy load balancer + cloudflared + optional observability backend. `node-app1`/`node-app2`: `web` container + observability agent. `node-db`: PostgreSQL, Redis, postgres-exporter, redis-exporter. |
 | Cloud (Hetzner, OpenTofu + Ansible) | `cloud-main`, `cloud-app1`, `cloud-app2`, `cloud-db` | Same roles as LocalCluster. Only `cloud-main` has public networking (Hetzner firewall); private nodes use its NAT; it is also the SSH bastion. Server type from variable `server_type` (currently `cx23` in `Deployment/Cloud/infra/opentofu/terraform.tfvars`). |
 
@@ -552,10 +552,10 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A14 `shared/allocation-single-node`
 
-- [ ] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalSingleNode — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalSingleNode — both frontend profiles`.
   - Nodes: `«device» User device` containing `«execution environment» Browser` containing artifact `Frontend assets (selected profile)`; `«external» Cloudflare edge`; `«device» Linux PC (single node)`.
-  - Inside the Linux PC: host services `Caddy (site on loopback:public_origin_port)` and `cloudflared`; an `«execution environment» Docker Engine` frame containing a frame `Compose project (one per app)` with artifacts `web (APP_IMAGE_REF)`, `postgres`, `redis`, and a `«volume»` artifact `postgres_data`.
-  - Protocol links: User device – Cloudflare edge `HTTPS`; Cloudflare edge – cloudflared `outbound tunnel`; cloudflared – Caddy `HTTP (loopback)`; Caddy – web `HTTP loopback:APP_PORT`; web – postgres `PostgreSQL protocol (loopback)`; web – redis `Redis protocol (loopback)`.
+  - Inside the Linux PC: host services `Caddy (site on loopback:public_origin_port)` and `cloudflared`; an `«execution environment» Docker Engine` frame containing a frame `Compose project (one per app)` with artifacts `web (APP_IMAGE_REF)`, `postgres`, `redis`, and `«volume»` artifacts `postgres_data` and `redis_data` (corrected in A14 from `Deployment/LocalSingleNode/compose/docker-compose.yml`).
+  - Protocol links: User device – Cloudflare edge `HTTPS`; Cloudflare edge – cloudflared `outbound tunnel`; cloudflared – Caddy `HTTP (loopback)`; Caddy – web `HTTP loopback:APP_PORT`; web – postgres `PostgreSQL protocol (Compose network)`; web – redis `Redis protocol (Compose network)` (corrected in A14: the connection strings use the service names `postgres` and `redis`).
   - Note "Requirements": the readiness floors from 7.6 labelled "planning floor (Readiness.md)". Note: "Telemetry disabled. Other app instances may share Caddy, cloudflared and Docker. Nightly PostgreSQL dump."
 - **Verify / Done when:** as A05 (commit `docs: add single-node allocation view [skip ci]`).
 
