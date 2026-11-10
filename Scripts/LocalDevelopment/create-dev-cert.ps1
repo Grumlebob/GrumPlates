@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$outDir = Join-Path $PSScriptRoot 'https'
+$outDir = Join-Path $PSScriptRoot 'certs'
 if (-not (Test-Path $outDir)) {
   New-Item -ItemType Directory -Path $outDir | Out-Null
 }

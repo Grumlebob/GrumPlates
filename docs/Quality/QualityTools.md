@@ -36,7 +36,7 @@ The default timeout is 15 minutes, including image pulls. Set `--timeout-minutes
 
 ## Summarize Lighthouse runs
 
-`Scripts/RunLighthouse.ps1` writes one report folder per run under `TestResults/Lighthouse`. Summarize several runs that share a label prefix, one line per page and device with the median of its runs:
+`Scripts/Quality/RunLighthouse.ps1` writes one report folder per run under `TestResults/Lighthouse`. Summarize several runs that share a label prefix, one line per page and device with the median of its runs:
 
 ```powershell
 python Scripts/Quality/summarize_lighthouse.py p2-origin-

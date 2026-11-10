@@ -97,7 +97,7 @@ function Assert-DockerAvailable {
 
 Write-Heading "Local Docker residue cleanup"
 Write-Host "This script never prunes Docker volumes."
-Write-Host "Use .\Scripts\RunLocal.ps1 -ResetDatabase only when you intentionally want to delete local service volumes."
+Write-Host "Use .\Scripts\LocalDevelopment\RunLocal.ps1 -ResetDatabase only when you intentionally want to delete local service volumes."
 
 Assert-DockerAvailable
 Write-DockerReport -Label "Before cleanup"

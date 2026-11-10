@@ -24,7 +24,7 @@ React hides private data while rechecking the session and clears private query c
 Local setup seeds one Admin and one User for both frontends. Run it once, or again if `.env` or the local certificate is missing:
 
 ```powershell
-pwsh -File ./docker/setup-local.ps1
+pwsh -File ./Scripts/LocalDevelopment/setup-local.ps1
 ```
 
 Setup fills `Accounts__AdminSeed__*` with `admin@localhost.test` and `Accounts__UserSeed__*` with `user@localhost.test` in the ignored `.env`, each with a generated 24-character password. It prints the emails, never the passwords. It leaves a seed alone when its email or password is already set, so your own values are kept. Startup creates each account once, confirmed, with the `Admin` or `User` role. It never changes an existing password or email, and it refuses an email that belongs to an account without that role. Local self-registration stays off because there is no local mail server.
@@ -32,7 +32,7 @@ Setup fills `Accounts__AdminSeed__*` with `admin@localhost.test` and `Accounts__
 Start the app and sign in at `https://localhost:7186/Account/Login` (Blazor) or `https://localhost:7186/auth/login` (React):
 
 ```powershell
-.\Scripts\RunLocal.ps1 -NoBrowser
+.\Scripts\LocalDevelopment\RunLocal.ps1 -NoBrowser
 ```
 
 | Setting | Meaning |

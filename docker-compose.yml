@@ -60,7 +60,7 @@ services:
     ports:
       - "127.0.0.1:${APP_HTTPS_HOST_PORT:-7186}:7186"
     volumes:
-      - ./docker/https:/https:ro
+      - ./Scripts/LocalDevelopment/certs:/https:ro
 
   redis:
     image: redis:8.8.0-alpine3.23
@@ -130,7 +130,7 @@ services:
     ports:
       - "127.0.0.1:${PROMETHEUS_HOST_PORT:-9090}:9090"
     volumes:
-      - ./docker/observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./Scripts/LocalObservability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./Deployment/Common/observability/prometheus/rules:/etc/prometheus/rules:ro
       - prometheusdata:/prometheus
     mem_limit: 384m
@@ -174,7 +174,7 @@ services:
     ports:
       - "127.0.0.1:${LOKI_HOST_PORT:-3100}:3100"
     volumes:
-      - ./docker/observability/loki/loki.yml:/etc/loki/loki.yml:ro
+      - ./Scripts/LocalObservability/loki/loki.yml:/etc/loki/loki.yml:ro
       - lokidata:/loki
     mem_limit: 256m
     mem_reservation: 128m
@@ -195,7 +195,7 @@ services:
     ports:
       - "127.0.0.1:${TEMPO_HOST_PORT:-3200}:3200"
     volumes:
-      - ./docker/observability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
+      - ./Scripts/LocalObservability/tempo/tempo.yml:/etc/tempo/tempo.yml:ro
       - tempodata:/var/tempo
     mem_limit: 384m
     mem_reservation: 192m
@@ -227,7 +227,7 @@ services:
     ports:
       - "127.0.0.1:${ALLOY_HOST_PORT:-12345}:12345"
     volumes:
-      - ./docker/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./Scripts/LocalObservability/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     mem_limit: 256m
     mem_reservation: 128m

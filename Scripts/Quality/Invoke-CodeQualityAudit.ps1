@@ -336,7 +336,7 @@ try {
         'Scripts/Quality/tool-versions.json', 'Scripts/Quality/quality-settings.example.json',
         'Scripts/Quality/SonarQube/SonarQube.Analysis.xml', 'Scripts/Quality/SonarQube/profile-overrides.json',
         'GrumPlates.React/package.json', 'GrumPlates.React/package-lock.json',
-        'GrumPlates.React/vitest.config.ts', 'docker/sonarqube/compose.yaml'
+        'GrumPlates.React/vitest.config.ts', 'Scripts/Quality/SonarQube/compose.yaml'
     )
     foreach ($relative in $requiredFiles) {
         $check = Invoke-QualityProcess -FilePath $git -ArgumentList @('-C', $invokingRoot, 'cat-file', '-e', "$($sourceSha):$relative") `
@@ -382,7 +382,7 @@ try {
 
     $sourceRoot = [string]$worktrees[0].path
     $context.RepoRoot = $sourceRoot
-    $context.ComposePath = Join-Path $sourceRoot 'docker/sonarqube/compose.yaml'
+    $context.ComposePath = Join-Path $sourceRoot 'Scripts/Quality/SonarQube/compose.yaml'
     $context.ToolVersions = Get-QualityToolVersions -RepoRoot $sourceRoot
     $batch.toolVersions = $context.ToolVersions
     if ($profiles -contains 'React') {

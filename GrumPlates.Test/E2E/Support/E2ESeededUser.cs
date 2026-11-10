@@ -25,7 +25,7 @@ internal static class E2ESeededUser
         }
 
         throw new InvalidOperationException(
-            "Blazor E2E needs the seeded User. Run docker/setup-local.ps1, or set E2E_USER_EMAIL and E2E_USER_PASSWORD.");
+            "Blazor E2E needs the seeded User. Run Scripts/LocalDevelopment/setup-local.ps1, or set E2E_USER_EMAIL and E2E_USER_PASSWORD.");
     }
 
     // Raw KEY=value lines, as Compose env_file reads them: no trimming or unquoting of values.

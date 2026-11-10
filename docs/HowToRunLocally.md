@@ -14,13 +14,13 @@ Use the repository wrapper for the normal local setup. It prepares Docker, local
 From the repository root, create local configuration and a development certificate:
 
 ```powershell
-pwsh -File ./docker/setup-local.ps1
+pwsh -File ./Scripts/LocalDevelopment/setup-local.ps1
 ```
 
 Then start the app:
 
 ```powershell
-.\Scripts\RunLocal.ps1
+.\Scripts\LocalDevelopment\RunLocal.ps1
 ```
 
 Use `-NoBrowser` to keep the browser closed, `-Observability` to start the optional local telemetry stack, and `-StopStack` to stop containers while retaining their volumes. Local Docker values belong in `.env`; use [`.env.example`](../.env.example) as the authority and do not commit `.env`. It contains the default host ports and service settings.
@@ -32,7 +32,7 @@ Local setup seeds a local Admin and a local User; their emails are printed by se
 ## Reset local data
 
 ```powershell
-.\Scripts\RunLocal.ps1 -ResetDatabase -NoBrowser
+.\Scripts\LocalDevelopment\RunLocal.ps1 -ResetDatabase -NoBrowser
 ```
 
 Reset removes this Compose project's named volumes before rebuilding. This deletes the local PostgreSQL database and stored state for Redis Insight and optional observability services. It cannot be undone. Use it only when you intend to recreate local service data, such as after an incompatible database image upgrade. Ordinary start and stop keep the volumes. Do not delete another clone's data.

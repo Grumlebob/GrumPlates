@@ -15,7 +15,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $scriptRoot = $PSScriptRoot
-$repoRoot = Split-Path -Parent $scriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptRoot)
 $envPath = Join-Path $repoRoot '.env'
 $previousObservabilityEnabled = $env:OBSERVABILITY_ENABLED
 $previousObservabilityEndpoint = $env:OBSERVABILITY_OTLP_ENDPOINT
@@ -45,7 +45,7 @@ function Wait-Docker {
     Start-Sleep -Seconds 2
   }
 
-  throw "Docker Desktop is not ready. Start Docker Desktop, wait until it finishes starting, and run .\Scripts\RunLocal.ps1 again."
+  throw "Docker Desktop is not ready. Start Docker Desktop, wait until it finishes starting, and run .\Scripts\LocalDevelopment\RunLocal.ps1 again."
 }
 
 function Read-DotEnv {
@@ -142,7 +142,7 @@ function Write-StartupFailureHelp {
   if ($Logs -match 'relation "AspNetRoles" already exists' -or $Logs -match '42P07') {
     Write-Host ""
     Write-Warning "The local Docker PostgreSQL volume contains an older schema. This repo now has a fresh initial migration, so the old local database must be reset."
-    Write-Host "Run: .\Scripts\RunLocal.ps1 -ResetDatabase"
+    Write-Host "Run: .\Scripts\LocalDevelopment\RunLocal.ps1 -ResetDatabase"
   }
 }
 
@@ -172,7 +172,7 @@ Push-Location $repoRoot
 try {
   if ($StatusOnly) {
     Write-Host "Preparing and checking local Docker setup..."
-    $statusSetupArgs = @('-File', './docker/setup-local.ps1')
+    $statusSetupArgs = @('-File', './Scripts/LocalDevelopment/setup-local.ps1')
     if ($SkipCertificate) {
       $statusSetupArgs += '-SkipCertificate'
     }
@@ -214,7 +214,7 @@ try {
   }
 
   Write-Host "Preparing local Docker setup..."
-  $setupArgs = @('-File', './docker/setup-local.ps1')
+  $setupArgs = @('-File', './Scripts/LocalDevelopment/setup-local.ps1')
   if ($SkipCertificate) {
     $setupArgs += '-SkipCertificate'
   }
@@ -379,14 +379,14 @@ try {
     Write-Host "Prometheus:   $prometheusUrl"
     Write-Host "Loki:         $lokiUrl"
     Write-Host "Tempo:        $tempoUrl"
-    Write-Host "Smoke check:  pwsh -File .\docker\observability\smoke-local-observability.ps1"
+    Write-Host "Smoke check:  pwsh -File .\Scripts\LocalObservability\smoke-local-observability.ps1"
   }
   else {
-    Write-Host "Observability: disabled; run .\Scripts\RunLocal.ps1 -Observability to start the local Grafana stack."
+    Write-Host "Observability: disabled; run .\Scripts\LocalDevelopment\RunLocal.ps1 -Observability to start the local Grafana stack."
   }
   Write-Host ""
-  Write-Host "Stop with:    .\Scripts\RunLocal.ps1 -StopStack"
-  Write-Host "Reset with:   .\Scripts\RunLocal.ps1 -ResetDatabase"
+  Write-Host "Stop with:    .\Scripts\LocalDevelopment\RunLocal.ps1 -StopStack"
+  Write-Host "Reset with:   .\Scripts\LocalDevelopment\RunLocal.ps1 -ResetDatabase"
 
   # Each rebuild leaves the previous web image dangling. Remove only dangling
   # images here; stopped containers, networks and build cache may belong to

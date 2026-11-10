@@ -4,10 +4,10 @@ Browser checks are separate from the ordinary test run. Blazor Playwright E2E is
 
 ## Blazor Playwright E2E
 
-For the Docker app, start the stack without opening a second browser. Blazor E2E signs in as the local seeded User; it does not register accounts. It reads `Accounts__UserSeed__Email` and `Accounts__UserSeed__Password` from the repository `.env` that `docker/setup-local.ps1` writes, or `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` when both are set. Tests must not change that account. Clear `RUN_E2E` after the run so later test commands do not start browsers unexpectedly.
+For the Docker app, start the stack without opening a second browser. Blazor E2E signs in as the local seeded User; it does not register accounts. It reads `Accounts__UserSeed__Email` and `Accounts__UserSeed__Password` from the repository `.env` that `Scripts/LocalDevelopment/setup-local.ps1` writes, or `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` when both are set. Tests must not change that account. Clear `RUN_E2E` after the run so later test commands do not start browsers unexpectedly.
 
 ```powershell
-.\Scripts\RunLocal.ps1 -NoBrowser
+.\Scripts\LocalDevelopment\RunLocal.ps1 -NoBrowser
 dotnet build .\GrumPlates.Test\GrumPlates.Test.csproj
 pwsh .\GrumPlates.Test\bin\Debug\net10.0\playwright.ps1 install chromium
 $env:RUN_E2E='1'
@@ -39,10 +39,10 @@ The React runner builds a React-profile host and its own disposable services. Th
 The client npm lockfile pins Lighthouse. Reports are generated under `TestResults/Lighthouse`. Start the Docker app, then run:
 
 ```powershell
-.\Scripts\RunLocal.ps1 -NoBrowser
-.\Scripts\RunLighthouse.ps1 -BaseUrl https://127.0.0.1:7186 -Paths "/", "/books" -Profile both -IgnoreCertificateErrors
+.\Scripts\LocalDevelopment\RunLocal.ps1 -NoBrowser
+.\Scripts\Quality\RunLighthouse.ps1 -BaseUrl https://127.0.0.1:7186 -Paths "/", "/books" -Profile both -IgnoreCertificateErrors
 ```
 
-For production, omit `-IgnoreCertificateErrors` and set `-BaseUrl` to the deployed origin. A fixture proxy can be passed with `-BrowserProxy`; it must be a loopback proxy and enforce the public-route allowlist. See `Scripts/RunLighthouse.ps1` for current options.
+For production, omit `-IgnoreCertificateErrors` and set `-BaseUrl` to the deployed origin. A fixture proxy can be passed with `-BrowserProxy`; it must be a loopback proxy and enforce the public-route allowlist. See `Scripts/Quality/RunLighthouse.ps1` for current options.
 
 Add `-Minimum "performance=90,accessibility=100,best-practices=100,seo=100"` to fail the run when a median score is below a minimum, or summarize earlier runs with `Scripts/Quality/summarize_lighthouse.py` ([details](../Quality/QualityTools.md#summarize-lighthouse-runs)).

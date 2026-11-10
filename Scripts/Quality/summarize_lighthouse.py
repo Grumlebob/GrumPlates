@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Summarize Lighthouse reports written by Scripts/RunLighthouse.ps1.
+"""Summarize Lighthouse reports written by Scripts/Quality/RunLighthouse.ps1.
 
 Prints one line per page and device with the median of its runs. With --minimum it also lists every
 page and device whose median category score is below the given minimum and exits with 1.

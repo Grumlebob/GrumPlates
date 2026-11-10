@@ -81,4 +81,4 @@ pwsh -NoProfile -File Scripts/Quality/tests/Test-SonarQualityFoundation.ps1
 pwsh -NoProfile -File Scripts/Quality/tests/Test-SonarQualityAuditContract.ps1
 ```
 
-Code or configuration changes also need the [repository local gate](../Test.md#local-gate). Validate the SonarQube Compose file with `yamllint docker/sonarqube/compose.yaml`.
+Code or configuration changes also need the [repository local gate](../Test.md#local-gate). Validate the SonarQube Compose file with `yamllint Scripts/Quality/SonarQube/compose.yaml`.
