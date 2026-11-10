@@ -5,7 +5,17 @@ Use this when a fork becomes a product of its own instead of a configured copy o
 ## Create the repository
 
 1. Create the empty product repository. Disable Actions until a runner for it exists (`gh api -X PUT repos/<owner>/<repo>/actions/permissions -F enabled=false`). Every job runs on self-hosted labels and otherwise queues indefinitely.
-2. Clone the template with its history and point the remotes at the product:
+2. While the repository is still empty, apply the settings the workflow expects. Pull-request auto-merge is used by the Dependabot workflow and agents, and merged branches are deleted automatically. Every workflow declares its own token permissions, so the default token stays read-only:
+
+   ```bash
+   gh api -X PATCH repos/<owner>/<repo> -F allow_auto_merge=true -F delete_branch_on_merge=true \
+     -F allow_update_branch=true -F allow_squash_merge=true -F allow_merge_commit=true
+   gh api -X PUT repos/<owner>/<repo>/actions/permissions/workflow \
+     -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
+   ```
+
+   Keep merge commits enabled: the Dependabot workflow merges with `--merge`. Add branch protection only after the first push (an empty repository has no `main`). On a public repository, requiring `build-test-push` also blocks `[skip ci]` documentation PRs, because their check never runs. Decide which you want before enabling it.
+3. Clone the template with its history and point the remotes at the product:
 
    ```bash
    git clone https://github.com/<template-owner>/<template-repo>.git <Product>
@@ -14,8 +24,9 @@ Use this when a fork becomes a product of its own instead of a configured copy o
    git remote add origin https://github.com/<owner>/<repo>.git
    git push -u origin main
    ```
-3. Run `gh repo set-default <owner>/<repo>` in the new checkout immediately. `gh` prefers a remote named `upstream`, so without it `gh pr merge`, `gh run list` and scripts that call `gh repo view` act on the template.
-4. Commit one seed change for identity, frontend profile and release settings as described in the fork guide. Keep the internal project names until the rename step.
+4. Run `gh repo set-default <owner>/<repo>` in the new checkout immediately. `gh` prefers a remote named `upstream`, so without it `gh pr merge`, `gh run list` and scripts that call `gh repo view` act on the template.
+5. Commit one seed change for identity, frontend profile and release settings as described in the fork guide. Keep the internal project names until the rename step. Put the product's final `app_image` in this seed, before main CI first publishes. A GHCR package created by the repository's own workflow grants that repository access automatically. If the package already exists (pushed by hand, by another repository or under an earlier name), give the repository the Write role under the package's **Settings → Manage Actions access**. GitHub offers that setting only in the web UI.
+6. Expect Dependabot to open update PRs right after the first push, against the template's paths. Leave them until the rename and removals land. Then close the ones whose directories no longer exist (`gh pr close <n>`); Dependabot recreates the rest with the new paths.
 
 ## Runners and plan limits
 
@@ -24,7 +35,7 @@ Use this when a fork becomes a product of its own instead of a configured copy o
 
 ## Order of simplification
 
-Each step is its own pull request with the [local gate](Test.md#local-gate) and an exact-head `build-test-push`. When PRs are stacked, retarget the dependent PR to `main` before merging the lower one.
+Every pull request costs a full [local gate](Test.md#local-gate) (about 15 minutes) and an exact-head `build-test-push`, so batch the steps. Use a few large PRs, not one per step. RitzauDemo removed React and the unused targets in one PR (310 files), then renamed and reorganized in the next (371 files), both on the same day. Keep the rename out of the deletion PR so its diff stays mechanical. When PRs are stacked, retarget the dependent PR to `main` before merging the lower one.
 
 1. **Seed** (above), with green CI.
 2. **One frontend:** follow [React-only clone](Frontend/ReactOnlyClone.md) when Blazor is not needed.
@@ -36,7 +47,7 @@ Each step is its own pull request with the [local gate](Test.md#local-gate) and 
    | `GrumPlates.sln`, `GrumPlates`, `.Core` and `.Test` projects, folders and root namespaces | `<Product>.sln`, `<Product>`, `<Product>.Core`, `<Product>.Test` |
    | `GrumPlates.React`, npm package `grumplates-react` | `<Product>.React`, `<product>-react` |
    | Image labels `com.grumplates.*` | A product label namespace. Change the Dockerfile, manifest writer and validator, release verifiers, smoke test, tests and deployment audit together |
-   | Alloy container filter `grumplates` in `docker/observability/alloy/config.alloy` | The product's Compose project name |
+   | Alloy container filter `grumplates` in `Scripts/LocalObservability/alloy/config.alloy` | The product's Compose project name |
 
    Keep shared host names unchanged: the deployment lock `/tmp/localcluster-deploy.lockdir` and the CI resource labels are shared with other apps on the same machine. Run `api:check` afterwards; the generated contract should not change.
 5. **Remove template material** (next section).
@@ -52,7 +63,7 @@ Each step is its own pull request with the [local gate](Test.md#local-gate) and 
 | Favicon | The React app ships none, so browsers log a 404 for `/favicon.ico`. Add the product's icon under the React app's `public/` folder |
 | `AGENTS.md` | Keep the working rules; drop rules for removed parts, such as the Razor stylesheet rebuild |
 | `.claude/skills/`, `.codex/`, `.qlty/`, `.run/` | Keep what the team uses and update names and paths |
-| `Scripts/Quality`, `docker/sonarqube` | Keep deliberately or remove with their docs |
+| `Scripts/Quality` (including `Scripts/Quality/SonarQube`) | Keep deliberately or remove with their docs |
 | `.github/dependabot.yml` | Keep; update directories after renames |
 
 Finish with a search and classify every match:

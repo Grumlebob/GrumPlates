@@ -18,13 +18,20 @@ def git(*args):
     return subprocess.check_output(['git', *args], cwd=ROOT).decode('utf-8').strip()
 
 
+TEXT_SUFFIXES = ('.md','.mdx')
+# Text diagrams (for example draw.io `.drawio.svg`) count only under docs/, which no build or image reads.
+DIAGRAM_SUFFIXES = ('.svg','.drawio')
+
+
 def ordinary_documentation(path):
     value = PurePosixPath(path)
     if (value.is_absolute() or '\\' in path or any(part in ('.','..') for part in value.parts)
-            or value.suffix not in ('.md','.mdx')):
+            or value.suffix not in TEXT_SUFFIXES + DIAGRAM_SUFFIXES):
         return False
     if any(part.casefold() in ('scripts','tests','fixtures','ansible','compose','inventory','workflows') for part in value.parts[:-1]):
         return False
+    if value.suffix in DIAGRAM_SUFFIXES:
+        return len(value.parts) > 1 and value.parts[0] == 'docs'
     if value.name in ('README.md','AGENTS.md'):
         return True
     if len(value.parts) == 1:

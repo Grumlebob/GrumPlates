@@ -64,12 +64,15 @@ class OperationSourceTests(unittest.TestCase):
             module.select_source([self.current]*101,query=lambda sha:{'outcome':'no_eligible_run'},unchanged=lambda *_:True)
 
     def test_only_ordinary_documentation_paths_qualify(self):
-        for path in ('AGENTS.md','README.md','docs/Test.md','Plans/Delivery.md','Deployment/LocalSingleNode/AgentSetup.md','docs/Guide.mdx'):
+        for path in ('AGENTS.md','README.md','docs/Test.md','Plans/Delivery.md','Deployment/LocalSingleNode/AgentSetup.md','docs/Guide.mdx',
+                     'docs/illustrations/module-packages.drawio.svg','docs/illustrations/source.drawio'):
             with self.subTest(path=path):
                 self.assertTrue(module.ordinary_documentation(path))
         for path in ('Scripts/source.md','.github/workflows/source.md','Deployment/LocalSingleNode/ansible/template.md',
                      'Deployment/LocalSingleNode/Scripts/Tests/fixture.md','docs/../build.md','/docs/Guide.md',
-                     'docs\\Guide.md','docs/config.yml','GrumPlates/source.md','config.md'):
+                     'docs\\Guide.md','docs/config.yml','GrumPlates/source.md','config.md',
+                     'GrumPlates/wwwroot/logo.svg','Plans/diagram.svg','Deployment/LocalCluster/topology.drawio','diagram.svg',
+                     'docs/Scripts/diagram.svg','docs/illustrations/diagram.png'):
             with self.subTest(path=path):
                 self.assertFalse(module.ordinary_documentation(path))
 
@@ -113,6 +116,26 @@ class OperationSourceTests(unittest.TestCase):
                 self.assertTrue(module.documentation_diff(parent,child))
             git('mv','source.py','docs/Source.md')
             git('commit','-qm','Disguised source rename')
+            with patch.object(module,'ROOT',directory):
+                self.assertFalse(module.documentation_diff(child,git('rev-parse','HEAD')))
+
+    def test_real_diff_accepts_text_diagrams_only_under_docs(self):
+        diagram='<svg xmlns="http://www.w3.org/2000/svg" content="&lt;mxfile/&gt;"><rect width="1" height="1"/></svg>'
+        with tempfile.TemporaryDirectory() as temporary:
+            directory=Path(temporary)
+            git=self.repository(directory)
+            parent=git('rev-parse','HEAD')
+            (directory/'docs/illustrations').mkdir()
+            (directory/'docs/illustrations/view.drawio.svg').write_text(diagram)
+            git('add','docs/illustrations/view.drawio.svg')
+            git('commit','-qm','Add documentation diagram')
+            child=git('rev-parse','HEAD')
+            with patch.object(module,'ROOT',directory):
+                self.assertTrue(module.documentation_diff(parent,child))
+            (directory/'wwwroot').mkdir()
+            (directory/'wwwroot/logo.svg').write_text(diagram)
+            git('add','wwwroot/logo.svg')
+            git('commit','-qm','Served image')
             with patch.object(module,'ROOT',directory):
                 self.assertFalse(module.documentation_diff(child,git('rev-parse','HEAD')))
 

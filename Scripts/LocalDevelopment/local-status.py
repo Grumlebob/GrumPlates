@@ -11,10 +11,10 @@ import tempfile
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ROOT / ".env"
 ENV_EXAMPLE_PATH = ROOT / ".env.example"
-CERT_PATH = ROOT / "docker" / "https" / "aspnetapp.pfx"
+CERT_PATH = ROOT / "Scripts" / "LocalDevelopment" / "certs" / "aspnetapp.pfx"
 GLOBAL_JSON_PATH = ROOT / "global.json"
 
 REQUIRED_KEYS = [
@@ -306,7 +306,7 @@ def main() -> int:
     if CERT_PATH.exists():
         ok("HTTPS dev certificate exported")
     else:
-        warn("HTTPS dev certificate missing; run pwsh -File ./docker/create-dev-cert.ps1")
+        warn("HTTPS dev certificate missing; run pwsh -File ./Scripts/LocalDevelopment/create-dev-cert.ps1")
 
     if command_exists("docker"):
         ok("docker command available")

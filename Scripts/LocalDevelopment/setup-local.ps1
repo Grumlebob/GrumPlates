@@ -3,7 +3,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $envPath = Join-Path $repoRoot '.env'
 $examplePath = Join-Path $repoRoot '.env.example'
 
@@ -32,7 +32,7 @@ else {
 
   if ($missingLines.Count -gt 0) {
     Add-Content -Path $envPath -Value ""
-    Add-Content -Path $envPath -Value "# Added by docker/setup-local.ps1 from .env.example"
+    Add-Content -Path $envPath -Value "# Added by Scripts/LocalDevelopment/setup-local.ps1 from .env.example"
     Add-Content -Path $envPath -Value $missingLines
     Write-Host "Added missing .env key(s): $($missingLines.Count)"
   }

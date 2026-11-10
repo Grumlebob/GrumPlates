@@ -15,7 +15,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Split-Path -Parent $scriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $scriptRoot)
 $clientRoot = Join-Path $repoRoot "GrumPlates.Client"
 $outputRootPath = if ([IO.Path]::IsPathRooted($OutputRoot)) {
   [IO.Path]::GetFullPath($OutputRoot)
@@ -135,7 +135,7 @@ if ($AuthenticatedLocalUser) {
     if ([string]::IsNullOrEmpty($Email)) { $Email = $seed["Accounts__UserSeed__Email"] }
     if ([string]::IsNullOrEmpty($Password)) { $Password = $seed["Accounts__UserSeed__Password"] }
     if ([string]::IsNullOrEmpty($Email) -or [string]::IsNullOrEmpty($Password)) {
-      throw "-AuthenticatedLocalUser needs -Email and -Password, or the seeded User in .env from docker/setup-local.ps1."
+      throw "-AuthenticatedLocalUser needs -Email and -Password, or the seeded User in .env from Scripts/LocalDevelopment/setup-local.ps1."
     }
   }
   Write-Host "Creating authenticated local Lighthouse session for $Email..."
@@ -219,6 +219,6 @@ if ($Minimum) {
     throw "Python 3 was not found; it is required for -Minimum."
   }
 
-  & $python.Source (Join-Path $scriptRoot "Quality/summarize_lighthouse.py") (Split-Path -Leaf $runDirectory) --root $outputRootPath --minimum $Minimum
+  & $python.Source (Join-Path $scriptRoot "summarize_lighthouse.py") (Split-Path -Leaf $runDirectory) --root $outputRootPath --minimum $Minimum
   exit $LASTEXITCODE
 }

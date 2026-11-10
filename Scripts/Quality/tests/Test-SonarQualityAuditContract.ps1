@@ -63,7 +63,7 @@ try {
         RepositoryIdentity = 'github.com/quality-test/fixture'
         ComposeProject = 'sonarqube-quality-test-01234567'
         ComposeNetwork = 'sonarqube-quality-test-01234567-network'
-        ComposePath = Join-Path $temporaryRoot 'docker/sonarqube/compose.yaml'
+        ComposePath = Join-Path $temporaryRoot 'Scripts/Quality/SonarQube/compose.yaml'
         BaseDirectory = $privateRoot
         SecretsDirectory = Join-Path $privateRoot 'secrets'
         LockPath = Join-Path $privateRoot 'audit.lock'

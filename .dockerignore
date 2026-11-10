@@ -28,10 +28,10 @@
 !GrumPlates/Dockerfile
 !docker-compose.yml
 !GrumPlates/appsettings.Docker.json
-docker/https/*.pfx
-docker/https/*.p12
-docker/https/*.key
-docker/https/*.crt
+Scripts/LocalDevelopment/certs/*.pfx
+Scripts/LocalDevelopment/certs/*.p12
+Scripts/LocalDevelopment/certs/*.key
+Scripts/LocalDevelopment/certs/*.crt
 .env
 .env.*
 !.env.example

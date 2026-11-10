@@ -8,5 +8,5 @@ if errorlevel 1 (
   exit /b 1
 )
 
-pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0RunLocal.ps1" %*
+pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0LocalDevelopmentRunLocal.ps1" %*
 exit /b %ERRORLEVEL%

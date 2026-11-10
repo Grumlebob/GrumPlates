@@ -5,7 +5,7 @@ GrumPlates is a .NET 10 application template with two frontend profiles: `Blazor
 Run the local Docker stack:
 
 ```powershell
-.\Scripts\RunLocal.ps1
+.\Scripts\LocalDevelopment\RunLocal.ps1
 ```
 
 ## Start here

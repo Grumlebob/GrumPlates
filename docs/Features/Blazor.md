@@ -12,6 +12,8 @@ Put routable components under `GrumPlates.Client/Features/{Feature}/Routes`. Kee
 
 The [public catalog state](../../GrumPlates.Client/Features/Books/AuthorBookcase/AuthorBookcaseState.cs) may persist its small public list to avoid a duplicate prerender fetch. The [private books state](../../GrumPlates.Client/Features/Books/UserBookcase/UserBookcaseState.cs) owns bounded search and pagination and clears rows when authentication changes; never put private API responses in `PersistentComponentState`. Page components own request cancellation and ignore stale completions.
 
+Component and feature-state code runs on the renderer's context, one piece at a time, even across `await`. Run callbacks from outside the renderer, such as `AuthenticationStateChanged`, through `InvokeAsync`. To ignore a stale completion, check after the `await` that the request's own cancellation source is still the active one (route components), or that a plain `int` version is unchanged (feature state); `Interlocked` and `Volatile` add nothing here.
+
 ## Prerender and interactivity
 
 Interactive Auto prerenders on the server, then usually starts server interactivity on the first visit while downloading WebAssembly. Later visits can run in WebAssembly; an existing server component does not switch runtime when the download finishes. The server contract implementation serves prerender and server interactivity; the client implementation serves WebAssembly. Keep both implementations consistent. See [Microsoft's render-mode guidance](https://learn.microsoft.com/en-us/aspnet/core/blazor/components/render-modes?view=aspnetcore-10.0#interactive-auto).

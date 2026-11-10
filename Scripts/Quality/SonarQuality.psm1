@@ -359,7 +359,7 @@ function Get-QualityContext {
         LockPath = Join-Path $baseDirectory 'audit.lock'
         HostPort = $hostPort
         BaseUrl = $baseUrl
-        ComposePath = Join-Path $repo 'docker/sonarqube/compose.yaml'
+        ComposePath = Join-Path $repo 'Scripts/Quality/SonarQube/compose.yaml'
         ToolVersions = $versions
         DotnetExecutable = [IO.Path]::GetFullPath($dotnetCommand.Source)
         GitExecutable = [IO.Path]::GetFullPath($gitCommand.Source)

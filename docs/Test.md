@@ -26,7 +26,7 @@ Resource-heavy validation and publication steps use `with-runner-build-admission
 
 ## Local Gate
 
-For ordinary Markdown-only changes, follow the documentation exception in [AGENTS.md](../AGENTS.md#changes-and-checks). Mixed PRs use the full gate below.
+For documentation-only changes (Markdown, or diagrams under `docs/`), follow the documentation exception in [AGENTS.md](../AGENTS.md#changes-and-checks). Mixed PRs use the full gate below.
 
 Run every command successfully before pushing non-Markdown changes. Use Linux or WSL with the pinned .NET SDK, Python 3, Docker, and ShellCheck available in that environment. The virtual-environment paths below assume Linux.
 

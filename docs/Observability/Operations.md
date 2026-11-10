@@ -7,7 +7,7 @@ Use [Architecture](Architecture.md) for signal flow, configuration ownership, la
 Start the local stack from the repository root:
 
 ```powershell
-.\Scripts\RunLocal.ps1 -Observability
+.\Scripts\LocalDevelopment\RunLocal.ps1 -Observability
 ```
 
 Open Grafana at `http://127.0.0.1:3000`. Prometheus is at `http://127.0.0.1:9090`, Alertmanager at `http://127.0.0.1:9093`, Loki at `http://127.0.0.1:3100`, and Tempo at `http://127.0.0.1:3200`. The ports bind to loopback; local Grafana allows anonymous admin access, so never publish these ports. Port overrides are in [`.env.example`](../../.env.example).
@@ -41,7 +41,7 @@ The [Prometheus rules](../../Deployment/Common/observability/prometheus/rules) c
 After starting the local stack, run its smoke check:
 
 ```powershell
-pwsh -File .\docker\observability\smoke-local-observability.ps1
+pwsh -File .\Scripts\LocalObservability\smoke-local-observability.ps1
 ```
 
 After changing shared assets, validate the configuration. Run the resource-limit check when Compose limits change. With the local stack running, use the smoke and cardinality checks; after changing Alertmanager routing, run the safe route test:
@@ -62,7 +62,7 @@ These are current template values; the linked configuration is authoritative if 
 
 | Target | Prometheus | Loki | Tempo | Source |
 | --- | --- | --- | --- | --- |
-| Local Docker | 24 hours / 512 MB | 24 hours | 1 hour | [`docker-compose.yml`](../../docker-compose.yml), [`Loki config`](../../docker/observability/loki/loki.yml), [`Tempo config`](../../docker/observability/tempo/tempo.yml) |
+| Local Docker | 24 hours / 512 MB | 24 hours | 1 hour | [`docker-compose.yml`](../../docker-compose.yml), [`Loki config`](../../Scripts/LocalObservability/loki/loki.yml), [`Tempo config`](../../Scripts/LocalObservability/tempo/tempo.yml) |
 | LocalCluster | 7 days / 6 GB | 7 days | 24 hours | [`LocalCluster group vars`](../../Deployment/LocalCluster/inventory/prod/group_vars/all.yml) |
 | Cloud | 7 days / 4 GB | 3 days | 24 hours | [`Cloud group vars`](../../Deployment/Cloud/inventory/prod/group_vars/all.yml) |
 
@@ -75,7 +75,7 @@ Cloud metrics, logs, and traces are disposable and are destroyed with the Cloud 
 To suspend only local telemetry containers while leaving the app and data services running, stop the profile services from the repository root:
 
 ```powershell
-.\Scripts\RunLocal.ps1 -StopObservability
+.\Scripts\LocalDevelopment\RunLocal.ps1 -StopObservability
 ```
 
 This preserves volumes. The app may still attempt telemetry export, but export failure must not block requests. To resume the local telemetry profile, use `RunLocal.ps1 -Observability`.
