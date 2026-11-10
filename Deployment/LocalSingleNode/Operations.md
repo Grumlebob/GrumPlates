@@ -45,7 +45,7 @@ Select `app_instance=primary` or `additional` deliberately. See [ApplicationInst
 
 ### Setup and maintenance source
 
-Additional-app setup and maintenance use [verify-operation-source.py](../Common/Scripts/verify-operation-source.py). They pin trusted `main` with full history. When ordinary documentation descendants skipped CI, the gate can use the nearest successful main CI only after proving the operation code is unchanged. Source/configuration changes, disguised Markdown in implementation directories, incomplete history, or an actual failed/pending run stop the operation. This exception validates operation code; it never selects release artifacts or relaxes CD's exact-source checks.
+Additional-app setup and maintenance use [verify-operation-source.py](../Common/Scripts/verify-operation-source.py). They pin trusted `main` with full history. When ordinary documentation descendants skipped CI, the gate can use the nearest successful main CI only after proving the operation code is unchanged. Source/configuration changes, disguised documentation in implementation directories, diagrams outside `docs/`, incomplete history, or an actual failed/pending run stop the operation. This exception validates operation code; it never selects release artifacts or relaxes CD's exact-source checks.
 
 ## Deployment lock recovery
 
