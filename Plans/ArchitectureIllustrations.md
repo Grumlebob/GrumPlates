@@ -1,6 +1,6 @@
 # Architecture illustrations (3+1 views)
 
-Status: ready. Steps A00–A19 are not started. Prepared 2026-11-10 from source baseline `2c55a7ccd9bc2c4b3f85574e672e969a9ce80b72`. This plan changes documentation only and does not authorize deployment.
+Status: in progress (A00–A18 done; A19 PR and closeout pending). Prepared 2026-11-10 from source baseline `2c55a7ccd9bc2c4b3f85574e672e969a9ce80b72`. This plan changes documentation only and does not authorize deployment.
 
 This plan is written so that an executor with no prior context can finish it. Do the steps in order. Do not skip a **Verify** block. When a fact in this plan no longer matches the code, the code wins: update the fact in this plan in the same PR and draw what the code does.
 
@@ -235,6 +235,7 @@ Rules enforced by `GrumPlates.Test/Architecture` (put the relevant ones in a not
 - State: `UserBookcase/UserBookcaseState`, `AuthorBookcase/AuthorBookcaseState`.
 - Route components (`Routes/`): `Index.razor` (`/`, `/books`), `BookCreate.razor` (`/books/new`), `BookEdit.razor` (`/books/{Id:int}/edit`), `UserBookDetails.razor` (`/books/{Id:int}`), `AuthorBookDetails.razor` (`/books/catalog/{Id:int}`), `AuthorDetails.razor` (`/books/author/{SeedKey}`).
 - Shared components (`Shared/`): `BookForm`, `BookFormModel`, `BookDetailsView`, `BookListRow`; plus `UserBookcase.razor`, `UserBookcaseLoginPrompt.razor`, `AuthorBookcase.razor`.
+- Dependencies (checked in A08): route components inject `IBooksApi` or `IAuthorBooksApi`, and the private routes also `UserBookcaseState`; `Index.razor` renders the bookcase components; `UserBookcase.razor` and `AuthorBookcase.razor` inject the two states.
 - Key point for the diagram: the same Core interface `IBooksApi` is realized twice. During server rendering (SSR/prerender and interactive server) components resolve `BooksServerService` directly; in WebAssembly they resolve `BooksClientService`, which calls the HTTP API. Components depend only on `IBooksApi` or feature state. Show `BooksServerService` as a reference box labelled "(server, see shared view)".
 
 ### 7.4 Books client: React profile
@@ -276,7 +277,7 @@ React only: the web app serves a static SPA (`index.html` fallback for HTML navi
 
 | Target | Nodes (role names) | Allocation |
 | --- | --- | --- |
-| LocalSingleNode | one Linux PC | Host services: Caddy (site bound to `127.0.0.1`, origin port setting `public_origin_port`), cloudflared tunnel connector. Docker Compose project per app: `web` (app image `APP_IMAGE_REF`, published on `127.0.0.1:${APP_PORT}`), `postgres`, `redis` (both published on loopback only). Telemetry disabled. Nightly local PostgreSQL dump. Other app instances can share Caddy, cloudflared and Docker. |
+| LocalSingleNode | one Linux PC | Host services: Caddy (site bound to `127.0.0.1`, origin port setting `public_origin_port`), cloudflared tunnel connector. Docker Compose project per app: `web` (app image `APP_IMAGE_REF`, published on `127.0.0.1:${APP_PORT}`), `postgres`, `redis` (both published on loopback only, for host tools; `web` reaches them over the Compose network by service name), volumes `postgres_data` and `redis_data`. Telemetry disabled. Nightly local PostgreSQL dump. Other app instances can share Caddy, cloudflared and Docker. |
 | LocalCluster | `node-main`, `node-app1`, `node-app2`, `node-db` | `node-main`: Caddy load balancer + cloudflared + optional observability backend. `node-app1`/`node-app2`: `web` container + observability agent. `node-db`: PostgreSQL, Redis, postgres-exporter, redis-exporter. |
 | Cloud (Hetzner, OpenTofu + Ansible) | `cloud-main`, `cloud-app1`, `cloud-app2`, `cloud-db` | Same roles as LocalCluster. Only `cloud-main` has public networking (Hetzner firewall); private nodes use its NAT; it is also the SSH bastion. Server type from variable `server_type` (currently `cx23` in `Deployment/Cloud/infra/opentofu/terraform.tfvars`). |
 
@@ -370,7 +371,7 @@ Review checklist (all must be true):
 
 ### A00 Preconditions
 
-- [ ] **Do:** `git fetch origin` and confirm that `origin/main` contains the documentation-rule change: `git show origin/main:AGENTS.md | grep -n "drawio"` prints the documentation-only line, and `git show origin/main:Deployment/Common/Scripts/verify-operation-source.py | grep -n DIAGRAM_SUFFIXES` prints matches.
+- [x] **Do:** `git fetch origin` and confirm that `origin/main` contains the documentation-rule change: `git show origin/main:AGENTS.md | grep -n "drawio"` prints the documentation-only line, and `git show origin/main:Deployment/Common/Scripts/verify-operation-source.py | grep -n DIAGRAM_SUFFIXES` prints matches.
 - **Verify:** both commands print at least one line.
 - **Done when:** both are true. If not, the prerequisite PR (branch `chore/template-batch-20261110`, which carries this plan and the rule) is not merged yet. Finish it instead of stopping:
   1. `gh pr list -R Grumlebob/GrumPlates --state all --head chore/template-batch-20261110 --json number,state,mergedAt` to find it. If no PR exists, push the branch and open one with `gh pr create -R Grumlebob/GrumPlates --base main --head chore/template-batch-20261110`.
@@ -380,13 +381,13 @@ Review checklist (all must be true):
 
 ### A01 Workspace
 
-- [ ] **Do:** create a branch from the latest `origin/main`: `git switch -c docs/architecture-illustrations origin/main` (or a separate worktree if the primary checkout is busy; never touch someone else's uncommitted work). Create the scratch folders `Plans.local/ArchitectureIllustrations/src` and `Plans.local/ArchitectureIllustrations/preview`.
+- [x] **Do:** create a branch from the latest `origin/main`: `git switch -c docs/architecture-illustrations origin/main` (or a separate worktree if the primary checkout is busy; never touch someone else's uncommitted work). Create the scratch folders `Plans.local/ArchitectureIllustrations/src` and `Plans.local/ArchitectureIllustrations/preview`.
 - **Verify:** `git status --short` is empty; `git check-ignore Plans.local/ArchitectureIllustrations/src` prints the path (ignored).
 - **Done when:** clean branch exists and scratch folders are ignored.
 
 ### A02 Toolchain and validator
 
-- [ ] **Do:**
+- [x] **Do:**
   1. Run `"$DRAWIO" --version` (section 5). If draw.io is missing, install draw.io desktop from the official release (Windows: `winget install JGraph.Draw`).
   2. Save the validator below as `Plans.local/ArchitectureIllustrations/validate_illustrations.py`.
   3. Export the 6.3 skeleton unchanged to `Plans.local/ArchitectureIllustrations/probe/probe.drawio.svg` and run the validator on that folder.
@@ -423,7 +424,7 @@ sys.exit(1 if failed else 0)
 
 ### A03 Re-inventory facts
 
-- [ ] **Do:** run each command and compare the output with section 7. Update section 7 in this plan for any difference.
+- [x] **Do:** run each command and compare the output with section 7. Update section 7 in this plan for any difference.
 
 ```bash
 grep -n -E "ProjectReference|Condition=" GrumPlates/GrumPlates.csproj GrumPlates.Client/GrumPlates.Client.csproj
@@ -441,13 +442,13 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A04 Scaffold folders and README skeletons
 
-- [ ] **Do:** create `docs/illustrations/README.md`, `docs/illustrations/blazorauto/README.md`, `docs/illustrations/react/README.md` with headings only (content in A16). Root README headings: `# Architecture illustrations`, `## How to read these views` (terminology), `## Architecturally significant requirements (+1)`, `## Shared views`, `## Frontend profile views`, `## Editing diagrams`. Profile README headings: `# <Profile> profile views`, `## Package overview`, `## Books client decomposition`, `## Runtime (C&C) overview`.
+- [x] **Do:** create `docs/illustrations/README.md`, `docs/illustrations/blazorauto/README.md`, `docs/illustrations/react/README.md` with headings only (content in A16). Root README headings: `# Architecture illustrations`, `## How to read these views` (terminology), `## Architecturally significant requirements (+1)`, `## Shared views`, `## Frontend profile views`, `## Editing diagrams`. Profile README headings: `# <Profile> profile views`, `## Package overview`, `## Books client decomposition`, `## Runtime (C&C) overview`.
 - **Verify:** `git status` shows three new files under `docs/illustrations/`.
 - **Done when:** scaffold exists.
 
 ### A05 `shared/module-books-core-and-server`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Core and server — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Core and server — both frontend profiles`.
   - Outer `package` frames (large folders, contents drawn inside with `parent` set to the folder): `GrumPlates.Core › Features/Books` (left) and `GrumPlates › Features/Books` (right).
   - Inside Core: package `Contracts` with `class` boxes `«interface» IBooksApi` (six methods), `«interface» IAuthorBooksApi` (two methods), `BookRules` («static»); package `Domain` with `Book`, `UserBook`, `AuthorBook`; `package-list` `UseCases` listing the eight folders from 7.2.
   - Inside server: `BooksServerService`, `AuthorBooksServerService` (Services); `BooksEndpoints` (label `/api/books`), `AuthorBooksEndpoints` (`/api/author-books`) (Endpoints); `BookEntityTypeConfiguration` (Persistence); `package-list` `Caching` (three classes) and `AuthorBookcase/Seed` (`AuthorBookSeeder`).
@@ -470,7 +471,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A06 `blazorauto/module-packages`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — BlazorAuto profile`.
   - `package-list` boxes: `GrumPlates (server host)` with its five sub-folders; `GrumPlates.Client (Blazor WebAssembly)` with its three sub-folders; `GrumPlates.Core` with its four sub-folders (7.1).
   - Relations: `uses` server → Client (label `«uses» (BlazorAuto profile)`); `uses` server → Core; `uses` Client → Core.
   - `note` "Enforced by GrumPlates.Test/Architecture": the rules from 7.1 that mention Core, Client or the server.
@@ -480,7 +481,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A07 `react/module-packages`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — React profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Package overview — React profile`.
   - `package-list` boxes: `GrumPlates (server host)`, `GrumPlates.Core`, `GrumPlates.React (TypeScript SPA)` listing `app/routes`, `app/features/books`, `app/features/accounts`, `app/api`, `app/components`.
   - `artifact` boxes: `openapi.json` (label "GrumPlates.React/api/openapi.json") and `schema.d.ts` (label "app/api/generated").
   - Relations: `uses` server → Core. Dashed `uses` with label `«generated from»`: openapi.json → server; schema.d.ts → openapi.json. `uses` GrumPlates.React → schema.d.ts. No arrow from GrumPlates.React to any .NET package.
@@ -489,27 +490,27 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A08 `blazorauto/module-books-client`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Blazor client — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Blazor client — BlazorAuto profile`.
   - Reference boxes (dashed `class`) on the left: `«interface» IBooksApi`, `«interface» IAuthorBooksApi` (label "GrumPlates.Core, see shared view"), `BooksServerService`, `AuthorBooksServerService` (label "server, see shared view").
   - Package `GrumPlates.Client › Features/Books` containing: `BooksClientService`, `AuthorBooksClientService`, `BooksAntiforgeryHandler` («DelegatingHandler»), `UserBookcaseState`, `AuthorBookcaseState`, `package-list` `Routes` (six components with their routes from 7.3), `package-list` `Shared` (four items), `package-list` `Bookcases` (`UserBookcase`, `UserBookcaseLoginPrompt`, `AuthorBookcase`).
-  - Relations: `realizes` BooksClientService → IBooksApi; AuthorBooksClientService → IAuthorBooksApi; and (from the reference boxes) BooksServerService → IBooksApi; AuthorBooksServerService → IAuthorBooksApi. `uses` UserBookcaseState → IBooksApi; AuthorBookcaseState → IAuthorBooksApi; Routes → UserBookcaseState, AuthorBookcaseState, Shared; BooksClientService → BooksAntiforgeryHandler (label `«uses» HttpClient pipeline`).
+  - Relations: `realizes` BooksClientService → IBooksApi; AuthorBooksClientService → IAuthorBooksApi; and (from the reference boxes) BooksServerService → IBooksApi; AuthorBooksServerService → IAuthorBooksApi. `uses` UserBookcaseState → IBooksApi; AuthorBookcaseState → IAuthorBooksApi; Routes → IBooksApi, IAuthorBooksApi, UserBookcaseState, Bookcases, Shared; Bookcases → UserBookcaseState, AuthorBookcaseState, Shared (corrected in A08 from the `@inject` and component usages); BooksClientService → BooksAntiforgeryHandler (label `«uses» HttpClient pipeline`).
   - Note: "Interactive Auto: during server rendering components get the server realization; in WebAssembly they get the client realization, which calls the HTTP API. Components never inject HttpClient."
 - **Verify / Done when:** as A05 (commit `docs: add Blazor Books client module view [skip ci]`).
 
 ### A09 `react/module-books-client`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: React client — React profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: React client — React profile`.
   - Package `app/routes`: `home.tsx`, `books.tsx`, `author-book.tsx`, `my-books.tsx` (with their paths from 7.4).
   - Package `app/features/books`: `catalog-page.tsx`, `author-book-page.tsx`, `book-card.tsx`, `private-book-list.tsx`, `read-states.tsx`.
   - Package `app/features/accounts`: `AccountSessionController`, `account-provider.tsx`.
   - Package `app/api`: `api-client.ts`, `client.ts` (public, no credentials), `queries.ts`, `api-result.ts`, `errors.ts`, `generated/schema.d.ts`.
-  - Relations (`uses`): books.tsx → catalog-page; author-book.tsx → author-book-page; my-books.tsx → private-book-list, account-provider; catalog-page and author-book-page → queries; queries → client.ts; private-book-list → account-provider; account-provider → AccountSessionController; AccountSessionController → api-client.ts; client.ts → api-client.ts; api-client.ts → schema.d.ts; pages → api-result/errors (one arrow from the package is fine).
+  - Relations (`uses`): books.tsx → catalog-page; author-book.tsx → author-book-page; my-books.tsx → private-book-list, account-context; catalog-page and author-book-page → queries; queries → client.ts; private-book-list → account-context; `root.tsx` → account-provider; account-provider → account-context («provides»), AccountSessionController (corrected in A09 from the imports: private code reads `account-context.ts`, which `account-provider.tsx`, mounted in `root.tsx`, supplies); AccountSessionController → api-client.ts; client.ts → api-client.ts; api-client.ts → schema.d.ts; pages → api-result/errors (one arrow from the package is fine).
   - Note: "Public catalog requests omit credentials. Private requests use the session-decorated client (cookie, X-Expected-User, X-CSRF-TOKEN). Accounts are disabled by default in the React profile."
 - **Verify / Done when:** as A05 (commit `docs: add React Books client module view [skip ci]`).
 
 ### A10 `blazorauto/cc-runtime`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — BlazorAuto profile`.
   - Components: `Browser: Blazor WebAssembly client`, `Reverse proxy`, `Web app (ASP.NET Core: SSR, interactive server, JSON API)`, `Account mail outbox worker` (draw inside the web app component as a nested component), `PostgreSQL`, `Redis`. Externals: `SMTP server`, `Google OAuth (optional)`. Optional group (dashed `frame` labelled `opt [observability enabled]`): `Alloy agent`, `Observability backend`.
   - Connectors with labels: Browser–Reverse proxy `HTTPS: HTML (SSR), JSON API, SignalR WebSocket circuit, WebAssembly assets`; Reverse proxy–Web app `HTTP`; Web app–PostgreSQL `SQL (EF Core + Npgsql)`; Web app–Redis `Redis: cache + pub/sub invalidation`; worker → SMTP `SMTP`; Web app → Google `OAuth 2.0 redirect flow` (the browser follows the redirect; a note may say so); Web app → Alloy `OTLP`; Alloy → backend `OTLP / logs`.
   - Note listing patterns: client-server, shared-data (PostgreSQL), publish-subscribe (Redis invalidation).
@@ -517,7 +518,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A11 `react/cc-runtime`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — React profile`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Runtime overview — React profile`.
   - Components as A10, but the browser component is `Browser: React SPA`, the web app is `Web app (ASP.NET Core: static SPA host, JSON API)`, and there is no Google OAuth and no SignalR.
   - Browser–Reverse proxy label: `HTTPS: static SPA assets, JSON API (public: no credentials; private: cookie + X-Expected-User + X-CSRF-TOKEN)`.
   - Note: "HTML navigations fall back to index.html; API, health and reserved account paths never do. Accounts are disabled by default."
@@ -525,7 +526,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A12 `shared/cc-protocol-get-book`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: GET /api/books/{id} — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: GET /api/books/{id} — both frontend profiles`.
   - Lifelines (left to right, 240 px apart): `API client (selected frontend)`, `Web app pipeline` (rate limiter, authentication, account guard, authorization), `Books endpoint`, `BooksServerService`, `PostgreSQL`.
   - First message: `GET /api/books/{id}` + second line `Cookie, X-Expected-User` from client to pipeline.
   - One `alt` frame with operands separated by `separator` lines, each with a guard and reply. Replies go back to the client:
@@ -542,7 +543,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A13 `shared/cc-protocol-create-book`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: POST /api/books — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: POST /api/books — both frontend profiles`.
   - Lifelines: `API client (selected frontend)`, `Web app pipeline`, `Books endpoint`, `BooksServerService`, `PostgreSQL`, `Redis`.
   - First message: `POST /api/books {title, author, url}` + `Cookie, X-Expected-User, X-CSRF-TOKEN`.
   - `alt` operands: `[rate limit, sign-in, policy or account check fails]` (one operand with a single reply `429 · 401 · 403 · 409 — see GET protocol`), `[invalid antiforgery token]` → `400 Bad Request · CsrfInvalid`, `[validation fails]` endpoint → client `400 Bad Request · ValidationProblem`, `[valid]`: endpoint → service `CreateAsync(request)`, service → PostgreSQL `INSERT book for owner`, service → Redis `publish invalidation (book lists)`, replies, endpoint → client `201 Created · Location: /api/books/{id} · CreateBookResponse`; `[database failure]` → `503`.
@@ -551,16 +552,16 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A14 `shared/allocation-single-node`
 
-- [ ] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalSingleNode — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalSingleNode — both frontend profiles`.
   - Nodes: `«device» User device` containing `«execution environment» Browser` containing artifact `Frontend assets (selected profile)`; `«external» Cloudflare edge`; `«device» Linux PC (single node)`.
-  - Inside the Linux PC: host services `Caddy (site on loopback:public_origin_port)` and `cloudflared`; an `«execution environment» Docker Engine` frame containing a frame `Compose project (one per app)` with artifacts `web (APP_IMAGE_REF)`, `postgres`, `redis`, and a `«volume»` artifact `postgres_data`.
-  - Protocol links: User device – Cloudflare edge `HTTPS`; Cloudflare edge – cloudflared `outbound tunnel`; cloudflared – Caddy `HTTP (loopback)`; Caddy – web `HTTP loopback:APP_PORT`; web – postgres `PostgreSQL protocol (loopback)`; web – redis `Redis protocol (loopback)`.
+  - Inside the Linux PC: host services `Caddy (site on loopback:public_origin_port)` and `cloudflared`; an `«execution environment» Docker Engine` frame containing a frame `Compose project (one per app)` with artifacts `web (APP_IMAGE_REF)`, `postgres`, `redis`, and `«volume»` artifacts `postgres_data` and `redis_data` (corrected in A14 from `Deployment/LocalSingleNode/compose/docker-compose.yml`).
+  - Protocol links: User device – Cloudflare edge `HTTPS`; Cloudflare edge – cloudflared `outbound tunnel`; cloudflared – Caddy `HTTP (loopback)`; Caddy – web `HTTP loopback:APP_PORT`; web – postgres `PostgreSQL protocol (Compose network)`; web – redis `Redis protocol (Compose network)` (corrected in A14: the connection strings use the service names `postgres` and `redis`).
   - Note "Requirements": the readiness floors from 7.6 labelled "planning floor (Readiness.md)". Note: "Telemetry disabled. Other app instances may share Caddy, cloudflared and Docker. Nightly PostgreSQL dump."
 - **Verify / Done when:** as A05 (commit `docs: add single-node allocation view [skip ci]`).
 
 ### A15 `shared/allocation-four-node`
 
-- [ ] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalCluster and Cloud (multi-tier) — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Allocation viewpoint (deployment view) · LocalCluster and Cloud (multi-tier) — both frontend profiles`.
   - Nodes: `User device` (as A14), `Cloudflare edge` («external»), `node-main / cloud-main`, `node-app1 / cloud-app1`, `node-app2 / cloud-app2`, `node-db / cloud-db`.
   - Allocations: main → `Caddy load balancer`, `cloudflared`, opt frame `observability backend` (prometheus 384m/0.50, alertmanager 128m/0.15, loki 256m/0.50, tempo 384m/0.35, grafana 256m/0.35). Each app node → Docker Engine → `web (APP_IMAGE_REF)`, opt `alloy 192m/0.35`, `node-exporter 64m/0.10`. db → Docker Engine → `postgres`, `redis`, `postgres-exporter 128m/0.15`, `redis-exporter 96m/0.10`, opt agent.
   - Protocol links: User – edge `HTTPS`; edge – cloudflared `outbound tunnel`; Caddy – each `web` `HTTP app_port · sticky cookie · health /health/ready every 5 s`; each web – postgres `PostgreSQL protocol (private network)`; each web – redis `Redis protocol (private network)`; agents → backend `telemetry (private)`.
@@ -569,7 +570,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A16 README content
 
-- [ ] **Do:** fill the README headings from A04. Rules: link instead of repeating long rules; use relative links; embed each diagram with `![<title>](<relative path>)` followed by 2–6 sentences.
+- [x] **Do:** fill the README headings from A04. Rules: link instead of repeating long rules; use relative links; embed each diagram with `![<title>](<relative path>)` followed by 2–6 sentences.
   - Root `README.md`:
     - *How to read these views*: the terminology table from section 2 in shortened form (Viewpoint, View, Module, C&C, Allocation, +1) and one sentence on the 3+1 approach and its source.
     - *+1*: S1–S3 and the quality attributes from 7.8, each linking the views it uses.
@@ -582,7 +583,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A17 Links from existing docs
 
-- [ ] **Do:**
+- [x] **Do:**
   1. `docs/Architecture.md`: after the first table, add one sentence: `Diagrams of these structures, using module, component-and-connector and allocation views, are in [architecture illustrations](illustrations/README.md).`
   2. `docs/Frontend/ReactOnlyClone.md`: add a row to the inventory table near "Docs and rules": `| Illustrations | docs/illustrations/blazorauto/ and its link in docs/illustrations/README.md | Delete |` (format paths as code like the other rows).
 - **Verify:** `git diff` shows only these two small additions in those files.
@@ -590,7 +591,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A18 Validation
 
-- [ ] **Do:**
+- [x] **Do:**
   1. `python -I Plans.local/ArchitectureIllustrations/validate_illustrations.py docs/illustrations` → exit 0, 11 files.
   2. Documentation-only proof (uses the same rule CI operations use):
 
@@ -630,3 +631,6 @@ python -I -c "import importlib.util,subprocess,sys; s=importlib.util.spec_from_f
 
 - 2026-11-10: plan prepared. The documentation-rule change (AGENTS.md, `verify-operation-source.py` and its tests, `.gitattributes`, `docs/Test.md`, `Deployment/LocalSingleNode/Operations.md`) ships in the same PR as this plan. Verified locally before commit: `test_operation_source.py` 12 tests passed in WSL; deployment audit passed. Toolchain probes (draw.io 26.1.1 SVG/PNG export, validator positive and negative cases) passed.
 - 2026-11-10: the prerequisite PR is the batched branch `chore/template-batch-20261110`. Besides this plan and the rule, it moves `docker/` and local scripts into `Scripts/LocalDevelopment`, `Scripts/LocalObservability` and `Scripts/Quality`, documents why Blazor stale-result checks need no `Interlocked`/`Volatile`, and records fork lessons. None of that changes the facts in section 7. It was rebased onto `33d51451` (#459, which simplified the Blazor Books async guards and added the internal helper `BookUserIdentity`; the helper is too small for the package diagrams). Section 7 facts were rechecked after that rebase.
+- 2026-11-10: A00 passed (`origin/main` = `fc2aaacd`, #460 carries the rule). A01 branch `docs/architecture-illustrations`. A02 draw.io 26.1.1 and validator probe passed. A03 re-inventory at `fc2aaacd`: no drift (pipeline order, Books files, routes, OpenAPI responses, Caddy load balancing, Compose limits and `server_type` all match section 7). The `Program.cs` grep in A03 failed in this Git Bash because of the `\(` escape; `grep -n -E "app\.|Use[A-Z]|Map[A-Z]" GrumPlates/Program.cs` gives the same information. Sources are generated by small Python scripts in `Plans.local/ArchitectureIllustrations/` (scratch only).
+- 2026-11-10: A05–A17 done on branch `docs/architecture-illustrations`, one commit per diagram. Code won over this plan in four places, each corrected above: Blazor route components inject the Core interfaces and `UserBookcaseState` while the bookcase components use the states (A08); React private code reads `account-context.ts`, supplied by `account-provider.tsx` mounted in `root.tsx` (A09); `GetByIdAsync` reads through HybridCache, so the SQL message is marked `[cache miss]`, and create-book validation runs as an endpoint filter before the handler (A12, A13); single-node `web` reaches PostgreSQL and Redis over the Compose network and there is also a `redis_data` volume (A14). Note boxes got right padding after A11, so all diagrams were re-exported once.
+- 2026-11-10: A18 at `1cfb91d3`: validator exit 0 on 11 files; documentation-only check True; `git diff --check origin/main...HEAD` empty; changed paths are only `docs/illustrations/**`, `docs/Architecture.md`, `docs/Frontend/ReactOnlyClone.md` and this plan; no Blazor or React names in shared diagrams and no cross-profile names in profile diagrams; all 11 PNG previews reviewed (titles top-left, legends bottom-left, default colours).

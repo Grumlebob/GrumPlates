@@ -9,6 +9,8 @@ The application has three production .NET projects and an optional React fronten
 | `GrumPlates` | HTTP endpoints, server feature operations, EF persistence and hosting. References Core and, only for BlazorAuto, Client. |
 | `GrumPlates.React` | React routes and feature UI, using the server's generated OpenAPI contract over HTTP. It is not a .NET assembly. |
 
+Diagrams of these structures, using module, component-and-connector and allocation views, are in [architecture illustrations](illustrations/README.md).
+
 `frontend-profile.txt` selects BlazorAuto or React. Profile-specific composition and publish inputs exclude the other renderer's runtime dependencies and assets. See [frontend profiles](FrontendProfiles.md), [server features](Features/Server.md), [Blazor features](Features/Blazor.md) and [React development](Frontend/React.md).
 
 ## Accounts and persistence

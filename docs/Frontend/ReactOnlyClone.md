@@ -32,6 +32,7 @@ Expect matches in these areas:
 | Tests | `GrumPlates.Test/E2E/Support/BlazorE2ETestBase.cs`, Blazor E2E, render-mode and head-asset hosting tests, architecture tests naming the client, and script fixtures under `Scripts/CI/tests/`, `Deployment/Common/Scripts/Tests/` and `Deployment/LocalSingleNode/Scripts/Tests/` | Delete Blazor-only tests; make architecture and composition tests assert the React-only host; turn fixtures that name the Blazor profile into React ones |
 | Browser tools | `axe-core` and `lighthouse` in `GrumPlates.Client/package.json`, used by `Scripts/Quality/RunLighthouse.ps1` and the axe tests | Move them to a test-only package with its own lockfile and Dependabot entry **before** deleting the client |
 | Quality tools | `Scripts/Quality` (including `Scripts/Quality/SonarQube`) | Optional; remove with their docs when unused, as Portfolio did, and delete the CI step that runs their tests |
+| Illustrations | `docs/illustrations/blazorauto/` and its link in `docs/illustrations/README.md` | Delete |
 | Docs and rules | `AGENTS.md` (Tailwind rebuild rule), `README.md`, and every page under `docs/` that names the profile, such as [FrontendProfiles](../FrontendProfiles.md), [Blazor features](../Features/Blazor.md), the [feature guide](../HowToAddANewFeature.md) and [running locally](../HowToRunLocally.md) | Describe one frontend; delete the Blazor guide |
 
 ## Safe removal sequence
