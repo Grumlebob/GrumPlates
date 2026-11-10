@@ -235,6 +235,7 @@ Rules enforced by `GrumPlates.Test/Architecture` (put the relevant ones in a not
 - State: `UserBookcase/UserBookcaseState`, `AuthorBookcase/AuthorBookcaseState`.
 - Route components (`Routes/`): `Index.razor` (`/`, `/books`), `BookCreate.razor` (`/books/new`), `BookEdit.razor` (`/books/{Id:int}/edit`), `UserBookDetails.razor` (`/books/{Id:int}`), `AuthorBookDetails.razor` (`/books/catalog/{Id:int}`), `AuthorDetails.razor` (`/books/author/{SeedKey}`).
 - Shared components (`Shared/`): `BookForm`, `BookFormModel`, `BookDetailsView`, `BookListRow`; plus `UserBookcase.razor`, `UserBookcaseLoginPrompt.razor`, `AuthorBookcase.razor`.
+- Dependencies (checked in A08): route components inject `IBooksApi` or `IAuthorBooksApi`, and the private routes also `UserBookcaseState`; `Index.razor` renders the bookcase components; `UserBookcase.razor` and `AuthorBookcase.razor` inject the two states.
 - Key point for the diagram: the same Core interface `IBooksApi` is realized twice. During server rendering (SSR/prerender and interactive server) components resolve `BooksServerService` directly; in WebAssembly they resolve `BooksClientService`, which calls the HTTP API. Components depend only on `IBooksApi` or feature state. Show `BooksServerService` as a reference box labelled "(server, see shared view)".
 
 ### 7.4 Books client: React profile
@@ -489,10 +490,10 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A08 `blazorauto/module-books-client`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Blazor client — BlazorAuto profile`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Blazor client — BlazorAuto profile`.
   - Reference boxes (dashed `class`) on the left: `«interface» IBooksApi`, `«interface» IAuthorBooksApi` (label "GrumPlates.Core, see shared view"), `BooksServerService`, `AuthorBooksServerService` (label "server, see shared view").
   - Package `GrumPlates.Client › Features/Books` containing: `BooksClientService`, `AuthorBooksClientService`, `BooksAntiforgeryHandler` («DelegatingHandler»), `UserBookcaseState`, `AuthorBookcaseState`, `package-list` `Routes` (six components with their routes from 7.3), `package-list` `Shared` (four items), `package-list` `Bookcases` (`UserBookcase`, `UserBookcaseLoginPrompt`, `AuthorBookcase`).
-  - Relations: `realizes` BooksClientService → IBooksApi; AuthorBooksClientService → IAuthorBooksApi; and (from the reference boxes) BooksServerService → IBooksApi; AuthorBooksServerService → IAuthorBooksApi. `uses` UserBookcaseState → IBooksApi; AuthorBookcaseState → IAuthorBooksApi; Routes → UserBookcaseState, AuthorBookcaseState, Shared; BooksClientService → BooksAntiforgeryHandler (label `«uses» HttpClient pipeline`).
+  - Relations: `realizes` BooksClientService → IBooksApi; AuthorBooksClientService → IAuthorBooksApi; and (from the reference boxes) BooksServerService → IBooksApi; AuthorBooksServerService → IAuthorBooksApi. `uses` UserBookcaseState → IBooksApi; AuthorBookcaseState → IAuthorBooksApi; Routes → IBooksApi, IAuthorBooksApi, UserBookcaseState, Bookcases, Shared; Bookcases → UserBookcaseState, AuthorBookcaseState, Shared (corrected in A08 from the `@inject` and component usages); BooksClientService → BooksAntiforgeryHandler (label `«uses» HttpClient pipeline`).
   - Note: "Interactive Auto: during server rendering components get the server realization; in WebAssembly they get the client realization, which calls the HTTP API. Components never inject HttpClient."
 - **Verify / Done when:** as A05 (commit `docs: add Blazor Books client module view [skip ci]`).
 
