@@ -583,7 +583,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A17 Links from existing docs
 
-- [ ] **Do:**
+- [x] **Do:**
   1. `docs/Architecture.md`: after the first table, add one sentence: `Diagrams of these structures, using module, component-and-connector and allocation views, are in [architecture illustrations](illustrations/README.md).`
   2. `docs/Frontend/ReactOnlyClone.md`: add a row to the inventory table near "Docs and rules": `| Illustrations | docs/illustrations/blazorauto/ and its link in docs/illustrations/README.md | Delete |` (format paths as code like the other rows).
 - **Verify:** `git diff` shows only these two small additions in those files.
