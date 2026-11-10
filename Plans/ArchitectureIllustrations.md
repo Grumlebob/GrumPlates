@@ -1,6 +1,6 @@
 # Architecture illustrations (3+1 views)
 
-Status: ready. Steps A00–A19 are not started. Prepared 2026-11-10 from source baseline `2c55a7ccd9bc2c4b3f85574e672e969a9ce80b72`. This plan changes documentation only and does not authorize deployment.
+Status: in progress (A00–A05 done). Prepared 2026-11-10 from source baseline `2c55a7ccd9bc2c4b3f85574e672e969a9ce80b72`. This plan changes documentation only and does not authorize deployment.
 
 This plan is written so that an executor with no prior context can finish it. Do the steps in order. Do not skip a **Verify** block. When a fact in this plan no longer matches the code, the code wins: update the fact in this plan in the same PR and draw what the code does.
 
@@ -370,7 +370,7 @@ Review checklist (all must be true):
 
 ### A00 Preconditions
 
-- [ ] **Do:** `git fetch origin` and confirm that `origin/main` contains the documentation-rule change: `git show origin/main:AGENTS.md | grep -n "drawio"` prints the documentation-only line, and `git show origin/main:Deployment/Common/Scripts/verify-operation-source.py | grep -n DIAGRAM_SUFFIXES` prints matches.
+- [x] **Do:** `git fetch origin` and confirm that `origin/main` contains the documentation-rule change: `git show origin/main:AGENTS.md | grep -n "drawio"` prints the documentation-only line, and `git show origin/main:Deployment/Common/Scripts/verify-operation-source.py | grep -n DIAGRAM_SUFFIXES` prints matches.
 - **Verify:** both commands print at least one line.
 - **Done when:** both are true. If not, the prerequisite PR (branch `chore/template-batch-20261110`, which carries this plan and the rule) is not merged yet. Finish it instead of stopping:
   1. `gh pr list -R Grumlebob/GrumPlates --state all --head chore/template-batch-20261110 --json number,state,mergedAt` to find it. If no PR exists, push the branch and open one with `gh pr create -R Grumlebob/GrumPlates --base main --head chore/template-batch-20261110`.
@@ -380,13 +380,13 @@ Review checklist (all must be true):
 
 ### A01 Workspace
 
-- [ ] **Do:** create a branch from the latest `origin/main`: `git switch -c docs/architecture-illustrations origin/main` (or a separate worktree if the primary checkout is busy; never touch someone else's uncommitted work). Create the scratch folders `Plans.local/ArchitectureIllustrations/src` and `Plans.local/ArchitectureIllustrations/preview`.
+- [x] **Do:** create a branch from the latest `origin/main`: `git switch -c docs/architecture-illustrations origin/main` (or a separate worktree if the primary checkout is busy; never touch someone else's uncommitted work). Create the scratch folders `Plans.local/ArchitectureIllustrations/src` and `Plans.local/ArchitectureIllustrations/preview`.
 - **Verify:** `git status --short` is empty; `git check-ignore Plans.local/ArchitectureIllustrations/src` prints the path (ignored).
 - **Done when:** clean branch exists and scratch folders are ignored.
 
 ### A02 Toolchain and validator
 
-- [ ] **Do:**
+- [x] **Do:**
   1. Run `"$DRAWIO" --version` (section 5). If draw.io is missing, install draw.io desktop from the official release (Windows: `winget install JGraph.Draw`).
   2. Save the validator below as `Plans.local/ArchitectureIllustrations/validate_illustrations.py`.
   3. Export the 6.3 skeleton unchanged to `Plans.local/ArchitectureIllustrations/probe/probe.drawio.svg` and run the validator on that folder.
@@ -423,7 +423,7 @@ sys.exit(1 if failed else 0)
 
 ### A03 Re-inventory facts
 
-- [ ] **Do:** run each command and compare the output with section 7. Update section 7 in this plan for any difference.
+- [x] **Do:** run each command and compare the output with section 7. Update section 7 in this plan for any difference.
 
 ```bash
 grep -n -E "ProjectReference|Condition=" GrumPlates/GrumPlates.csproj GrumPlates.Client/GrumPlates.Client.csproj
@@ -441,13 +441,13 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A04 Scaffold folders and README skeletons
 
-- [ ] **Do:** create `docs/illustrations/README.md`, `docs/illustrations/blazorauto/README.md`, `docs/illustrations/react/README.md` with headings only (content in A16). Root README headings: `# Architecture illustrations`, `## How to read these views` (terminology), `## Architecturally significant requirements (+1)`, `## Shared views`, `## Frontend profile views`, `## Editing diagrams`. Profile README headings: `# <Profile> profile views`, `## Package overview`, `## Books client decomposition`, `## Runtime (C&C) overview`.
+- [x] **Do:** create `docs/illustrations/README.md`, `docs/illustrations/blazorauto/README.md`, `docs/illustrations/react/README.md` with headings only (content in A16). Root README headings: `# Architecture illustrations`, `## How to read these views` (terminology), `## Architecturally significant requirements (+1)`, `## Shared views`, `## Frontend profile views`, `## Editing diagrams`. Profile README headings: `# <Profile> profile views`, `## Package overview`, `## Books client decomposition`, `## Runtime (C&C) overview`.
 - **Verify:** `git status` shows three new files under `docs/illustrations/`.
 - **Done when:** scaffold exists.
 
 ### A05 `shared/module-books-core-and-server`
 
-- [ ] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Core and server — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Module viewpoint (development view) · Books decomposition: Core and server — both frontend profiles`.
   - Outer `package` frames (large folders, contents drawn inside with `parent` set to the folder): `GrumPlates.Core › Features/Books` (left) and `GrumPlates › Features/Books` (right).
   - Inside Core: package `Contracts` with `class` boxes `«interface» IBooksApi` (six methods), `«interface» IAuthorBooksApi` (two methods), `BookRules` («static»); package `Domain` with `Book`, `UserBook`, `AuthorBook`; `package-list` `UseCases` listing the eight folders from 7.2.
   - Inside server: `BooksServerService`, `AuthorBooksServerService` (Services); `BooksEndpoints` (label `/api/books`), `AuthorBooksEndpoints` (`/api/author-books`) (Endpoints); `BookEntityTypeConfiguration` (Persistence); `package-list` `Caching` (three classes) and `AuthorBookcase/Seed` (`AuthorBookSeeder`).
@@ -630,3 +630,4 @@ python -I -c "import importlib.util,subprocess,sys; s=importlib.util.spec_from_f
 
 - 2026-11-10: plan prepared. The documentation-rule change (AGENTS.md, `verify-operation-source.py` and its tests, `.gitattributes`, `docs/Test.md`, `Deployment/LocalSingleNode/Operations.md`) ships in the same PR as this plan. Verified locally before commit: `test_operation_source.py` 12 tests passed in WSL; deployment audit passed. Toolchain probes (draw.io 26.1.1 SVG/PNG export, validator positive and negative cases) passed.
 - 2026-11-10: the prerequisite PR is the batched branch `chore/template-batch-20261110`. Besides this plan and the rule, it moves `docker/` and local scripts into `Scripts/LocalDevelopment`, `Scripts/LocalObservability` and `Scripts/Quality`, documents why Blazor stale-result checks need no `Interlocked`/`Volatile`, and records fork lessons. None of that changes the facts in section 7. It was rebased onto `33d51451` (#459, which simplified the Blazor Books async guards and added the internal helper `BookUserIdentity`; the helper is too small for the package diagrams). Section 7 facts were rechecked after that rebase.
+- 2026-11-10: A00 passed (`origin/main` = `fc2aaacd`, #460 carries the rule). A01 branch `docs/architecture-illustrations`. A02 draw.io 26.1.1 and validator probe passed. A03 re-inventory at `fc2aaacd`: no drift (pipeline order, Books files, routes, OpenAPI responses, Caddy load balancing, Compose limits and `server_type` all match section 7). The `Program.cs` grep in A03 failed in this Git Bash because of the `\(` escape; `grep -n -E "app\.|Use[A-Z]|Map[A-Z]" GrumPlates/Program.cs` gives the same information. Sources are generated by small Python scripts in `Plans.local/ArchitectureIllustrations/` (scratch only).
