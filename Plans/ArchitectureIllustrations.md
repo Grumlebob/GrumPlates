@@ -526,7 +526,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A12 `shared/cc-protocol-get-book`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: GET /api/books/{id} — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: GET /api/books/{id} — both frontend profiles`.
   - Lifelines (left to right, 240 px apart): `API client (selected frontend)`, `Web app pipeline` (rate limiter, authentication, account guard, authorization), `Books endpoint`, `BooksServerService`, `PostgreSQL`.
   - First message: `GET /api/books/{id}` + second line `Cookie, X-Expected-User` from client to pipeline.
   - One `alt` frame with operands separated by `separator` lines, each with a guard and reply. Replies go back to the client:
@@ -543,7 +543,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A13 `shared/cc-protocol-create-book`
 
-- [ ] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: POST /api/books — both frontend profiles`.
+- [x] **Do:** procedure P. Title: `Component & Connector viewpoint (runtime view) · Connector protocol: POST /api/books — both frontend profiles`.
   - Lifelines: `API client (selected frontend)`, `Web app pipeline`, `Books endpoint`, `BooksServerService`, `PostgreSQL`, `Redis`.
   - First message: `POST /api/books {title, author, url}` + `Cookie, X-Expected-User, X-CSRF-TOKEN`.
   - `alt` operands: `[rate limit, sign-in, policy or account check fails]` (one operand with a single reply `429 · 401 · 403 · 409 — see GET protocol`), `[invalid antiforgery token]` → `400 Bad Request · CsrfInvalid`, `[validation fails]` endpoint → client `400 Bad Request · ValidationProblem`, `[valid]`: endpoint → service `CreateAsync(request)`, service → PostgreSQL `INSERT book for owner`, service → Redis `publish invalidation (book lists)`, replies, endpoint → client `201 Created · Location: /api/books/{id} · CreateBookResponse`; `[database failure]` → `503`.
