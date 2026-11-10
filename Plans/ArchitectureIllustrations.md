@@ -570,7 +570,7 @@ grep -n -E "reverse_proxy|lb_policy|health_" Deployment/*/ansible/roles/*caddy*/
 
 ### A16 README content
 
-- [ ] **Do:** fill the README headings from A04. Rules: link instead of repeating long rules; use relative links; embed each diagram with `![<title>](<relative path>)` followed by 2–6 sentences.
+- [x] **Do:** fill the README headings from A04. Rules: link instead of repeating long rules; use relative links; embed each diagram with `![<title>](<relative path>)` followed by 2–6 sentences.
   - Root `README.md`:
     - *How to read these views*: the terminology table from section 2 in shortened form (Viewpoint, View, Module, C&C, Allocation, +1) and one sentence on the 3+1 approach and its source.
     - *+1*: S1–S3 and the quality attributes from 7.8, each linking the views it uses.
