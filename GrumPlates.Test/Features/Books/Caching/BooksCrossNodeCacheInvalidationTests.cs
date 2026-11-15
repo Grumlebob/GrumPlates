@@ -1,8 +1,10 @@
+using System.Data.Common;
 using GrumPlates.Core.Features.Books.UseCases.CreateBook;
 using GrumPlates.Core.Features.Books.UseCases.GetBook;
 using GrumPlates.Core.Features.Books.UseCases.GetBooks;
 using GrumPlates.Core.Features.Books.UseCases.UpdateBook;
 using GrumPlates.Test.TestSupport.Integration;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Internal;
 
@@ -53,16 +55,40 @@ public sealed class BooksCrossNodeCacheInvalidationTests(SharedIntegrationEnviro
     [Fact]
     public async Task Update_OnNodeA_InvalidatesItemAndList_OnNodeB()
     {
-        var (nodeA, nodeB) = await StartNodesAsync();
+        var databaseReads = new BookReadCounter();
+        var clock = new ControlledMemoryClock();
+        var (nodeA, nodeB) = await StartNodesAsync(configureNodeBServices: services =>
+        {
+            services.AddSingleton<DbCommandInterceptor>(databaseReads);
+            services.Configure<MemoryCacheOptions>(options => options.Clock = clock);
+        });
         var created = await CreateBookAsync(nodeA, "Original");
 
+        // 1. Populate B's item and list caches, observing the actual database reads.
+        var readsBeforeWarmup = databaseReads.Count;
         var warmedItem = await GetBookAsync(nodeB, created.Id);
         Assert.NotNull(warmedItem);
         Assert.Equal("Original", warmedItem!.Title);
         var warmedList = await GetBooksAsync(nodeB);
         Assert.Single(warmedList.Books);
         Assert.Equal("Original", warmedList.Books[0].Title);
+        Assert.Equal(readsBeforeWarmup + 2, databaseReads.Count);
 
+        // 2. Prove both reads hit cache. Allow the initial create notification to settle.
+        await Eventually.EventuallyAsync(async () =>
+        {
+            var readsBeforeCacheHits = databaseReads.Count;
+            var cachedItem = await GetBookAsync(nodeB, created.Id);
+            var cachedList = await GetBooksAsync(nodeB);
+
+            Assert.NotNull(cachedItem);
+            Assert.Equal("Original", cachedItem.Title);
+            Assert.Equal("Original", Assert.Single(cachedList.Books).Title);
+            Assert.Equal(readsBeforeCacheHits, databaseReads.Count);
+        });
+        var readsBeforeUpdate = databaseReads.Count;
+
+        // 3. Update through A. B's clock never advances, so local TTL expiry cannot help.
         var update = new UpdateBookRequest
         {
             Id = created.Id,
@@ -83,6 +109,13 @@ public sealed class BooksCrossNodeCacheInvalidationTests(SharedIntegrationEnviro
             Assert.Single(list.Books);
             Assert.Equal("Updated", list.Books[0].Title);
         });
+        Assert.Equal(readsBeforeUpdate + 2, databaseReads.Count);
+
+        // The refreshed item and list are cached again, rather than bypassing caching.
+        var readsAfterRefresh = databaseReads.Count;
+        Assert.Equal("Updated", (await GetBookAsync(nodeB, created.Id))!.Title);
+        Assert.Equal("Updated", Assert.Single((await GetBooksAsync(nodeB)).Books).Title);
+        Assert.Equal(readsAfterRefresh, databaseReads.Count);
     }
 
     [Fact]
@@ -165,6 +198,37 @@ public sealed class BooksCrossNodeCacheInvalidationTests(SharedIntegrationEnviro
         await nodeA.ResetDatabaseAsync();
         var userName = $"node-user-{suffix}@example.test";
         return (nodeA.CreateAuthenticatedClient(userName), nodeB.CreateAuthenticatedClient(userName));
+    }
+
+    private sealed class BookReadCounter : DbCommandInterceptor
+    {
+        private int _count;
+
+        public int Count => Volatile.Read(ref _count);
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result)
+        {
+            CountBookRead(command);
+            return result;
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command, CommandEventData eventData, InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            CountBookRead(command);
+            return ValueTask.FromResult(result);
+        }
+
+        private void CountBookRead(DbCommand command)
+        {
+            if (command.CommandText.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase)
+                && command.CommandText.Contains("\"UserBooks\"", StringComparison.Ordinal))
+            {
+                Interlocked.Increment(ref _count);
+            }
+        }
     }
 
     // MemoryCache in .NET 10 uses ISystemClock; HybridCache's TimeProvider
