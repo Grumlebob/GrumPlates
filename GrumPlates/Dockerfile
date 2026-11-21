@@ -18,7 +18,7 @@ WORKDIR /app
 EXPOSE 8080
 EXPOSE 7186
 
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS source
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS source
 WORKDIR /src
 COPY global.json ./
 COPY Directory.Build.props ./
