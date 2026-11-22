@@ -16,8 +16,8 @@
     }
   },
   "devDependencies": {
-    "@tailwindcss/cli": "^4.3.3",
-    "axe-core": "^4.14.0",
+    "@tailwindcss/cli": "^4.3.5",
+    "axe-core": "^4.14.1",
     "lighthouse": "13.6.0",
     "tailwindcss": "^4.3.3"
   }
