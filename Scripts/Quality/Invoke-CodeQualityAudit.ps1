@@ -42,12 +42,7 @@ $sourceSha = $null
 $driverSha = $null
 $worktrees = [Collections.Generic.List[object]]::new()
 $archiveVerified = $false
-$serverWasRunning = $false
-$serverStartedByCommand = $false
-$serverAdoptedLeftover = $false
-$serverStartAttempted = $false
-# Present while an audit owns the server it started; see Resolve-QualityServerOwnership.
-$serverLeasePath = Join-Path $context.BaseDirectory 'server-lease.json'
+$stopServerAfterAudit = $false
 $failureMessages = [Collections.Generic.List[string]]::new()
 
 function Invoke-AuditGit {
@@ -71,7 +66,7 @@ function Write-AuditJson {
     finally { Remove-Item -LiteralPath $temporary -Force -ErrorAction SilentlyContinue }
 }
 
-function Get-OwnedSonarContainer {
+function Test-QualityStackRunning {
     $environment = @{
         SONARQUBE_DB_PASSWORD = 'quality-compose-inspection'
         SONARQUBE_HOST_PORT = [string]$context.HostPort
@@ -79,13 +74,13 @@ function Get-OwnedSonarContainer {
         SONARQUBE_NETWORK_NAME = $context.ComposeNetwork
         SONARQUBE_COMPOSE_PROJECT = $context.ComposeProject
     }
-    $arguments = @('compose', '--project-name', $context.ComposeProject, '--file', $context.ComposePath, 'ps', '-q', 'sonarqube')
+    $arguments = @('compose', '--project-name', $context.ComposeProject, '--file', $context.ComposePath, 'ps', '-q', '--orphans=false')
     $result = Invoke-QualityProcess -FilePath $context.DockerExecutable -ArgumentList $arguments `
         -WorkingDirectory $context.BaseDirectory -TimeoutSeconds 30 -Environment $environment
     if ($result.TimedOut -or $result.ExitCode -ne 0) {
-        throw 'Could not establish ownership of the repository-scoped SonarQube container.'
+        throw 'Could not inspect the repository-scoped SonarQube stack.'
     }
-    return $result.Stdout.Trim()
+    return -not [string]::IsNullOrWhiteSpace($result.Stdout)
 }
 
 function Invoke-ServerAction {
@@ -397,20 +392,19 @@ try {
     }
 
     $serverScript = Join-Path $sourceRoot 'Scripts/Quality/SonarQubeServer.ps1'
-    $beforeContainer = Get-OwnedSonarContainer
-    $batch.server.wasRunning = -not [string]::IsNullOrWhiteSpace($beforeContainer)
+    $batch.server.wasRunning = Test-QualityStackRunning
     $ownership = Resolve-QualityServerOwnership -WasRunning $batch.server.wasRunning `
-        -LeasePresent (Test-Path -LiteralPath $serverLeasePath) -KeepRequested ([bool]$KeepServerRunning)
-    $serverAdoptedLeftover = $ownership.AdoptedLeftover
-    $batch.server.adoptedLeftover = $serverAdoptedLeftover
-    # Written before the start, so an audit killed during startup still leaves its lease for the next one.
-    if ($ownership.WriteLease) { Write-AuditJson -Path $serverLeasePath -Value ([ordered]@{ runId = $runId; writtenUtc = [DateTime]::UtcNow.ToString('o') }) }
-    if ($ownership.RemoveLease) { Remove-Item -LiteralPath $serverLeasePath -Force }
-    $serverStartAttempted = $true
+        -LeasePresent ([IO.File]::Exists($context.ServerLeasePath)) -KeepRequested ([bool]$KeepServerRunning)
+    $batch.server.adoptedLeftover = $ownership.AdoptedLeftover
+    if ($ownership.WriteLease) {
+        Write-AuditJson -Path $context.ServerLeasePath -Value ([ordered]@{ runId = $runId; writtenUtc = [DateTime]::UtcNow.ToString('o') })
+    }
+    if ($ownership.RemoveLease) { [IO.File]::Delete($context.ServerLeasePath) }
+
+    # An owned start can fail after bringing up only the database.
+    $stopServerAfterAudit = $ownership.WriteLease -or $ownership.AdoptedLeftover
     Invoke-ServerAction -Script $serverScript -Parameters @{ Start = $true; Initialize = $true }
-    $afterContainer = Get-OwnedSonarContainer
-    $serverStartedByCommand = (-not $batch.server.wasRunning) -and (-not [string]::IsNullOrWhiteSpace($afterContainer))
-    $batch.server.startedByCommand = $serverStartedByCommand
+    $batch.server.startedByCommand = (-not $batch.server.wasRunning) -and (Test-QualityStackRunning)
     $batch.settingsDigest = $context.SettingsDigest
     $batch.settings = $context.SettingsSnapshot
 
@@ -495,20 +489,15 @@ catch {
 }
 finally {
     try {
-        if ($serverStartAttempted -and -not $batch.server.wasRunning -and -not $serverStartedByCommand) {
-            try { $serverStartedByCommand = -not [string]::IsNullOrWhiteSpace((Get-OwnedSonarContainer)) }
-            catch { [void]$failureMessages.Add('Could not verify whether this audit started the owned SonarQube server; it was left untouched.') }
-        }
-        if ($serverStartAttempted -and ($serverStartedByCommand -or $serverAdoptedLeftover) -and -not $KeepServerRunning -and $worktrees.Count -gt 0) {
-            $serverScript = Join-Path $worktrees[0].path 'Scripts/Quality/SonarQubeServer.ps1'
+        if ($stopServerAfterAudit) {
             Invoke-ServerAction -Script $serverScript -Parameters @{ Stop = $true }
-            if ($batch) { $batch.server.stoppedByCommand = $true }
-            Remove-Item -LiteralPath $serverLeasePath -Force -ErrorAction SilentlyContinue
+            $batch.server.stoppedByCommand = $true
+            [IO.File]::Delete($context.ServerLeasePath)
         }
     }
     catch {
         $stopError = ConvertTo-AuditSafeMessage -Text $_.Exception.Message
-        [void]$failureMessages.Add("Owned server stop failed: $stopError")
+        [void]$failureMessages.Add("Owned stack cleanup failed: $stopError")
     }
 
     if ($batch) {
