@@ -769,6 +769,28 @@ function Wait-QualityServer {
     throw "SonarQube did not become ready within $TimeoutSeconds seconds; last status was '$lastStatus'."
 }
 
+<#
+.SYNOPSIS
+Decides whether a Full audit owns the repository's SonarQube server and must stop it when it finishes.
+.DESCRIPTION
+A finally block cannot run when an audit is killed, so an audit that starts the server first writes a lease file.
+The next audit holds the audit lock, so a running server with a lease was left by an audit that died: it adopts that
+server and stops it. A server started by hand, or kept with -KeepServerRunning, has no lease and is never stopped.
+#>
+function Resolve-QualityServerOwnership {
+    param(
+        [Parameter(Mandatory)][bool]$WasRunning,
+        [Parameter(Mandatory)][bool]$LeasePresent,
+        [Parameter(Mandatory)][bool]$KeepRequested
+    )
+    $adopted = $WasRunning -and $LeasePresent
+    return [pscustomobject]@{
+        AdoptedLeftover = $adopted
+        WriteLease = (-not $KeepRequested) -and ((-not $WasRunning) -or $adopted)
+        RemoveLease = $KeepRequested -and $LeasePresent
+    }
+}
+
 Export-ModuleMember -Function @(
     'Get-QualityToolVersions', 'ConvertTo-RepositoryIdentity', 'Get-QualityRepositoryIdentity',
     'Get-QualityBaseDirectory', 'Get-QualitySettingsDocument', 'Get-QualityPrivateSettings',
@@ -778,5 +800,5 @@ Export-ModuleMember -Function @(
     'Test-QualityPathWithinRoot', 'Assert-QualitySafeChildPath', 'Remove-QualityScannerState',
     'Get-QualitySecretPath', 'Set-QualitySecret', 'Get-QualitySecret', 'Test-QualitySecret',
     'Remove-QualitySecret', 'New-QualityPassword', 'New-QualityAuthHeader', 'Get-QualityTokenProjectKey', 'Invoke-QualityApi',
-    'Wait-QualityServer'
+    'Wait-QualityServer', 'Resolve-QualityServerOwnership'
 )

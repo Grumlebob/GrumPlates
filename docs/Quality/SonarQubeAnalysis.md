@@ -30,7 +30,7 @@ For pre-merge analysis, commit the candidate, ensure the checkout is clean, then
 pwsh -NoProfile -File Scripts/Quality/Invoke-CodeQualityAudit.ps1 -Candidate
 ```
 
-Use `-KeepServerRunning` to leave the owned dashboard available after Full mode. Without it, the wrapper stops the stack only if that invocation started it. A stack that was already running stays up.
+Use `-KeepServerRunning` to leave the owned dashboard available after Full mode. Without it, the wrapper stops the stack if that invocation started it, or if an earlier Full audit started it and was killed before it could stop it ([server lease](SonarQubeMaintenance.md#memory-and-leftover-servers)). A stack started by hand, or kept with `-KeepServerRunning`, stays up.
 
 ## Server controls
 

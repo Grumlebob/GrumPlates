@@ -34,6 +34,20 @@ Assert-Equal (Get-QualityTokenProjectKey -Token ([pscustomobject]@{ projectKey =
 Assert-Equal (Get-QualityTokenProjectKey -Token ([pscustomobject]@{ project = [pscustomobject]@{ key = 'current-project-key'; name = 'Current project' } })) 'current-project-key' 'current token project key'
 Assert-Equal (Get-QualityTokenProjectKey -Token ([pscustomobject]@{ project = $null })) $null 'missing token project key'
 
+# Server ownership: a lease marks a server an audit started, so a killed audit's server is adopted and stopped later.
+$fresh = Resolve-QualityServerOwnership -WasRunning $false -LeasePresent $false -KeepRequested $false
+Assert-Equal "$($fresh.AdoptedLeftover)/$($fresh.WriteLease)/$($fresh.RemoveLease)" 'False/True/False' 'fresh start writes a lease'
+$leftover = Resolve-QualityServerOwnership -WasRunning $true -LeasePresent $true -KeepRequested $false
+Assert-Equal "$($leftover.AdoptedLeftover)/$($leftover.WriteLease)/$($leftover.RemoveLease)" 'True/True/False' 'killed audit server is adopted'
+$manual = Resolve-QualityServerOwnership -WasRunning $true -LeasePresent $false -KeepRequested $false
+Assert-Equal "$($manual.AdoptedLeftover)/$($manual.WriteLease)/$($manual.RemoveLease)" 'False/False/False' 'manually started server is left alone'
+$kept = Resolve-QualityServerOwnership -WasRunning $true -LeasePresent $true -KeepRequested $true
+Assert-Equal "$($kept.AdoptedLeftover)/$($kept.WriteLease)/$($kept.RemoveLease)" 'True/False/True' 'keep request hands the server to the owner'
+$keptFresh = Resolve-QualityServerOwnership -WasRunning $false -LeasePresent $false -KeepRequested $true
+Assert-Equal "$($keptFresh.WriteLease)/$($keptFresh.RemoveLease)" 'False/False' 'kept fresh server has no lease'
+$stale = Resolve-QualityServerOwnership -WasRunning $false -LeasePresent $true -KeepRequested $false
+Assert-Equal "$($stale.AdoptedLeftover)/$($stale.WriteLease)" 'False/True' 'stale lease without a server is replaced'
+
 $tempRoot = Join-Path ([IO.Path]::GetTempPath()) "quality-module-$([guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 try {
