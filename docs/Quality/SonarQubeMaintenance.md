@@ -70,6 +70,15 @@ finally {
 
 Before a file-level volume backup, stop the owned stack. To upgrade, review SonarQube release notes, change the pinned image in a pull request, create and verify a backup, stop the stack, then start it with `SonarQubeServer.ps1 -Start`. Follow any migration prompt in the loopback UI. Never remove volumes or prune Docker resources during an upgrade. Keep a verified backup until the new version starts and its history is readable. Pinned server, database, MCP, scanner, analyzer, and Node versions live in [`Scripts/Quality/tool-versions.json`](../../Scripts/Quality/tool-versions.json).
 
+## Memory and leftover servers
+
+A running stack holds about 3 GB, and its limits are 4 GB for SonarQube and 512 MB for the database. On a developer PC shared by builds, gates and Docker, the usual cause of low memory is a stack nobody stopped, or WSL page cache, not a leak in SonarQube.
+
+- **Leftover servers.** Before a Full audit starts the stack, it writes `server-lease.json` in the private base directory, and it removes the file after stopping the stack. If the audit is killed, its `finally` block never runs, so the stack and the lease stay. The next Full audit holds the audit lock, so it knows the lease's owner is gone. It adopts the stack and stops it when it finishes, and `summary.json` records `server.adoptedLeftover`. A stack started with `-Start`, or kept with `-KeepServerRunning`, has no lease and is never stopped.
+- **Check and stop.** `SonarQubeServer.ps1 -Status` shows this repository's stack. `docker ps --filter name=sonarqube` shows the stacks of every repository on the PC, because each one has its own. When no audit holds the lock, stop an idle stack with `SonarQubeServer.ps1 -Stop` from that repository. The volumes and history stay.
+- **Run long audits detached.** A Full audit takes long enough that a supervising tool may end its shell under memory pressure. Start it as its own process, for example `Start-Process pwsh -ArgumentList '-NoProfile','-File','Scripts/Quality/Invoke-CodeQualityAudit.ps1' -RedirectStandardOutput <log> -RedirectStandardError <log>.err -WindowStyle Hidden`, and follow the log.
+- **WSL page cache.** Docker Desktop runs in the shared WSL VM. Without `autoMemoryReclaim`, the VM keeps its file cache and does not give it back to Windows. To reclaim it once, run `wsl -d <distro> -u root -- sh -c 'sync; echo 1 > /proc/sys/vm/drop_caches'`. The machine-level setting is in `%USERPROFILE%\.wslconfig` and takes effect after `wsl --shutdown`, which stops every distro, Docker Desktop and any CI runner in WSL.
+
 ## Validate maintenance changes
 
 Run the offline checks from the repository root. They do not contact a SonarQube server:

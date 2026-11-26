@@ -44,7 +44,10 @@ $worktrees = [Collections.Generic.List[object]]::new()
 $archiveVerified = $false
 $serverWasRunning = $false
 $serverStartedByCommand = $false
+$serverAdoptedLeftover = $false
 $serverStartAttempted = $false
+# Present while an audit owns the server it started; see Resolve-QualityServerOwnership.
+$serverLeasePath = Join-Path $context.BaseDirectory 'server-lease.json'
 $failureMessages = [Collections.Generic.List[string]]::new()
 
 function Invoke-AuditGit {
@@ -367,7 +370,7 @@ try {
         settingsDigest = $context.SettingsDigest
         settings = $context.SettingsSnapshot
         toolVersions = $null
-        server = [ordered]@{ wasRunning = $false; startedByCommand = $false; stoppedByCommand = $false; keepRequested = [bool]$KeepServerRunning }
+        server = [ordered]@{ wasRunning = $false; startedByCommand = $false; adoptedLeftover = $false; stoppedByCommand = $false; keepRequested = [bool]$KeepServerRunning }
         worktreeCleanup = 'pending'
         archiveVerified = $false
         outputs = [ordered]@{ run = $runId; archive = $null }
@@ -396,6 +399,13 @@ try {
     $serverScript = Join-Path $sourceRoot 'Scripts/Quality/SonarQubeServer.ps1'
     $beforeContainer = Get-OwnedSonarContainer
     $batch.server.wasRunning = -not [string]::IsNullOrWhiteSpace($beforeContainer)
+    $ownership = Resolve-QualityServerOwnership -WasRunning $batch.server.wasRunning `
+        -LeasePresent (Test-Path -LiteralPath $serverLeasePath) -KeepRequested ([bool]$KeepServerRunning)
+    $serverAdoptedLeftover = $ownership.AdoptedLeftover
+    $batch.server.adoptedLeftover = $serverAdoptedLeftover
+    # Written before the start, so an audit killed during startup still leaves its lease for the next one.
+    if ($ownership.WriteLease) { Write-AuditJson -Path $serverLeasePath -Value ([ordered]@{ runId = $runId; writtenUtc = [DateTime]::UtcNow.ToString('o') }) }
+    if ($ownership.RemoveLease) { Remove-Item -LiteralPath $serverLeasePath -Force }
     $serverStartAttempted = $true
     Invoke-ServerAction -Script $serverScript -Parameters @{ Start = $true; Initialize = $true }
     $afterContainer = Get-OwnedSonarContainer
@@ -489,10 +499,11 @@ finally {
             try { $serverStartedByCommand = -not [string]::IsNullOrWhiteSpace((Get-OwnedSonarContainer)) }
             catch { [void]$failureMessages.Add('Could not verify whether this audit started the owned SonarQube server; it was left untouched.') }
         }
-        if ($serverStartAttempted -and $serverStartedByCommand -and -not $KeepServerRunning -and $worktrees.Count -gt 0) {
+        if ($serverStartAttempted -and ($serverStartedByCommand -or $serverAdoptedLeftover) -and -not $KeepServerRunning -and $worktrees.Count -gt 0) {
             $serverScript = Join-Path $worktrees[0].path 'Scripts/Quality/SonarQubeServer.ps1'
             Invoke-ServerAction -Script $serverScript -Parameters @{ Stop = $true }
             if ($batch) { $batch.server.stoppedByCommand = $true }
+            Remove-Item -LiteralPath $serverLeasePath -Force -ErrorAction SilentlyContinue
         }
     }
     catch {
