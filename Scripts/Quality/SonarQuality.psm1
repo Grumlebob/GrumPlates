@@ -357,6 +357,7 @@ function Get-QualityContext {
         ReportsDirectory = Join-Path $baseDirectory 'reports'
         RunsDirectory = Join-Path $baseDirectory 'runs'
         LockPath = Join-Path $baseDirectory 'audit.lock'
+        ServerLeasePath = Join-Path $baseDirectory 'server-lease.json'
         HostPort = $hostPort
         BaseUrl = $baseUrl
         ComposePath = Join-Path $repo 'Scripts/Quality/SonarQube/compose.yaml'
@@ -773,9 +774,8 @@ function Wait-QualityServer {
 .SYNOPSIS
 Decides whether a Full audit owns the repository's SonarQube server and must stop it when it finishes.
 .DESCRIPTION
-A finally block cannot run when an audit is killed, so an audit that starts the server first writes a lease file.
-The next audit holds the audit lock, so a running server with a lease was left by an audit that died: it adopts that
-server and stops it. A server started by hand, or kept with -KeepServerRunning, has no lease and is never stopped.
+An audit writes a lease before starting a stopped stack. The next audit can adopt a running stack with a lease
+while holding the same lock. Explicit server controls and -KeepServerRunning clear the lease when taking ownership.
 #>
 function Resolve-QualityServerOwnership {
     param(
@@ -783,10 +783,9 @@ function Resolve-QualityServerOwnership {
         [Parameter(Mandatory)][bool]$LeasePresent,
         [Parameter(Mandatory)][bool]$KeepRequested
     )
-    $adopted = $WasRunning -and $LeasePresent
     return [pscustomobject]@{
-        AdoptedLeftover = $adopted
-        WriteLease = (-not $KeepRequested) -and ((-not $WasRunning) -or $adopted)
+        AdoptedLeftover = -not $KeepRequested -and $WasRunning -and $LeasePresent
+        WriteLease = -not $KeepRequested -and -not $WasRunning
         RemoveLease = $KeepRequested -and $LeasePresent
     }
 }

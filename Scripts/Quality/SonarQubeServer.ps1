@@ -610,10 +610,11 @@ try {
     New-Item -ItemType Directory -Force -Path $Context.BaseDirectory | Out-Null
     if ($Start) {
         Test-QualityDockerLinux
-        $port = Resolve-QualityHostPort -Context $Context
+        $null = Resolve-QualityHostPort -Context $Context
         Save-QualityPrivateSettings -Context $Context
         $databasePassword = Ensure-QualityDatabasePassword
         Assert-QualityPortOwnership -DatabasePassword $databasePassword
+        if ($standalone) { [IO.File]::Delete($Context.ServerLeasePath) }
         $null = Invoke-QualityCompose -Arguments @('up', '-d') -DatabasePassword $databasePassword -StepName 'compose-up'
         Wait-QualityServer -Context $Context -TimeoutSeconds 600
         Write-Host "SonarQube is ready at $($Context.BaseUrl)."
@@ -638,6 +639,7 @@ try {
     elseif ($Stop) {
         $databasePassword = Get-QualitySecret -Context $Context -Name 'database-password' -Optional
         $null = Invoke-QualityCompose -Arguments @('stop') -DatabasePassword $databasePassword -StepName 'compose-stop'
+        if ($standalone) { [IO.File]::Delete($Context.ServerLeasePath) }
         Write-Host 'Owned SonarQube services stopped. Named history volumes remain in place.'
     }
     elseif ($Status) {

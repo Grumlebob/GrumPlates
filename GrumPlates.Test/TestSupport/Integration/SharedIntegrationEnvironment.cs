@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
+using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 
 namespace GrumPlates.Test.TestSupport.Integration;
@@ -39,8 +40,12 @@ public sealed class SharedIntegrationEnvironment : IAsyncLifetime
 
     public string PostgresContainerId => _dbContainer.Id;
 
-    public string RedisConnectionString =>
-        $"127.0.0.1:{_redisContainer.GetMappedPublicPort(RedisPort)},password={_redisPassword},abortConnect=false";
+    public string RedisConnectionString => new ConfigurationOptions
+    {
+        EndPoints = { { _redisContainer.Hostname, _redisContainer.GetMappedPublicPort(RedisPort) } },
+        Password = _redisPassword,
+        AbortOnConnectFail = false
+    }.ToString(includePassword: true);
 
     public async ValueTask InitializeAsync()
     {
